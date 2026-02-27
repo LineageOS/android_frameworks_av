@@ -45,6 +45,7 @@ using content::AttributionSourceState;
 struct audio_track_cblk_t;
 class AudioTrackClientProxy;
 class StaticAudioTrackClientProxy;
+class AudioTrackMmap;
 
 // ----------------------------------------------------------------------------
 
@@ -97,6 +98,7 @@ public:
     class Buffer
     {
     friend AudioTrack;
+    friend AudioTrackMmap;
     public:
        size_t size() const { return mSize; }
        size_t getFrameCount() const { return frameCount; }
@@ -151,6 +153,7 @@ public:
 
     class IAudioTrackCallback : public virtual RefBase {
       friend AudioTrack;
+      friend AudioTrackMmap;
       protected:
        /* Request to write more data to buffer.
         * This event only occurs for TRANSFER_CALLBACK.
@@ -476,12 +479,12 @@ public:
      * This includes the latency due to AudioTrack buffer size, AudioMixer (if any)
      * and audio hardware driver.
      */
-            uint32_t    latency();
+            virtual uint32_t    latency();
 
     /* Returns the number of application-level buffer underruns
      * since the AudioTrack was created.
      */
-            uint32_t    getUnderrunCount() const;
+            virtual uint32_t    getUnderrunCount() const;
 
     /* getters, see constructors and set() */
 
@@ -509,7 +512,7 @@ public:
     /* Return effective size of audio buffer that an application writes to
      * or a negative error if the track is uninitialized.
      */
-            ssize_t     getBufferSizeInFrames();
+            virtual ssize_t     getBufferSizeInFrames();
 
     /* Returns the buffer duration in microseconds at current playback rate.
      */
@@ -523,7 +526,7 @@ public:
      *
      * A static AudioTrack returns 0.
      */
-    int64_t getWrittenFramesCount() const;
+    virtual int64_t getWrittenFramesCount() const;
 
     /* Set the effective size of audio buffer that an application writes to.
      * This is used to determine the amount of available room in the buffer,
@@ -536,12 +539,12 @@ public:
      *
      * Return the final size or a negative value (NO_INIT) if the track is uninitialized.
      */
-            ssize_t     setBufferSizeInFrames(size_t size);
+            virtual ssize_t     setBufferSizeInFrames(size_t size);
 
     /* Returns the start threshold on the buffer for audio streaming
      * or a negative value if the AudioTrack is not initialized.
      */
-            ssize_t     getStartThresholdInFrames() const;
+            virtual ssize_t     getStartThresholdInFrames() const;
 
     /* Sets the start threshold in frames on the buffer for audio streaming.
      *
@@ -549,7 +552,7 @@ public:
      * value if the AudioTrack is not initialized or if the input
      * is zero or greater than INT_MAX.
      */
-            ssize_t     setStartThresholdInFrames(size_t startThresholdInFrames);
+            virtual ssize_t     setStartThresholdInFrames(size_t startThresholdInFrames);
 
     /* Return the static buffer specified in constructor or set(), or 0 for streaming mode */
             sp<IMemory> sharedBuffer() const { return mSharedBuffer; }
@@ -576,7 +579,7 @@ public:
      * make it active. If set, the callback will start being called.
      * If the track was previously paused, volume is ramped up over the first mix buffer.
      */
-            status_t        start();
+            virtual status_t        start();
 
     /* Stop a track.
      * In static buffer mode, the track is stopped immediately.
@@ -585,7 +588,7 @@ public:
      * In streaming mode the stop does not occur immediately: any data remaining in the buffer
      * is first drained, mixed, and output, and only then is the track marked as stopped.
      */
-            void        stop();
+            virtual void        stop();
             bool        stopped() const;
 
     /* Call stop() and then wait for all of the callbacks to return.
@@ -599,14 +602,14 @@ public:
      * This is not thread safe and should only be called from one thread,
      * ideally as the AudioTrack is being closed.
      */
-            void        stopAndJoinCallbacks();
+            virtual void        stopAndJoinCallbacks();
 
     /* Flush a stopped or paused track. All previously buffered data is discarded immediately.
      * This has the effect of draining the buffers without mixing or output.
      * Flush is intended for streaming mode, for example before switching to non-contiguous content.
      * This function is a no-op if the track is not stopped or paused, or uses a static buffer.
      */
-            void        flush();
+            virtual void        flush();
 
     /* Pause a track. After pause, the callback will cease being called and
      * obtainBuffer returns WOULD_BLOCK. Note that obtainBuffer() still works
@@ -614,7 +617,7 @@ public:
      * Volume is ramped down over the next mix buffer following the pause request,
      * and then the track is marked as paused.  It can be resumed with ramp up by start().
      */
-            void        pause();
+            virtual void        pause();
 
     /* Pause and wait (with timeout) for the audio track to ramp to silence.
      *
@@ -628,28 +631,28 @@ public:
      * left and right volumes. Levels must be >= 0.0 and <= 1.0.
      * This is the older API.  New applications should use setVolume(float) when possible.
      */
-            status_t    setVolume(float left, float right);
+            virtual status_t    setVolume(float left, float right);
 
     /* Set volume for all channels.  This is the preferred API for new applications,
      * especially for multi-channel content.
      */
-            status_t    setVolume(float volume);
+            virtual status_t    setVolume(float volume);
 
     /* Set the send level for this track. An auxiliary effect should be attached
      * to the track with attachEffect(). Level must be >= 0.0 and <= 1.0.
      */
-            status_t    setAuxEffectSendLevel(float level);
+            virtual status_t    setAuxEffectSendLevel(float level);
             void        getAuxEffectSendLevel(float* level) const;
 
     /* Set source sample rate for this track in Hz, mostly used for games' sound effects.
      * Zero is not permitted.
      */
-            status_t    setSampleRate(uint32_t sampleRate);
+            virtual status_t    setSampleRate(uint32_t sampleRate);
 
     /* Return current source sample rate in Hz.
      * If specified as zero in constructor or set(), this will be the sink sample rate.
      */
-            uint32_t    getSampleRate() const;
+            virtual uint32_t    getSampleRate() const;
 
     /* Return the original source sample rate in Hz. This corresponds to the sample rate
      * if playback rate had normal speed and pitch.
@@ -666,16 +669,16 @@ public:
             audio_format_t    getHalFormat() const;
 
     /* Sets the Dual Mono mode presentation on the output device. */
-            status_t    setDualMonoMode(audio_dual_mono_mode_t mode);
+            virtual status_t    setDualMonoMode(audio_dual_mono_mode_t mode);
 
     /* Returns the Dual Mono mode presentation setting. */
-            status_t    getDualMonoMode(audio_dual_mono_mode_t* mode) const;
+            virtual status_t    getDualMonoMode(audio_dual_mono_mode_t* mode) const;
 
     /* Sets the Audio Description Mix level in dB. */
-            status_t    setAudioDescriptionMixLevel(float leveldB);
+            virtual status_t    setAudioDescriptionMixLevel(float leveldB);
 
     /* Returns the Audio Description Mix level in dB. */
-            status_t    getAudioDescriptionMixLevel(float* leveldB) const;
+            virtual status_t    getAudioDescriptionMixLevel(float* leveldB) const;
 
     /* Set source playback rate for timestretch
      * 1.0 is normal speed: < 1.0 is slower, > 1.0 is faster
@@ -687,10 +690,10 @@ public:
      * Speed increases the playback rate of media, but does not alter pitch.
      * Pitch increases the "tonal frequency" of media, but does not affect the playback rate.
      */
-            status_t    setPlaybackRate(const AudioPlaybackRate &playbackRate);
+            virtual status_t    setPlaybackRate(const AudioPlaybackRate &playbackRate);
 
     /* Return current playback rate */
-            const AudioPlaybackRate& getPlaybackRate();
+            virtual const AudioPlaybackRate& getPlaybackRate();
 
     /* Enables looping and sets the start and end points of looping.
      * Only supported for static buffer mode.
@@ -709,7 +712,7 @@ public:
      * setLoop() will return BAD_VALUE.  loopCount must be >= -1.
      *
      */
-            status_t    setLoop(uint32_t loopStart, uint32_t loopEnd, int loopCount);
+            virtual status_t    setLoop(uint32_t loopStart, uint32_t loopEnd, int loopCount);
 
     /* Sets marker position. When playback reaches the number of frames specified, a callback with
      * event type EVENT_MARKER is called. Calling setMarkerPosition with marker == 0 cancels marker
@@ -727,8 +730,8 @@ public:
      *  - NO_ERROR: successful operation
      *  - INVALID_OPERATION: the AudioTrack has no callback installed.
      */
-            status_t    setMarkerPosition(uint32_t marker);
-            status_t    getMarkerPosition(uint32_t *marker) const;
+            virtual status_t    setMarkerPosition(uint32_t marker);
+            virtual status_t    getMarkerPosition(uint32_t *marker) const;
 
     /* Sets position update period. Every time the number of frames specified has been played,
      * a callback with event type EVENT_NEW_POS is called.
@@ -746,8 +749,8 @@ public:
      *  - NO_ERROR: successful operation
      *  - INVALID_OPERATION: the AudioTrack has no callback installed.
      */
-            status_t    setPositionUpdatePeriod(uint32_t updatePeriod);
-            status_t    getPositionUpdatePeriod(uint32_t *updatePeriod) const;
+            virtual status_t    setPositionUpdatePeriod(uint32_t updatePeriod);
+            virtual status_t    getPositionUpdatePeriod(uint32_t *updatePeriod) const;
 
     /* Sets playback head position.
      * Only supported for static buffer mode.
@@ -764,7 +767,7 @@ public:
      *  - BAD_VALUE: The specified position is beyond the number of frames present in AudioTrack
      *               buffer
      */
-            status_t    setPosition(uint32_t position);
+            virtual status_t    setPosition(uint32_t position);
 
     /* Return the total number of frames played since playback start.
      * The counter will wrap (overflow) periodically, e.g. every ~27 hours at 44.1 kHz.
@@ -778,7 +781,7 @@ public:
      *  - NO_ERROR: successful operation
      *  - BAD_VALUE:  position is NULL
      */
-            status_t    getPosition(uint32_t *position);
+            virtual status_t    getPosition(uint32_t *position);
 
     /* For static buffer mode only, this returns the current playback position in frames
      * relative to start of buffer.  It is analogous to the position units used by
@@ -795,7 +798,7 @@ public:
      *  - NO_ERROR: successful operation
      *  - INVALID_OPERATION: the AudioTrack is not stopped or paused, or is streaming mode.
      */
-            status_t    reload();
+            virtual status_t    reload();
 
     /**
      * @param transferType
@@ -824,7 +827,7 @@ public:
      *  - NO_ERROR: successful operation
      *    TODO: what else can happen here?
      */
-            status_t    setOutputDevice(audio_port_handle_t deviceId);
+            virtual status_t    setOutputDevice(audio_port_handle_t deviceId);
 
     /* Returns the ID of the audio device selected for this AudioTrack.
      * A value of AUDIO_PORT_HANDLE_NONE indicates default (AudioPolicyManager) routing.
@@ -845,7 +848,7 @@ public:
       * Parameters:
       *  none.
       */
-     DeviceIdVector getRoutedDeviceIds();
+     virtual DeviceIdVector getRoutedDeviceIds();
 
     /* Returns the unique session ID associated with this track.
      *
@@ -869,7 +872,7 @@ public:
      *  - INVALID_OPERATION: the effect is not an auxiliary effect.
      *  - BAD_VALUE: The specified effect ID is invalid
      */
-            status_t    attachAuxEffect(int effectId);
+            virtual status_t    attachAuxEffect(int effectId);
 
     /* Public API for TRANSFER_OBTAIN mode.
      * Obtains a buffer of up to "audioBuffer->frameCount" empty slots for frames.
@@ -961,7 +964,7 @@ public:
      * false for the method to return immediately without waiting to try multiple times to write
      * the full content of the buffer.
      */
-            ssize_t     write(const void* buffer, size_t size, bool blocking = true);
+            virtual ssize_t     write(const void* buffer, size_t size, bool blocking = true);
 
     /*
      * Dumps the state of an audio track.
@@ -973,24 +976,24 @@ public:
      * Return the total number of frames which AudioFlinger desired but were unavailable,
      * and thus which resulted in an underrun.  Reset to zero by stop().
      */
-            uint32_t    getUnderrunFrames() const;
+            virtual uint32_t    getUnderrunFrames() const;
 
     /* Get the flags */
-            audio_output_flags_t getFlags() const { AutoMutex _l(mLock); return mFlags; }
+            virtual audio_output_flags_t getFlags() const { AutoMutex _l(mLock); return mFlags; }
 
     /* Set parameters - only possible when using direct output */
-            status_t    setParameters(const String8& keyValuePairs);
+            virtual status_t    setParameters(const String8& keyValuePairs);
 
     /* Sets the volume shaper object */
-            media::VolumeShaper::Status applyVolumeShaper(
+            virtual media::VolumeShaper::Status applyVolumeShaper(
                     const sp<media::VolumeShaper::Configuration>& configuration,
                     const sp<media::VolumeShaper::Operation>& operation);
 
     /* Gets the volume shaper state */
-            sp<media::VolumeShaper::State> getVolumeShaperState(int id);
+            virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id);
 
     /* Selects the presentation (if available) */
-            status_t    selectPresentation(int presentationId, int programId);
+            virtual status_t    selectPresentation(int presentationId, int programId);
 
     /* Get parameters */
             String8     getParameters(const String8& keys);
@@ -1017,7 +1020,7 @@ public:
      *
      * The timestamp parameter is undefined on return, if status is not NO_ERROR.
      */
-            status_t    getTimestamp(AudioTimestamp& timestamp);
+            virtual status_t    getTimestamp(AudioTimestamp& timestamp);
 private:
             status_t    getTimestamp_l(AudioTimestamp& timestamp);
 public:
@@ -1207,13 +1210,13 @@ public:
             //      NS_INACTIVE inactive so don't run again until re-started
             //      NS_NEVER    never again
             static const nsecs_t NS_WHENEVER = -1, NS_INACTIVE = -2, NS_NEVER = -3;
-            nsecs_t processAudioBuffer();
+            virtual nsecs_t processAudioBuffer();
 
             // caller must hold lock on mLock for all _l methods
 
             void updateLatency_l(); // updates mAfLatency and mLatency from AudioSystem cache
 
-            status_t createTrack_l();
+            virtual status_t createTrack_l();
 
             // can only be called when mState != STATE_ACTIVE
             void flush_l();
@@ -1494,6 +1497,8 @@ public:
 
     sp<media::VolumeHandler>       mVolumeHandler;
 
+    wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
+
 private:
     class DeathNotifier : public IBinder::DeathRecipient {
     public:
@@ -1507,8 +1512,6 @@ private:
     sp<DeathNotifier>       mDeathNotifier;
     uint32_t                mSequence;              // incremented for each new IAudioTrack attempt
     AttributionSourceState mClientAttributionSource;
-
-    wp<AudioSystem::AudioDeviceCallback> mDeviceCallback;
 
     // Cached values to restore along with the AudioTrack.
     audio_dual_mono_mode_t mDualMonoMode = AUDIO_DUAL_MONO_MODE_OFF;
