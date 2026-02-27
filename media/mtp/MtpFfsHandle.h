@@ -55,11 +55,15 @@ protected:
     void doSendEvent(mtp_event me);
     bool openEndpoints(bool ptp);
 
+    void setClosed(bool closed);
+
     static int getPacketSize(int ffs_fd);
 
     bool mCanceled;
     bool mBatchCancel;
+    bool mClosed = true;
 
+    std::mutex mChildThreadsLock;
     std::vector<std::thread> mChildThreads;
 
     android::base::unique_fd mControl;

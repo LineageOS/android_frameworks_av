@@ -31,6 +31,8 @@ cc_test {
         "libbase",
         "libmtp",
         "liblog",
+        "server_configurable_flags",
+        "android.hardware.usb.flags-aconfig-cc-lib",
     ],
     cflags: [
         "-Wall",
