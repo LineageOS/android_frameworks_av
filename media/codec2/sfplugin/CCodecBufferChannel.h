@@ -112,6 +112,9 @@ public:
     void pollForRenderedBuffers() override;
     void onBufferReleasedFromOutputSurface(uint32_t generation) override;
     void onBufferAttachedToOutputSurface(uint32_t generation) override;
+    void onBufferDetachedFromOutputSurface(uint32_t generation, uint64_t bufferId) override;
+    void onBuffersRemovedFromOutputSurface(uint32_t generation,
+                                           const std::vector<uint64_t>& bufferIds) override;
     status_t discardBuffer(const sp<MediaCodecBuffer> &buffer) override;
     void getInputBufferArray(Vector<sp<MediaCodecBuffer>> *array) override;
     void getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *array) override;

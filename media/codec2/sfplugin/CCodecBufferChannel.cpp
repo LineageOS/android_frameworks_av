@@ -202,23 +202,24 @@ std::shared_ptr<C2Info> generateC2EncryptionInfo(CryptoPlugin::Mode mode,
 
 class SurfaceCallbackHandler {
 public:
-    enum callback_type_t {
-        ON_BUFFER_RELEASED = 0,
-        ON_BUFFER_ATTACHED
-    };
+  enum callback_type_t {
+      ON_BUFFER_RELEASED = 0,
+      ON_BUFFER_ATTACHED,
+      ON_BUFFER_DETACHED,
+      ON_BUFFERS_REMOVED,
+  };
 
-    void post(callback_type_t callback,
-            std::shared_ptr<Codec2Client::Component> component,
-            uint32_t generation) {
-        if (!component) {
-            ALOGW("surface callback psoted for invalid component");
-        }
-        std::shared_ptr<SurfaceCallbackItem> item =
-                std::make_shared<SurfaceCallbackItem>(callback, component, generation);
-        std::unique_lock<std::mutex> lock(mMutex);
-        mItems.emplace_back(std::move(item));
-        mCv.notify_one();
-    }
+  void post(callback_type_t callback, std::shared_ptr<Codec2Client::Component> component,
+            uint32_t generation, const std::vector<uint64_t>& removedBufferIds = {}) {
+      if (!component) {
+          ALOGW("surface callback psoted for invalid component");
+      }
+      std::shared_ptr<SurfaceCallbackItem> item = std::make_shared<SurfaceCallbackItem>(
+              callback, component, generation, removedBufferIds);
+      std::unique_lock<std::mutex> lock(mMutex);
+      mItems.emplace_back(std::move(item));
+      mCv.notify_one();
+  }
 
     ~SurfaceCallbackHandler() {
         {
@@ -241,12 +242,14 @@ private:
         callback_type_t mCallback;
         std::weak_ptr<Codec2Client::Component> mComp;
         uint32_t mGeneration;
+        std::vector<uint64_t> mRemovedBufferIds;
 
-        SurfaceCallbackItem(
-                callback_type_t callback,
-                std::shared_ptr<Codec2Client::Component> comp,
-                uint32_t generation)
-                : mCallback(callback), mComp(comp), mGeneration(generation) {}
+        SurfaceCallbackItem(callback_type_t callback, std::shared_ptr<Codec2Client::Component> comp,
+                            uint32_t generation, const std::vector<uint64_t>& removedBufferIds)
+            : mCallback(callback),
+              mComp(comp),
+              mGeneration(generation),
+              mRemovedBufferIds(removedBufferIds) {}
     };
 
     SurfaceCallbackHandler() { mThread = std::thread(&SurfaceCallbackHandler::run, this); }
@@ -281,6 +284,22 @@ private:
                     std::shared_ptr<Codec2Client::Component> comp = item->mComp.lock();
                     if (comp) {
                         comp->onBufferAttachedToOutputSurface(item->mGeneration);
+                    }
+                    break;
+                }
+                case ON_BUFFER_DETACHED: {
+                    std::shared_ptr<Codec2Client::Component> comp = item->mComp.lock();
+                    if (comp) {
+                        comp->onBufferDetachedFromOutputSurface(item->mGeneration,
+                                                                item->mRemovedBufferIds[0]);
+                    }
+                    break;
+                }
+                case ON_BUFFERS_REMOVED: {
+                    std::shared_ptr<Codec2Client::Component> comp = item->mComp.lock();
+                    if (comp) {
+                        comp->onBuffersRemovedFromOutputSurface(item->mGeneration,
+                                                                item->mRemovedBufferIds);
                     }
                     break;
                 }
@@ -1877,6 +1896,32 @@ void CCodecBufferChannel::onBufferAttachedToOutputSurface(uint32_t generation) {
     if (comp) {
       SurfaceCallbackHandler::GetInstance().post(
                 SurfaceCallbackHandler::ON_BUFFER_ATTACHED, comp, generation);
+    }
+}
+
+void CCodecBufferChannel::onBufferDetachedFromOutputSurface(uint32_t generation,
+                                                            uint64_t bufferId) {
+    // Note: Since this is called asynchronously from IProducerListener not
+    // knowing the internal state of CCodec/CCodecBufferChannel,
+    // prevent mComponent from being destroyed by holding the shared reference
+    // during this interface being executed.
+    std::shared_ptr<Codec2Client::Component> comp = std::atomic_load(&mComponent);
+    if (comp) {
+        SurfaceCallbackHandler::GetInstance().post(SurfaceCallbackHandler::ON_BUFFER_DETACHED, comp,
+                                                   generation, {bufferId});
+    }
+}
+
+void CCodecBufferChannel::onBuffersRemovedFromOutputSurface(
+        uint32_t generation, const std::vector<uint64_t>& bufferIds) {
+    // Note: Since this is called asynchronously from IProducerListener not
+    // knowing the internal state of CCodec/CCodecBufferChannel,
+    // prevent mComponent from being destroyed by holding the shared reference
+    // during this interface being executed.
+    std::shared_ptr<Codec2Client::Component> comp = std::atomic_load(&mComponent);
+    if (comp) {
+        SurfaceCallbackHandler::GetInstance().post(SurfaceCallbackHandler::ON_BUFFERS_REMOVED, comp,
+                                                   generation, bufferIds);
     }
 }
 
