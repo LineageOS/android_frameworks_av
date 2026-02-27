@@ -159,30 +159,48 @@ class MmapStreamInterface : public virtual RefBase
     virtual status_t getObservablePosition(uint64_t* position, int64_t* timeNanos);
 
     /**
-     * Start a stream operating in mmap mode.
-     * createMmapBuffer() must be called before calling start()
+     * Create a track for the client.
      *
-     * \param[in] client a AudioClient struct describing the client starting on this stream.
+     * \param[in] client a AudioClient struct describing the client.
      * \param[in] attr audio attributes provided by the client.
-     * \param[out] handle unique handle for this instance. Used with stop().
+     * \param[out] portId allocated port id for the track. Used for start() and stop()
+     * \param[out] ioHandle IO handle of the thread.
      * \return OK in case of success.
-     *         NO_INIT in case of initialization error
-     *         INVALID_OPERATION if called out of sequence
      */
-    virtual status_t start(const AudioClient& client,
-                           const audio_attributes_t* attr, // nullable
-                           audio_port_handle_t* handle);
+    virtual status_t createTrack(const AudioClient& client,
+                                 const audio_attributes_t& attr,
+                                 audio_port_handle_t* portId,
+                                 audio_io_handle_t* ioHandle);
 
     /**
-     * Stop a stream operating in mmap mode.
-     * Must be called after start()
+     * Start a track operating in mmap mode.
+     * createMmapBuffer() must be called before calling start()
      *
-     * \param[in] handle unique handle allocated by start().
+     * \param[in] portId unique port id allocated by createTrack().
      * \return OK in case of success.
      *         NO_INIT in case of initialization error
      *         INVALID_OPERATION if called out of sequence
      */
-    virtual status_t stop(audio_port_handle_t handle);
+    virtual status_t startTrack(audio_port_handle_t portId);
+
+    /**
+     * Stop a track operating in mmap mode.
+     * Must be called after start()
+     *
+     * \param[in] portId unique port id allocated by createTrack().
+     * \return OK in case of success.
+     *         NO_INIT in case of initialization error
+     *         INVALID_OPERATION if called out of sequence
+     */
+    virtual status_t stopTrack(audio_port_handle_t portId);
+
+    /**
+     * Release a track from the mmap stream.
+     *
+     * \param[in] portId unique port id allocated by createTrack().
+     * \return OK in case of success.
+     */
+    virtual status_t releaseTrack(audio_port_handle_t portId);
 
     /**
      * Put a stream operating in mmap mode into standby.

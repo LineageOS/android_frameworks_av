@@ -53,18 +53,23 @@ public:
     void close() override EXCLUDES(mMmapStreamLock);
 
     aaudio_result_t startStream(android::sp<AAudioServiceStreamBase> stream,
-                                audio_port_handle_t *clientHandle) override
+                                audio_port_handle_t clientHandle) override
                                 EXCLUDES(mMmapStreamLock);
 
     aaudio_result_t stopStream(android::sp<AAudioServiceStreamBase> stream,
                                audio_port_handle_t clientHandle) override;
 
-    aaudio_result_t startClient(const android::AudioClient& client,
-                                const audio_attributes_t *attr,
-                                audio_port_handle_t *clientHandle)  override
-                                EXCLUDES(mMmapStreamLock);
+    aaudio_result_t createClient(const android::AudioClient& client,
+                                 const audio_attributes_t& attr,
+                                 audio_port_handle_t* clientHandle,
+                                 audio_io_handle_t* ioHandle) final
+                                 EXCLUDES(mMmapStreamLock);
 
-    aaudio_result_t stopClient(audio_port_handle_t clientHandle)  override
+    aaudio_result_t startClient(audio_port_handle_t clientHandle) final EXCLUDES(mMmapStreamLock);
+
+    aaudio_result_t stopClient(audio_port_handle_t clientHandle) final EXCLUDES(mMmapStreamLock);
+
+    aaudio_result_t releaseClient(audio_port_handle_t clientHandle) final
             EXCLUDES(mMmapStreamLock);
 
     void releaseClientWhenWakeUp(audio_port_handle_t clientHandle) final EXCLUDES(mLockStreams);

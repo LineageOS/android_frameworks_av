@@ -88,7 +88,7 @@ AAudioServiceStreamBase::~AAudioServiceStreamBase() {
 
 std::string AAudioServiceStreamBase::dumpHeader() {
     return {"    T   Handle   UId   Port Run State   Format   Burst Chan Mask     Capacity"
-            " HwFormat HwChan HwRate"};
+            " HwFormat HwChan HwRate IoHandle"};
 }
 
 std::string AAudioServiceStreamBase::dump() const {
@@ -108,6 +108,7 @@ std::string AAudioServiceStreamBase::dump() const {
     result << std::setw(9) << "0x" << std::hex << getHardwareFormat() << std::dec;
     result << std::setw(7) << getHardwareSamplesPerFrame();
     result << std::setw(7) << getHardwareSampleRate();
+    result << std::setw(8) << mIoHandle;
 
     return result.str();
 }
@@ -186,6 +187,15 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
         mClientCallback = request.getCallback();
     }
 
+    if (!request.isInService()) {
+        auto attr = AAudioServiceEndpoint::getAudioAttributesFrom(
+                &request.getConstantConfiguration());
+        result = mServiceEndpoint->createClient(mMmapClient, attr, &mClientHandle, &mIoHandle);
+        if (result != AAUDIO_OK) {
+            goto error;
+        }
+    }
+
     // Make sure this object does not get deleted before the run() method
     // can protect it by making a strong pointer.
     mCommandQueue.startWaiting();
@@ -237,12 +247,12 @@ aaudio_result_t AAudioServiceStreamBase::close_l(bool shouldDeferClose) {
                  "%s, close the stream when requesting defer as the endpoint is gone", __func__);
         // This will stop the stream, just in case it was not already stopped.
         stop_l();
+        releaseClient_l(mClientHandle);
         return closeAndClear();
     }
 }
 
 aaudio_result_t AAudioServiceStreamBase::startDevice_l() {
-    mClientHandle = AUDIO_PORT_HANDLE_NONE;
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
         ALOGE("%s() has no endpoint", __func__);
@@ -252,7 +262,7 @@ aaudio_result_t AAudioServiceStreamBase::startDevice_l() {
         ALOGE("%s() endpoint was already disconnected", __func__);
         return AAUDIO_ERROR_DISCONNECTED;
     }
-    return endpoint->startStream(this, &mClientHandle);
+    return endpoint->startStream(this, mClientHandle);
 }
 
 /**
@@ -299,7 +309,6 @@ aaudio_result_t AAudioServiceStreamBase::start_l() {
     // Start with fresh presentation timestamps.
     mAtomicStreamTimestamp.clear();
 
-    mClientHandle = AUDIO_PORT_HANDLE_NONE;
     result = startDevice_l();
     if (result != AAUDIO_OK) goto error;
 
@@ -752,17 +761,28 @@ void AAudioServiceStreamBase::run() {
                     command->result = param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
                                                        : exitStandby_l(param->mParcelable);
                 } break;
-                case START_CLIENT: {
-                    auto param = (StartClientParam *) command->parameter.get();
+                case CREATE_CLIENT: {
+                    auto param = (CreateClientParam *) command->parameter.get();
                     command->result = param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
-                                                       : startClient_l(param->mClient,
-                                                                       param->mAttr,
-                                                                       param->mClientHandle);
+                                                       : createClient_l(param->mClient,
+                                                                        param->mAttr,
+                                                                        param->mClientHandle,
+                                                                        param->mIoHandle);
+                } break;
+                case START_CLIENT: {
+                    auto param = (ClientOperationParam *) command->parameter.get();
+                    command->result = param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
+                                                       : startClient_l(param->mClientHandle);
                 } break;
                 case STOP_CLIENT: {
-                    auto param = (StopClientParam *) command->parameter.get();
+                    auto param = (ClientOperationParam *) command->parameter.get();
                     command->result = param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
                                                        : stopClient_l(param->mClientHandle);
+                } break;
+                case RELEASE_CLIENT: {
+                    auto param = (ClientOperationParam *) command->parameter.get();
+                    command->result = param == nullptr ? AAUDIO_ERROR_ILLEGAL_ARGUMENT
+                                                       : releaseClient_l(param->mClientHandle);
                 } break;
                 case UPDATE_TIMESTAMP: {
                     command->result = sendCurrentTimestamp_l();
@@ -884,7 +904,34 @@ void AAudioServiceStreamBase::disconnect_l() {
 
         sendServiceEvent(AAUDIO_SERVICE_EVENT_DISCONNECTED);
         setDisconnected_l(true);
+        releaseClient_l(mClientHandle);
     }
+}
+
+aaudio_result_t AAudioServiceStreamBase::createClient_l(
+        const android::AudioClient& client,
+        const audio_attributes_t& attr,
+        audio_port_handle_t* clientHandle,
+        audio_io_handle_t* ioHandle) {
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    // Create the client on behalf of the application. Generate a new client handle.
+    // IoHandle will be set to the input/output thread that the client is attached to.
+    aaudio_result_t result = endpoint->createClient(client, attr, clientHandle, ioHandle);
+    return result;
+}
+
+aaudio_result_t AAudioServiceStreamBase::releaseClient_l(audio_port_handle_t clientHandle) {
+    sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
+    if (endpoint == nullptr) {
+        ALOGE("%s() has no endpoint", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    aaudio_result_t result = endpoint->releaseClient(clientHandle);
+    return result;
 }
 
 aaudio_result_t AAudioServiceStreamBase::registerAudioThread(pid_t clientThreadId, int priority) {
@@ -1073,21 +1120,23 @@ aaudio_result_t AAudioServiceStreamBase::exitStandby(AudioEndpointParcelable *pa
     return mCommandQueue.sendCommand(command);
 }
 
-aaudio_result_t AAudioServiceStreamBase::sendStartClientCommand(const android::AudioClient &client,
-                                                                const audio_attributes_t *attr,
-                                                                audio_port_handle_t *clientHandle) {
+aaudio_result_t AAudioServiceStreamBase::sendCreateClientCommand(const android::AudioClient& client,
+                                                                const audio_attributes_t& attr,
+                                                                audio_port_handle_t* clientHandle,
+                                                                audio_io_handle_t* ioHandle) {
     auto command = std::make_shared<AAudioCommand>(
-            START_CLIENT,
-            std::make_shared<StartClientParam>(client, attr, clientHandle),
+            CREATE_CLIENT,
+            std::make_shared<CreateClientParam>(client, attr, clientHandle, ioHandle),
             true /*waitForReply*/,
             TIMEOUT_NANOS);
     return mCommandQueue.sendCommand(command);
 }
 
-aaudio_result_t AAudioServiceStreamBase::sendStopClientCommand(audio_port_handle_t clientHandle) {
+aaudio_result_t AAudioServiceStreamBase::sendClientOperationCommand(
+        int opCode, audio_port_handle_t clientHandle) {
     auto command = std::make_shared<AAudioCommand>(
-            STOP_CLIENT,
-            std::make_shared<StopClientParam>(clientHandle),
+            opCode,
+            std::make_shared<ClientOperationParam>(clientHandle),
             true /*waitForReply*/,
             TIMEOUT_NANOS);
     return mCommandQueue.sendCommand(command);

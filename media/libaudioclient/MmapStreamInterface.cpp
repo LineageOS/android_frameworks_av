@@ -284,27 +284,39 @@ status_t MmapStreamInterface::getObservablePosition(uint64_t* position, int64_t*
     return NO_ERROR;
 }
 
-status_t MmapStreamInterface::start(
-        const AudioClient& client, const audio_attributes_t* attr, audio_port_handle_t *handle) {
+status_t MmapStreamInterface::createTrack(
+        const AudioClient& client, const audio_attributes_t& attr,
+        audio_port_handle_t* portId, audio_io_handle_t* ioHandle) {
     const auto aidlClient = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioClient_AudioClient(client));
-    ::std::optional<::android::media::audio::common::AudioAttributes> aidlAttr;
-    if (attr) {
-        aidlAttr = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_attributes_t_AudioAttributes(*attr));
-    }
-    const int32_t aidlPriorPortId =
-            VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(*handle));
-    int32_t portId;
-
+    android::media::audio::common::AudioAttributes aidlAttr =
+            VALUE_OR_RETURN_STATUS(legacy2aidl_audio_attributes_t_AudioAttributes(attr));
+    media::IMmapStream::MmapCreateTrackResponse response;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            mStream->start(aidlClient, aidlAttr, aidlPriorPortId, &portId)));
-    *handle = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_port_handle_t(portId));
+            mStream->createTrack(aidlClient, aidlAttr, &response)));
+    *portId = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_port_handle_t(response.portId));
+    *ioHandle = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_io_handle_t(response.ioHandle));
     return NO_ERROR;
 }
 
-status_t MmapStreamInterface::stop(audio_port_handle_t handle) {
-    const int32_t portId =
-            VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(handle));
-    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mStream->stop(portId)));
+status_t MmapStreamInterface::startTrack(audio_port_handle_t portId) {
+    const int32_t aidlPortId =
+            VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(portId));
+
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mStream->startTrack(aidlPortId)));
+    return NO_ERROR;
+}
+
+status_t MmapStreamInterface::stopTrack(audio_port_handle_t portId) {
+    const int32_t aidlPortId =
+            VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(portId));
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mStream->stopTrack(aidlPortId)));
+    return NO_ERROR;
+}
+
+status_t MmapStreamInterface::releaseTrack(audio_port_handle_t portId) {
+    const int32_t aidlPortId =
+            VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(portId));
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(mStream->releaseTrack(aidlPortId)));
     return NO_ERROR;
 }
 

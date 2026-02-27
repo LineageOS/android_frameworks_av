@@ -88,11 +88,16 @@ public:
     // Calculate timeout based on framesPerBurst
     int64_t calculateReasonableTimeout();
 
-    aaudio_result_t startClient(const android::AudioClient& client,
-                                const audio_attributes_t *attr,
-                                audio_port_handle_t *clientHandle);
+    aaudio_result_t createClient(const android::AudioClient& client,
+                                 const audio_attributes_t& attr,
+                                 audio_port_handle_t* clientHandle,
+                                 audio_io_handle_t* ioHandle);
+
+    aaudio_result_t startClient(audio_port_handle_t clientHandle);
 
     aaudio_result_t stopClient(audio_port_handle_t clientHandle);
+
+    aaudio_result_t releaseClient(audio_port_handle_t clientHandle);
 
     aaudio_handle_t getServiceHandle() const {
         return mServiceStreamHandleInfo.getHandle();

@@ -104,15 +104,26 @@ public:
     aaudio_result_t unregisterAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                           pid_t clientThreadId) override;
 
+    aaudio_result_t createClient(const AAudioHandleInfo& /*streamHandleInfo*/,
+                                 const android::AudioClient& /*client*/,
+                                 const audio_attributes_t& /*attr*/,
+                                 audio_port_handle_t* /*clientHandle*/,
+                                 audio_io_handle_t* /*ioHandle*/) override {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
     aaudio_result_t startClient(const AAudioHandleInfo& streamHandleInfo __unused,
-                                const android::AudioClient& client __unused,
-                                const audio_attributes_t *attr __unused,
-                                audio_port_handle_t *clientHandle __unused) override {
+                                audio_port_handle_t clientHandle __unused) override {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
     aaudio_result_t stopClient(const AAudioHandleInfo& streamHandleInfo __unused,
                                audio_port_handle_t clientHandle __unused)  override {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    aaudio_result_t releaseClient(const AAudioHandleInfo& /*streamHandleInfo*/,
+                                  audio_port_handle_t /*clientHandle*/) override {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
@@ -200,18 +211,33 @@ public:
         }
 
         // This should never be called (call is rejected at the AudioBinderClient level).
+        aaudio_result_t createClient(const AAudioHandleInfo& /*streamHandleInfo*/,
+                                     const android::AudioClient& /*client*/,
+                                     const audio_attributes_t& /*attr*/,
+                                     audio_port_handle_t* /*clientHandle*/,
+                                     audio_io_handle_t* /*ioHandle*/) override {
+            LOG_ALWAYS_FATAL("%s, shouldn't get here", __func__);
+            return AAUDIO_ERROR_UNAVAILABLE;
+        }
+
+        // This should never be called (call is rejected at the AudioBinderClient level).
         aaudio_result_t startClient(const AAudioHandleInfo& streamHandle __unused,
-                                    const android::AudioClient& client __unused,
-                                    const audio_attributes_t* attr __unused,
-                                    audio_port_handle_t* clientHandle __unused) override {
-            LOG_ALWAYS_FATAL("Shouldn't get here");
+                                    audio_port_handle_t clientHandle __unused) override {
+            LOG_ALWAYS_FATAL("%s, shouldn't get here", __func__);
             return AAUDIO_ERROR_UNAVAILABLE;
         }
 
         // This should never be called (call is rejected at the AudioBinderClient level).
         aaudio_result_t stopClient(const AAudioHandleInfo& streamHandle __unused,
                                    audio_port_handle_t clientHandle __unused) override {
-            LOG_ALWAYS_FATAL("Shouldn't get here");
+            LOG_ALWAYS_FATAL("%s, shouldn't get here", __func__);
+            return AAUDIO_ERROR_UNAVAILABLE;
+        }
+
+        // This should never be called (call is rejected at the AudioBinderClient level).
+        aaudio_result_t releaseClient(const AAudioHandleInfo& /*streamHandle*/,
+                                      audio_port_handle_t /*clientHandle*/) override {
+            LOG_ALWAYS_FATAL("%s, shouldn't get here", __func__);
             return AAUDIO_ERROR_UNAVAILABLE;
         }
 

@@ -341,20 +341,14 @@ bool AAudioServiceEndpointMMAP::close_l() { // requires mMmapStreamLock
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBase> stream,
-                                                   audio_port_handle_t *clientHandle __unused) {
+                                                       audio_port_handle_t /*clientHandle*/) {
     // Start the client on behalf of the AAudio service.
     // Use the port handle that was provided by openMmapStream().
-    audio_port_handle_t tempHandle = mPortHandle;
     audio_attributes_t attr = {};
     if (stream != nullptr) {
         attr = getAudioAttributesFrom(stream.get());
     }
-    const aaudio_result_t result = startClient(
-            mMmapClient, stream == nullptr ? nullptr : &attr, &tempHandle);
-    // When AudioFlinger is passed a valid port handle then it should not change it.
-    LOG_ALWAYS_FATAL_IF(tempHandle != mPortHandle,
-                        "%s() port handle not expected to change from %d to %d",
-                        __func__, mPortHandle, tempHandle);
+    const aaudio_result_t result = startClient(mPortHandle);
     ALOGV("%s() mPortHandle = %d", __func__, mPortHandle);
     if (result == AAUDIO_OK) {
         std::lock_guard _l(mMmapStreamLock);
@@ -378,9 +372,23 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase
     return result;
 }
 
-aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClient& client,
-                                                       const audio_attributes_t *attr,
-                                                       audio_port_handle_t *portHandlePtr) {
+aaudio_result_t AAudioServiceEndpointMMAP::createClient(const android::AudioClient& client,
+                                                        const audio_attributes_t& attr,
+                                                        audio_port_handle_t* clientHandle,
+                                                        audio_io_handle_t* ioHandle) {
+    const std::lock_guard<std::mutex> lock(mMmapStreamLock);
+    if (mMmapStream == nullptr) {
+        ALOGW("%s(): called after mMmapStream set to NULL", __func__);
+        return AAUDIO_ERROR_NULL;
+    } else if (!isConnected()) {
+        ALOGD("%s(): MMAP stream was disconnected", __func__);
+        return AAUDIO_ERROR_DISCONNECTED;
+    }
+    return AAudioConvert_androidToAAudioResult(
+            mMmapStream->createTrack(client, attr, clientHandle, ioHandle));
+}
+
+aaudio_result_t AAudioServiceEndpointMMAP::startClient(audio_port_handle_t clientHandle) {
     const std::lock_guard<std::mutex> lock(mMmapStreamLock);
     if (mMmapStream == nullptr) {
         ALOGW("%s(): called after mMmapStream set to NULL", __func__);
@@ -389,30 +397,41 @@ aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClien
         ALOGD("%s(): MMAP stream was disconnected", __func__);
         return AAUDIO_ERROR_DISCONNECTED;
     } else {
-        aaudio_result_t result = AAudioConvert_androidToAAudioResult(
-                mMmapStream->start(client, attr, portHandlePtr));
-        if (!isConnected() && (portHandlePtr != nullptr)) {
+        aaudio_result_t result =
+                AAudioConvert_androidToAAudioResult(mMmapStream->startTrack(clientHandle));
+        if (!isConnected()) {
             ALOGD("%s(): MMAP stream DISCONNECTED after starting port %d, will stop it",
-                  __func__, *portHandlePtr);
-            mMmapStream->stop(*portHandlePtr);
-            *portHandlePtr = AUDIO_PORT_HANDLE_NONE;
+                  __func__, clientHandle);
+            mMmapStream->stopTrack(clientHandle);
             result = AAUDIO_ERROR_DISCONNECTED;
         }
-        ALOGD("%s(): returning port %d, result %d", __func__,
-              (portHandlePtr == nullptr) ? -1 : *portHandlePtr, result);
+        ALOGD("%s(%d): returning result %d", __func__, clientHandle, result);
         return result;
     }
 }
 
-aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t portHandle) {
+aaudio_result_t AAudioServiceEndpointMMAP::stopClient(audio_port_handle_t clientHandle) {
     const std::lock_guard<std::mutex> lock(mMmapStreamLock);
     if (mMmapStream == nullptr) {
-        ALOGE("%s(%d): called after mMmapStream set to NULL", __func__, (int)portHandle);
+        ALOGE("%s(%d): called after mMmapStream set to NULL", __func__, clientHandle);
         return AAUDIO_ERROR_NULL;
     } else {
         aaudio_result_t result = AAudioConvert_androidToAAudioResult(
-                mMmapStream->stop(portHandle));
-        ALOGD("%s(%d): returning %d", __func__, (int)portHandle, result);
+                mMmapStream->stopTrack(clientHandle));
+        ALOGD("%s(%d): returning %d", __func__, clientHandle, result);
+        return result;
+    }
+}
+
+aaudio_result_t AAudioServiceEndpointMMAP::releaseClient(audio_port_handle_t clientHandle) {
+    const std::lock_guard<std::mutex> lock(mMmapStreamLock);
+    if (mMmapStream == nullptr) {
+        ALOGE("%s(%d): called after mMmapStream set to NULL", __func__, clientHandle);
+        return AAUDIO_ERROR_NULL;
+    } else {
+        aaudio_result_t result = AAudioConvert_androidToAAudioResult(
+                mMmapStream->releaseTrack(clientHandle));
+        ALOGD("%s(%d): returning %d", __func__, clientHandle, result);
         return result;
     }
 }
