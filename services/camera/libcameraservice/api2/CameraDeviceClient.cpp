@@ -991,6 +991,20 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
     return res;
 }
 
+void CameraDeviceClient::cleanUpStreamsLocked(
+        const std::vector<int32_t>& newOutputStreamIds, int32_t newInputStreamId) {
+    // delete the input stream, if present
+    if (newInputStreamId != CAMERA3_STREAM_ID_INVALID) {
+        ALOGV("%s: Cleaning up input stream id %d", __FUNCTION__, newInputStreamId);
+        deleteStreamLocked(newInputStreamId);
+    }
+    // delete output streams
+    for (const auto& streamId : newOutputStreamIds) {
+        ALOGV("%s: Cleaning up output stream id %d", __FUNCTION__, streamId);
+        deleteStreamLocked(streamId);
+    }
+}
+
 binder::Status CameraDeviceClient::configureStreams(
         const hardware::camera2::utils::SessionConfigurationAndStreamIds&
                 sessionConfigurationAndStreamIds,
@@ -1055,6 +1069,7 @@ binder::Status CameraDeviceClient::configureStreams(
                 outputConfiguration.getWidth(), outputConfiguration.getHeight(),
                 outputConfiguration.getFormat());
         if (!(res = createStreamLocked(outputConfiguration, &newStreamId)).isOk()) {
+            cleanUpStreamsLocked(newStreamIds, newInputStreamId);
             return res;
         }
         newStreamIds.push_back(newStreamId);
@@ -1065,6 +1080,7 @@ binder::Status CameraDeviceClient::configureStreams(
     if (!(res = endConfigureLocked(sessionConfigurationDelta.getOperatingMode(),
             sessionConfigurationDelta.getSessionParameters(),
             sessionConfigurationAndStreamIds.createSessionTime, &offlineStreamIds)).isOk()) {
+        cleanUpStreamsLocked(newStreamIds, newInputStreamId);
         return res;
     }
 
