@@ -20,10 +20,12 @@ cc_test_library {
         "NativeMuxer.cpp",
         "NativeEncoder.cpp",
         "NativeDecoder.cpp",
+        "NativeMemCopy.cpp",
     ],
 
     shared_libs: [
         "liblog",
+        "libandroid",
     ],
 
     static_libs: [
