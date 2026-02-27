@@ -52,6 +52,8 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
     mHardwareSampleRate   = other.mHardwareSampleRate;
     mHardwareAudioFormat  = other.mHardwareAudioFormat;
     mPerformanceMode      = other.mPerformanceMode;
+    mPortHandle           = other.mPortHandle;
+    mIoHandle             = other.mIoHandle;
 }
 
 static aaudio_result_t isFormatValid(audio_format_t format) {
@@ -363,4 +365,6 @@ void AAudioStreamParameters::dump() const {
     ALOGD("mHardwareSampleRate   = %6d", mHardwareSampleRate);
     ALOGD("mHardwareAudioFormat  = %6d", (int)mHardwareAudioFormat);
     ALOGD("mPerformanceMode      = %6d", (int)mPerformanceMode);
+    ALOGD("mPortHandle           = %6d", (int)mPortHandle);
+    ALOGD("mIoHandle             = %6d", (int)mIoHandle);
 }

@@ -418,6 +418,10 @@ public:
         mDeviceSamplesPerFrame = deviceSamplesPerFrame;
     }
 
+    audio_format_t getDeviceFormat() const {
+        return mDeviceFormat;
+    }
+
     virtual aaudio_result_t setOffloadDelayPadding(int32_t delayInFrames [[maybe_unused]],
                                                    int32_t paddingInFrames [[maybe_unused]]) {
         return AAUDIO_ERROR_UNIMPLEMENTED;
@@ -681,10 +685,6 @@ protected:
     // This should not be called after the open() call.
     void setDeviceFormat(audio_format_t format) {
         mDeviceFormat = format;
-    }
-
-    audio_format_t getDeviceFormat() const {
-        return mDeviceFormat;
     }
 
     void setState(aaudio_stream_state_t state);

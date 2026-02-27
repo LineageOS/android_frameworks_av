@@ -168,7 +168,7 @@ class DeprecatedCamera3StreamSplitter : public IConsumerListener {
         void onBufferReleased() override;
         bool needsReleaseNotify() override { return true; };
         void onBuffersDiscarded(const std::vector<sp<GraphicBuffer>>& /*buffers*/) override {};
-        void onBufferDetached(int /*slot*/) override {}
+        void onBufferDetached(uint64_t /*bufferId*/) override {}
 
         // From IBinder::DeathRecipient
         void binderDied(const wp<IBinder>& who) override;

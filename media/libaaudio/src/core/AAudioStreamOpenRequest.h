@@ -44,12 +44,20 @@ public:
         return mDataCallbackProc;
     }
 
+    void setPartialDataCallbackProcVoid(AAudioStream_partialDataCallback proc) {
+        mPartialDataCallbackProc = proc;
+    }
+
     AAudioStream_partialDataCallback getPartialDataCallbackProc() const {
         return mPartialDataCallbackProc;
     }
 
     bool isDataCallbackSet() const {
         return mDataCallbackProc != nullptr || mPartialDataCallbackProc != nullptr;
+    }
+
+    void setDataCallbackUserDataVoid(void *userData) {
+        mDataCallbackUserData = userData;
     }
 
     void* getDataCallbackUserData() const {
@@ -64,8 +72,16 @@ public:
         return mErrorCallbackUserData;
     }
 
+    void setPresentationEndCallbackProcVoid(AAudioStream_presentationEndCallback proc) {
+        mPresentationEndCallbackProc = proc;
+    }
+
     AAudioStream_presentationEndCallback getPresentationEndCallbackProc() const {
         return mPresentationEndCallbackProc;
+    }
+
+    void setPresentationEndCallbackUserDataVoid(void *userData) {
+        mPresentationEndCallbackUserData = userData;
     }
 
     void* getPresentationEndCallbackUserData() const {

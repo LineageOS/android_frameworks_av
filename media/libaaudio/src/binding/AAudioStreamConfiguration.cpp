@@ -89,6 +89,10 @@ AAudioStreamConfiguration::AAudioStreamConfiguration(const StreamParameters& par
 
     static_assert(sizeof(aaudio_performance_mode_t) == sizeof(parcelable.performanceMode));
     setPerformanceMode(parcelable.performanceMode);
+    static_assert(sizeof(audio_port_handle_t) == sizeof(parcelable.portHandle));
+    setPortHandle(parcelable.portHandle);
+    static_assert(sizeof(audio_io_handle_t) == sizeof(parcelable.ioHandle));
+    setIoHandle(parcelable.ioHandle);
 }
 
 AAudioStreamConfiguration&
@@ -158,5 +162,9 @@ StreamParameters AAudioStreamConfiguration::parcelable() const {
     }
     static_assert(sizeof(aaudio_performance_mode_t) == sizeof(result.performanceMode));
     result.performanceMode = getPerformanceMode();
+    static_assert(sizeof(audio_port_handle_t) == sizeof(result.portHandle));
+    result.portHandle = getPortHandle();
+    static_assert(sizeof(audio_io_handle_t) == sizeof(result.ioHandle));
+    result.ioHandle = getIoHandle();
     return result;
 }

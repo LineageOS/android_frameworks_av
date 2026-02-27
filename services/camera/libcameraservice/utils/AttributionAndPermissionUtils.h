@@ -170,6 +170,8 @@ class AttributionAndPermissionUtils {
             const AttributionSourceState& attributionSource);
     virtual bool hasPermissionsForOpenCloseListener(
             const AttributionSourceState& attributionSource);
+    virtual bool hasPermissionsForCameraWarmUp(
+            const AttributionSourceState& attributionSource);
 
     virtual void finishDataDelivery(const AttributionSourceState& attributionSource);
 
@@ -181,6 +183,7 @@ class AttributionAndPermissionUtils {
     static const std::string sCameraPrivacyAllowlistPermission;
     static const std::string sCameraSendSystemEventsPermission;
     static const std::string sCameraOpenCloseListenerPermission;
+    static const std::string sCameraWarmUpPermission;
     static const std::string sCameraInjectExternalCameraPermission;
 
   protected:
@@ -354,6 +357,12 @@ class AttributionAndPermissionUtilsEncapsulator {
     bool hasPermissionsForOpenCloseListener(int callingPid, int callingUid) const {
         auto attributionSource = buildAttributionSource(callingPid, callingUid);
         return mAttributionAndPermissionUtils->hasPermissionsForOpenCloseListener(
+                attributionSource);
+    }
+
+    bool hasPermissionsForCameraWarmUp(int callingPid, int callingUid) const {
+        auto attributionSource = buildAttributionSource(callingPid, callingUid);
+        return mAttributionAndPermissionUtils->hasPermissionsForCameraWarmUp(
                 attributionSource);
     }
 

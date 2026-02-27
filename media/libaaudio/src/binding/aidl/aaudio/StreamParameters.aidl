@@ -39,4 +39,6 @@ parcelable StreamParameters {
     int                                       hardwareSampleRate;  //   = AAUDIO_UNSPECIFIED;
     AudioFormatDescription                    hardwareAudioFormat;  //  = AUDIO_FORMAT_DEFAULT;
     int /* aaudio_performance_mode_t */       performanceMode; //       = AAUDIO_UNSPECIFIED;
+    int /* audio_port_handle_t */             portHandle; //            = AAUDIO_UNSPECIFIED;
+    int /* audio_io_handle_t */               ioHandle; //              = AAUDIO_UNSPECIFIED;
 }

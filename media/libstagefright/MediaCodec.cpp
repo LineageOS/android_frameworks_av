@@ -1011,7 +1011,7 @@ public:
     void onBuffersDiscarded([[maybe_unused]] const std::vector<sp<GraphicBuffer>>& buffers)
         override { }
 
-    void onBufferDetached([[maybe_unused]] int slot) override {
+    void onBufferDetached(uint64_t /*bufferId*/) override {
         notifyBufferReleased();
     }
 

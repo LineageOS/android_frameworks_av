@@ -102,6 +102,14 @@ public:
         return mServiceStreamHandleInfo.getServiceLifetimeId();
     }
 
+    audio_port_handle_t getPortId() const {
+        return mPortId;
+    }
+
+    audio_io_handle_t getIoHandle() const {
+        return mIoHandle;
+    }
+
     // AAudioClientCallback interfaces
     android::binder::Status onWakeUp(const android::media::TimerQueueHandle& handle) override;
 
@@ -257,6 +265,9 @@ private:
     int32_t                  mDeviceBufferSizeInFrames = 0;
     int32_t                  mBufferCapacityInFrames = 0;
     int32_t                  mDeviceBufferCapacityInFrames = 0;
+
+    audio_port_handle_t      mPortId = AUDIO_PORT_HANDLE_NONE;
+    audio_io_handle_t        mIoHandle = AUDIO_IO_HANDLE_NONE;
 
 };
 
