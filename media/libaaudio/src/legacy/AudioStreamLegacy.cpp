@@ -21,6 +21,7 @@
 
 // go/keep-sorted start
 #include <aaudio/AAudio.h>
+#include <android_media_audio.h>
 #include <audio_utils/primitives.h>
 #include <core/AudioStream.h>
 #include <media/AudioTimestamp.h>
@@ -282,7 +283,12 @@ void AudioStreamLegacy::onAudioDeviceUpdate(audio_io_handle_t /* audioIo */,
     ALOGD("%s() devices %s => %s",
             __func__, android::toString(oldDeviceIds).c_str(),
             android::toString(deviceIds).c_str());
-    if (!oldDeviceIds.empty()
+    if (android::areDeviceIdsEqual(oldDeviceIds, deviceIds)) {
+        ALOGD("%s, ignore device update as it is the same as the old one", __func__);
+        return;
+    }
+    if (!android_media_audio_partial_flush_for_pcm_offload()
+            && !oldDeviceIds.empty()
             && !android::areDeviceIdsEqual(oldDeviceIds, deviceIds)
             && !isDisconnected()
             ) {
