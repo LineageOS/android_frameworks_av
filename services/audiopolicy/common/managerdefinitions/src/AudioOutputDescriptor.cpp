@@ -92,6 +92,25 @@ void AudioOutputDescriptor::setStopTime(const sp<TrackClientDescriptor>& client,
     mRoutingActivities[client->strategy()].setStopTime(sysTime);
 }
 
+product_strategy_t AudioOutputDescriptor::getMostRecentStrategy(int inPastMs) const {
+    const auto res = std::max_element(mRoutingActivities.begin(), mRoutingActivities.end(),
+                                      [](const auto& a, const auto& b) {
+                                          if (a.second.isActive()) {
+                                              return false;
+                                          }
+                                          if (b.second.isActive()) {
+                                              return true;
+                                          }
+                                          return a.second.getStopTime() < b.second.getStopTime();
+                                      });
+
+    if (res != mRoutingActivities.end() && res->second.isActive(inPastMs)) {
+        return res->first;
+    } else {
+        return PRODUCT_STRATEGY_NONE;
+    }
+}
+
 void AudioOutputDescriptor::setClientActive(const sp<TrackClientDescriptor>& client, bool active)
 {
     auto clientIter = std::find(begin(mActiveClients), end(mActiveClients), client);

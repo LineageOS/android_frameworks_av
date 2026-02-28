@@ -8345,7 +8345,21 @@ DeviceVector AudioPolicyManager::getNewOutputDevices(const sp<SwAudioOutputDescr
             break;
         }
     }
-    ALOGV("%s selected devices %s", __func__, devices.toString().c_str());
+    if (devices.empty()) {
+        // Consider the selected route for the most recently active strategy. This ensures that, if
+        // we haven't yet moved to standby, but there are no recent clients, we still re-route that
+        // patch, which is important for cleaning stale SCO patches.
+        // 7000ms to encompass standby time.
+        const auto strat = outputDesc->getMostRecentStrategy(/* inPastMs */ 7000);
+
+        if (strat != PRODUCT_STRATEGY_NONE) {
+            devices = mEngine->getOutputDevicesForStrategy(strat, nullptr, fromCache);
+            ALOGI("%s io %d recent device override %s", __func__, outputDesc->mIoHandle,
+                  devices.toString().c_str());
+        }
+    }
+    ALOGV("%s io %d selected devices %s", __func__, outputDesc->mIoHandle,
+          devices.toString().c_str());
     return devices;
 }
 
@@ -8655,7 +8669,12 @@ uint32_t AudioPolicyManager::setOutputDevices(const char *caller,
     // no need to proceed if new device is not AUDIO_DEVICE_NONE and not routable to/from current
     // output profile or if new device is not routable AND previous device(s) is(are) still
     // available (otherwise reset device must be done on the output)
-    if (!devices.isEmpty() && filteredDevices.isEmpty() && !availPrevDevices.empty()) {
+    // SCO is an exception: we should never restore the previous route to SCO, since it has
+    // implications for the overall HAL state. In that case, we proceed and reset the route, similar
+    // to explicitly setting the device to NONE.
+    if (!devices.isEmpty() && filteredDevices.isEmpty() && !availPrevDevices.empty() &&
+        !std::any_of(availPrevDevices.begin(), availPrevDevices.end(),
+                     [](const auto& x) { return audio_is_bluetooth_out_sco_device(x->type()); })) {
         ALOGV("%s: %s unsupported device %s for output", __func__, logPrefix.c_str(),
               devices.toString().c_str());
         // restore previous device after evaluating strategy mute state
