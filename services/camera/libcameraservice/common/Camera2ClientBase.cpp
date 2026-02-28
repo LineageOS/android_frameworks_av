@@ -373,20 +373,28 @@ void Camera2ClientBase<TClientBase>::notifyPhysicalCameraChange(const std::strin
 
     auto physicalCameraMetadata = mDevice->infoPhysical(physicalId);
     auto orientationEntry = physicalCameraMetadata.find(ANDROID_SENSOR_ORIENTATION);
-
     if (orientationEntry.count == 1) {
+        int orientation = orientationEntry.data.i32[0];
         int rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_NONE;
         std::optional<ui::Rotation> rotateAndCropRotation = TClientBase::mCompatInfo
                 .getRotateAndCropRotation();
-        if (rotateAndCropRotation.has_value() && rotateAndCropRotation.value() == ui::ROTATION_90) {
-            rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_90;
-        } else if (rotateAndCropRotation.has_value() && rotateAndCropRotation.value() ==
-                ui::ROTATION_270) {
-            rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_270;
+        bool sensorOrientationLandscape = orientation == 0 || orientation == 180;
+        // Check for static orientation override.
+        // TODO(b/483776201): check sensor orientation before populating CameraCompatibilityInfo.
+        //  This discrepancy only happens with static rotate-and-crop
+        //  (camera.enable_landscape_to_portrait).
+        if (TClientBase::mCompatInfo.shouldOverrideSensorOrientation()
+                == sensorOrientationLandscape) {
+            if (rotateAndCropRotation.has_value() &&
+                rotateAndCropRotation.value() == ui::ROTATION_90) {
+                rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_90;
+            } else if (rotateAndCropRotation.has_value() && rotateAndCropRotation.value() ==
+                                                            ui::ROTATION_270) {
+                rotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_270;
+            }
         }
-
         static_cast<TClientBase *>(this)->setRotateAndCropOverride(rotateAndCropMode,
-                                                                   /*fromHal*/ true);
+                /*fromHal*/ true);
     }
 }
 

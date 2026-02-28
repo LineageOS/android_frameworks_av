@@ -535,9 +535,12 @@ void Component::initListener(const std::shared_ptr<Component>& self) {
         CHECK(mListener);
         mDeathRecipient = ::ndk::ScopedAIBinder_DeathRecipient(
                 AIBinder_DeathRecipient_new(OnBinderDied));
-        mDeathContext = new DeathContext{ref<Component>()};
-        AIBinder_DeathRecipient_setOnUnlinked(mDeathRecipient.get(), OnBinderUnlinked);
-        AIBinder_linkToDeath(mListener->asBinder().get(), mDeathRecipient.get(), mDeathContext);
+        {
+            std::lock_guard<std::mutex> lock(mDeathContextMutex);
+            mDeathContext = new DeathContext{ref<Component>()};
+            AIBinder_DeathRecipient_setOnUnlinked(mDeathRecipient.get(), OnBinderUnlinked);
+            AIBinder_linkToDeath(mListener->asBinder().get(), mDeathRecipient.get(), mDeathContext);
+        }
     } else {
         mInit = C2_NO_INIT;
     }
@@ -554,7 +557,13 @@ void Component::OnBinderDied(void *cookie) {
 
 // static
 void Component::OnBinderUnlinked(void *cookie) {
-    delete (DeathContext *)cookie;
+    DeathContext *context = (DeathContext *)cookie;
+    std::shared_ptr<Component> comp = context->mWeakComp.lock();
+    if (comp) {
+        std::lock_guard<std::mutex> lock(comp->mDeathContextMutex);
+        comp->mDeathContext = nullptr;
+    }
+    delete context;
 }
 
 Component::~Component() {
@@ -565,7 +574,19 @@ Component::~Component() {
     InputBufferManager::unregisterFrameData(mListener);
     mStore->reportComponentDeath(this);
     if (mDeathRecipient.get()) {
-        AIBinder_unlinkToDeath(mListener->asBinder().get(), mDeathRecipient.get(), mDeathContext);
+        DeathContext *context = nullptr;
+        {
+            // The context will be deleted at OnBinderUnlinked,
+            // even if the component no longer tracks it.
+            std::lock_guard<std::mutex> lock(mDeathContextMutex);
+            context = mDeathContext;
+            mDeathContext = nullptr;
+        }
+        if (context) {
+            AIBinder_unlinkToDeath(mListener->asBinder().get(),
+                                   mDeathRecipient.get(),
+                                   context);
+        }
     }
 }
 

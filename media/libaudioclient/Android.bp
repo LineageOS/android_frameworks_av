@@ -184,6 +184,7 @@ cc_library {
         "AudioEffect.cpp",
         "AudioRecord.cpp",
         "AudioTrack.cpp",
+        "AudioTrackMmap.cpp",
         "RecordingActivityTracker.cpp",
         "ToneGenerator.cpp",
         "TrackPlayerBase.cpp",
@@ -193,6 +194,10 @@ cc_library {
     ],
     shared_libs: [
         "com.android.media.audioclient-aconfig-cc",
+        "libaaudio_internal_core",
+        "libaaudio_internal_fifo",
+        "libaaudio_internal_mmap",
+        "libaaudio_internal_utils",
         "libaudiobase",
         "libdl",
         "libmedia_helper",
@@ -202,6 +207,7 @@ cc_library {
     export_shared_lib_headers: [
         "audioflinger-aidl-cpp",
         "framework-permission-aidl-cpp",
+        "libaaudio_internal_mmap",
         "libaudiobase",
         "libbinder",
         "libmediametrics",
