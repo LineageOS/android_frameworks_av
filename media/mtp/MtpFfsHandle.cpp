@@ -17,6 +17,7 @@
 #include <android-base/logging.h>
 #include <android-base/properties.h>
 #include <android_hardware_usb_flags.h>
+#include <algorithm>
 #include <asyncio/AsyncIO.h>
 #include <dirent.h>
 #include <errno.h>
@@ -309,17 +310,17 @@ int MtpFfsHandle::start(bool ptp) {
 
 void MtpFfsHandle::close() {
     if (android::hardware::usb::flags::mtp_ffs_handle_close_concurrency_fix()) {
-        std::vector<std::thread> threadsToJoin;
+        std::vector<std::future<void>> futuresToJoin;
         {
             std::lock_guard<std::mutex> lock(mChildThreadsLock);
             mClosed = true;
-            threadsToJoin = std::move(mChildThreads);
+            futuresToJoin = std::move(mChildFutures);
         }
 
         // Join all child threads before destruction
-        for (auto& thread : threadsToJoin) {
-            if (thread.joinable()) {
-                thread.join();
+        for (auto& f : futuresToJoin) {
+            if (f.valid()) {
+                f.wait();
             }
         }
     } else {
@@ -706,10 +707,33 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
 int MtpFfsHandle::sendEvent(mtp_event me) {
     // Mimic the behavior of f_mtp by sending the event async.
     // Events aren't critical to the connection, so we don't need to check the return value.
-    std::unique_lock<std::mutex> lock(mChildThreadsLock, std::defer_lock);
     if (android::hardware::usb::flags::mtp_ffs_handle_close_concurrency_fix()) {
-        lock.lock();
-        if (mClosed) return -1;
+        char *temp = new char[me.length];
+        memcpy(temp, me.data, me.length);
+        me.data = temp;
+
+        std::lock_guard<std::mutex> lock(mChildThreadsLock);
+        if (mClosed) {
+            delete[] temp;
+            return -1;
+        }
+
+        // Reap finished threads to prevent memory leaks
+        mChildFutures.erase(
+            std::remove_if(mChildFutures.begin(), mChildFutures.end(),
+                [](std::future<void>& f) {
+                    return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+                }),
+            mChildFutures.end()
+        );
+
+        auto t = std::async(std::launch::async, [this, me]() {
+            return this->doSendEvent(me);
+        });
+
+        // Store the thread object for later joining
+        mChildFutures.emplace_back(std::move(t));
+        return 0;
     }
 
     char *temp = new char[me.length];
