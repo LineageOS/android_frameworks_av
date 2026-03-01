@@ -180,15 +180,26 @@ class FuzzAAudioClient : public virtual RefBase, public AAudioServiceInterface {
     aaudio_result_t unregisterAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                           pid_t clientThreadId) override;
 
-    aaudio_result_t startClient(const AAudioHandleInfo& streamHandleInfo UNUSED_PARAM,
-                                const AudioClient &client UNUSED_PARAM,
-                                const audio_attributes_t *attr UNUSED_PARAM,
-                                audio_port_handle_t *clientHandle UNUSED_PARAM) override {
+    aaudio_result_t createClient(const AAudioHandleInfo& /*streamHandleInfo*/,
+                                 const android::AudioClient& /*client*/,
+                                 const audio_attributes_t& /*attr*/,
+                                 audio_port_handle_t* /*clientHandle*/,
+                                 audio_io_handle_t* /*ioHandle*/) override {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
-    aaudio_result_t stopClient(const AAudioHandleInfo& streamHandleInfo UNUSED_PARAM,
-                               audio_port_handle_t clientHandle UNUSED_PARAM) override {
+    aaudio_result_t startClient(const AAudioHandleInfo& /*streamHandleInfo*/,
+                                audio_port_handle_t /*clientHandle*/) {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    aaudio_result_t stopClient(const AAudioHandleInfo& /*streamHandleInfo*/,
+                               audio_port_handle_t /*clientHandle*/) {
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    aaudio_result_t releaseClient(const AAudioHandleInfo& /*streamHandleInfo*/,
+                                  audio_port_handle_t /*clientHandle*/) {
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 

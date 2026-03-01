@@ -98,13 +98,20 @@ public:
     virtual aaudio_result_t unregisterAudioThread(const AAudioHandleInfo& streamHandleInfo,
                                                   pid_t clientThreadId) = 0;
 
+    virtual aaudio_result_t createClient(const AAudioHandleInfo& streamHandleInfo,
+                                         const android::AudioClient& client,
+                                         const audio_attributes_t& attr,
+                                         audio_port_handle_t* clientHandle,
+                                         audio_io_handle_t* ioHandle) = 0;
+
     virtual aaudio_result_t startClient(const AAudioHandleInfo& streamHandleInfo,
-                                        const android::AudioClient& client,
-                                        const audio_attributes_t *attr,
-                                        audio_port_handle_t *clientHandle) = 0;
+                                        audio_port_handle_t clientHandle) = 0;
 
     virtual aaudio_result_t stopClient(const AAudioHandleInfo& streamHandleInfo,
                                        audio_port_handle_t clientHandle) = 0;
+
+    virtual aaudio_result_t releaseClient(const AAudioHandleInfo& streamHandleInfo,
+                                         audio_port_handle_t clientHandle) = 0;
 
     /**
      * Exit the standby mode.

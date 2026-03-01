@@ -47,10 +47,17 @@ public:
     void close() override;
 
     aaudio_result_t startStream(android::sp<AAudioServiceStreamBase> stream,
-                                audio_port_handle_t *clientHandle) override;
+                                audio_port_handle_t clientHandle) override;
 
     aaudio_result_t stopStream(android::sp<AAudioServiceStreamBase> stream,
                                audio_port_handle_t clientHandle) override;
+
+    aaudio_result_t createClient(const android::AudioClient& client,
+                                 const audio_attributes_t& attr,
+                                 audio_port_handle_t* clientHandle,
+                                 audio_io_handle_t* ioHandle) final;
+
+    aaudio_result_t releaseClient(audio_port_handle_t clientHandle) final;
 
     aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
 

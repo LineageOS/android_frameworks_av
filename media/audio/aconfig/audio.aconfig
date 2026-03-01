@@ -21,6 +21,13 @@ flag {
 }
 
 flag {
+    name: "audio_service_routing_cache_shared_memory"
+    namespace: "media_audio"
+    description: "Use shared memory routing cache between audioserver and AudioService"
+    bug: "487025671"
+}
+
+flag {
     name: "audio_stream_bt_sco_cleanup"
     namespace: "media_audio"
     description: "Remove any usages of AUDIO_STREAM_BLUETOOTH_SCO from the audioserver."

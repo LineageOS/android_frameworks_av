@@ -996,6 +996,20 @@ private:
         }
     }
 
+    void notifyBufferDetached(uint64_t bufferId) {
+        auto p = mBufferChannel.lock();
+        if (p) {
+            p->onBufferDetachedFromOutputSurface(mGeneration, bufferId);
+        }
+    }
+
+    void notifyBuffersRemoved(const std::vector<uint64_t>& bufferIds) {
+        auto p = mBufferChannel.lock();
+        if (p) {
+            p->onBuffersRemovedFromOutputSurface(mGeneration, bufferIds);
+        }
+    }
+
 public:
     explicit OnBufferReleasedListener(
             uint32_t generation,
@@ -1008,11 +1022,26 @@ public:
         notifyBufferReleased();
     }
 
-    void onBuffersDiscarded([[maybe_unused]] const std::vector<sp<GraphicBuffer>>& buffers)
-        override { }
+    void onBuffersDiscarded(const std::vector<sp<GraphicBuffer>>& buffers) override {
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
+        std::vector<uint64_t> bufferIds;
+        bufferIds.reserve(buffers.size());
+        for (const auto& buffer : buffers) {
+            bufferIds.push_back(buffer->getId());
+        }
+        notifyBuffersRemoved(bufferIds);
+#else
+        (void)buffers;
+#endif
+    }
 
-    void onBufferDetached(uint64_t /*bufferId*/) override {
+    void onBufferDetached(uint64_t bufferId) override {
+#if COM_ANDROID_GRAPHICS_LIBGUI_FLAGS(WB_MEDIA_MIGRATION)
+        notifyBufferDetached(bufferId);
+#else
+        (void)bufferId;
         notifyBufferReleased();
+#endif
     }
 
     bool needsReleaseNotify() override { return true; }

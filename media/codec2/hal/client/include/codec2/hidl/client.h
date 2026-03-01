@@ -521,6 +521,13 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
     void onBufferAttachedToOutputSurface(
             uint32_t generation);
 
+    // Notify a buffer is detached from output surface.
+    void onBufferDetachedFromOutputSurface(uint32_t generation, uint64_t bufferId);
+
+    // Notify buffers are removed from output surface.
+    void onBuffersRemovedFromOutputSurface(uint32_t generation,
+                                           const std::vector<uint64_t>& removedBufferIds);
+
     // When the client received \p workList and the blocks inside
     // \p workList are IGBA based graphic blocks, specify the owner
     // as the current IGBA for the future operations.

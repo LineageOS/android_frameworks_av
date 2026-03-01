@@ -143,14 +143,25 @@ public:
     aaudio_result_t getPlaybackParameters(
             android::media::audio::common::AudioPlaybackRate* rate) EXCLUDES(mLock);
 
-    virtual aaudio_result_t startClient(const android::AudioClient& client,
-                                        const audio_attributes_t *attr __unused,
-                                        audio_port_handle_t *clientHandle __unused) {
-        ALOGD("AAudioServiceStreamBase::startClient(%p, ...) AAUDIO_ERROR_UNAVAILABLE", &client);
+    virtual aaudio_result_t createClient(const android::AudioClient& client,
+                                         const audio_attributes_t& /*attr*/,
+                                         audio_port_handle_t* /*clientHandle*/,
+                                         audio_io_handle_t* /*ioHandle*/) {
+        ALOGD("AAudioServiceStreamBase::createClient(%p, ...) AAUDIO_ERROR_UNAVAILABLE", &client);
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
-    virtual aaudio_result_t stopClient(audio_port_handle_t clientHandle __unused) {
+    virtual aaudio_result_t startClient(audio_port_handle_t clientHandle) {
+        ALOGD("AAudioServiceStreamBase::startClient(%d) AAUDIO_ERROR_UNAVAILABLE", clientHandle);
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    virtual aaudio_result_t stopClient(audio_port_handle_t clientHandle) {
+        ALOGD("AAudioServiceStreamBase::stopClient(%d) AAUDIO_ERROR_UNAVAILABLE", clientHandle);
+        return AAUDIO_ERROR_UNAVAILABLE;
+    }
+
+    virtual aaudio_result_t releaseClient(audio_port_handle_t clientHandle) {
         ALOGD("AAudioServiceStreamBase::stopClient(%d) AAUDIO_ERROR_UNAVAILABLE", clientHandle);
         return AAUDIO_ERROR_UNAVAILABLE;
     }
@@ -351,11 +362,13 @@ protected:
 
     aaudio_result_t sendXRunCount(int32_t xRunCount);
 
-    aaudio_result_t sendStartClientCommand(const android::AudioClient& client,
-                                           const audio_attributes_t *attr,
-                                           audio_port_handle_t *clientHandle) EXCLUDES(mLock);
+    aaudio_result_t sendCreateClientCommand(const android::AudioClient& client,
+                                            const audio_attributes_t& attr,
+                                            audio_port_handle_t* clientHandle,
+                                            audio_io_handle_t* ioHandle) EXCLUDES(mLock);
 
-    aaudio_result_t sendStopClientCommand(audio_port_handle_t clientHandle) EXCLUDES(mLock);
+    aaudio_result_t sendClientOperationCommand(int opCode,
+                                               audio_port_handle_t clientHandle) EXCLUDES(mLock);
 
     /**
      * @param positionFrames
@@ -434,7 +447,6 @@ protected:
                    android::audio_utils::TimerQueue::handle_t* handle)
                 : AAudioCommandParam(), mWakeUpNanos(wakeUpNanos),
                   mDrainType(drainType), mHandle(handle) { }
-        ~DrainParam() override = default;
 
         int64_t mWakeUpNanos;
         DrainType mDrainType;
@@ -445,44 +457,46 @@ protected:
     public:
         explicit ActivateParam(android::audio_utils::TimerQueue::handle_t handle)
                 : AAudioCommandParam(), mHandle(handle) { }
-        ~ActivateParam() override = default;
 
         android::audio_utils::TimerQueue::handle_t mHandle;
     };
 
-    class StartClientParam : public AAudioCommandParam {
+    class CreateClientParam : public AAudioCommandParam {
     public:
-        StartClientParam(const android::AudioClient& client, const audio_attributes_t* attr,
-                         audio_port_handle_t* clientHandle)
-                : AAudioCommandParam(), mClient(client), mAttr(attr), mClientHandle(clientHandle) {
+        CreateClientParam(const android::AudioClient& client, const audio_attributes_t& attr,
+                          audio_port_handle_t* clientHandle, audio_io_handle_t* ioHandle)
+                : AAudioCommandParam(), mClient(client), mAttr(attr), mClientHandle(clientHandle),
+                  mIoHandle(ioHandle) {
         }
-        ~StartClientParam() override = default;
 
-        android::AudioClient mClient;
-        const audio_attributes_t* mAttr;
+        const android::AudioClient mClient;
+        const audio_attributes_t& mAttr;
         audio_port_handle_t* mClientHandle;
+        audio_io_handle_t* mIoHandle;
     };
-    virtual aaudio_result_t startClient_l(
+    aaudio_result_t createClient_l(
             const android::AudioClient& client,
-            const audio_attributes_t *attr __unused,
-            audio_port_handle_t *clientHandle __unused) REQUIRES(mLock) {
-        ALOGD("AAudioServiceStreamBase::startClient_l(%p, ...) AAUDIO_ERROR_UNAVAILABLE", &client);
-        return AAUDIO_ERROR_UNAVAILABLE;
-    }
+            const audio_attributes_t& attr,
+            audio_port_handle_t* clientHandle,
+            audio_io_handle_t* ioHandle) REQUIRES(mLock);
 
-    class StopClientParam : public AAudioCommandParam {
+    class ClientOperationParam : public AAudioCommandParam {
     public:
-        explicit StopClientParam(audio_port_handle_t clientHandle)
+        explicit ClientOperationParam(audio_port_handle_t clientHandle)
                 : AAudioCommandParam(), mClientHandle(clientHandle) {
         }
-        ~StopClientParam() override = default;
 
         audio_port_handle_t mClientHandle;
     };
+    virtual aaudio_result_t startClient_l(audio_port_handle_t clientHandle) REQUIRES(mLock) {
+            ALOGD("AAudioServiceStreamBase::stopClient(%d) AAUDIO_ERROR_UNAVAILABLE", clientHandle);
+            return AAUDIO_ERROR_UNAVAILABLE;
+    }
     virtual aaudio_result_t stopClient_l(audio_port_handle_t clientHandle) REQUIRES(mLock) {
         ALOGD("AAudioServiceStreamBase::stopClient(%d) AAUDIO_ERROR_UNAVAILABLE", clientHandle);
         return AAUDIO_ERROR_UNAVAILABLE;
     }
+    aaudio_result_t releaseClient_l(audio_port_handle_t clientHandle) REQUIRES(mLock);
 
     class SoundDoseChangedParam : public AAudioCommandParam {
     public:
@@ -521,8 +535,10 @@ protected:
         UNREGISTER_AUDIO_THREAD,
         GET_DESCRIPTION,
         EXIT_STANDBY,
+        CREATE_CLIENT,
         START_CLIENT,
         STOP_CLIENT,
+        RELEASE_CLIENT,
         UPDATE_TIMESTAMP,
         DRAIN,
         ACTIVATE,
