@@ -367,9 +367,9 @@ IIS_XHEAACENC_CONFIG_INSTANCE_HANDLE C2SoftXheAacEnc::setAudioParams() {
     }
 
     ALOGV("setting IIS_XHEAACENC_PARAMETER_LIVE_MODE");
-    // Use the user-generated live mode.
+    // Use the general live mode.
     if (IIS_XHEAACENC_NO_ERROR != IIS_xHEAACEnc_Config_AddParamValueInt(
-            config, IIS_XHEAACENC_PARAMETER_LIVE_MODE, 1)) {
+            config, IIS_XHEAACENC_PARAMETER_LIVE_MODE, 0)) {
         ALOGE("Failed to set xHE-AAC encoder config parameters");
         return nullptr;
     }
