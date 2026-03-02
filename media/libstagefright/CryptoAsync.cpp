@@ -290,12 +290,12 @@ void CryptoAsync::onMessageReceived(const sp<AMessage> & msg) {
         }
         return OK;
     };
-    sp<AMessage> thisMsg;
     uint32_t nextTask = kWhatDoNothing;
-    getCurrentAndNextTask(&thisMsg, nextTask);
     switch(msg->what()) {
         case kWhatDecrypt:
         {
+            sp<AMessage> thisMsg;
+            getCurrentAndNextTask(&thisMsg, nextTask);
             if (thisMsg != nullptr) {
                 int32_t action;
                 err = OK;
