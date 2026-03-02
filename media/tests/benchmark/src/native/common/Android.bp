@@ -89,6 +89,7 @@ cc_defaults {
 
     defaults: [
         "libcodec2-hidl-client-defaults",
+        "libcodec2-aidl-client-defaults",
         "libmediabenchmark_soft_sanitize_all-defaults",
     ],
 

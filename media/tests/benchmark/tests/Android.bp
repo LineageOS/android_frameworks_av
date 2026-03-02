@@ -105,6 +105,10 @@ cc_test {
 
     srcs: ["C2DecoderTest.cpp"],
 
+    shared_libs: [
+        "libbinder_ndk",
+    ],
+
     static_libs: [
         "libmediabenchmark_codec2_extractor",
         "libmediabenchmark_codec2_common",
@@ -120,6 +124,10 @@ cc_test {
     ],
 
     srcs: ["C2EncoderTest.cpp"],
+
+    shared_libs: [
+        "libbinder_ndk",
+    ],
 
     static_libs: [
         "libmediabenchmark_codec2_extractor",
