@@ -39,5 +39,7 @@ enum PermissionEnum {
     BLUETOOTH_CONNECT = 13,
     BYPASS_CONCURRENT_RECORD_AUDIO_RESTRICTION = 14,
     MODIFY_AUDIO_SETTINGS_PRIVILEGED = 15,
-    ENUM_SIZE = 16, // Not for actual usage, used by Java
+    SCHEDULE_EXACT_ALARM = 16,
+    USE_EXACT_ALARM = 17,
+    ENUM_SIZE = 18, // Not for actual usage, used by Java
 }

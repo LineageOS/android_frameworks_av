@@ -432,7 +432,8 @@ class AfPlaybackCommon : public virtual RefBase {
     // TODO: atomic necessary if underneath thread lock?
     std::atomic<mute_state_t> mMuteState;
 
-    const EnforcementLevel mEnforcementLevel;
+    EnforcementLevel mEnforcementLevel;
+    media::IAudioManagerNative::HardeningExemptionReason mExemptionReason;
 
     std::atomic<bool> mHasOpControlPartial {true};
     std::atomic<bool> mHasOpControlFull {true};
