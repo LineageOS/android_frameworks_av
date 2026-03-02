@@ -27,6 +27,7 @@
 #include <afutils/AudioWatchdog.h>
 #include <afutils/NBAIO_Tee.h>
 #include <audio_utils/Balance.h>
+#include <audio_utils/CommandThread.h>
 #include <audio_utils/SimpleLog.h>
 #include <datapath/ThreadMetrics.h>
 #include <fastpath/FastCapture.h>
@@ -529,6 +530,8 @@ public:
     void systemReady() final EXCLUDES_ThreadBase_Mutex;
 
     void broadcast_l() final REQUIRES(mutex());
+
+    void asyncBroadcast() final;
 
     bool isTimestampCorrectionEnabled_l() const override REQUIRES(mutex()) { return false; }
 
@@ -1044,6 +1047,15 @@ protected:
             final REQUIRES(mutex());
 
     void boostThreadPriority(const int priority);
+
+    // AsyncCommandThread is a singleton thread which operates independently
+    // of the ThreadBase Thread and is used to launch async commands
+    // which take the ThreadBase mutex from contexts where acquiring such mutex
+    // would cause deadlocks.
+    //
+    // Currently there is only one AsyncCommandThread shared among all
+    // Threads, so do not do compute heavy operations on it.
+    static audio_utils::CommandThread& getAsyncCommandThread();
 
     private:
     void dumpBase_l(int fd, const Vector<String16>& args) REQUIRES(mutex());

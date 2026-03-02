@@ -2053,6 +2053,25 @@ void ThreadBase::broadcast_l()
     mWaitWorkCV.notify_all();
 }
 
+// static
+audio_utils::CommandThread& ThreadBase::getAsyncCommandThread()
+{
+    [[clang::no_destroy]] static audio_utils::CommandThread commandThread{};
+    return commandThread;
+}
+
+void ThreadBase::asyncBroadcast()
+{
+    // Wake from a separate thread to avoid deadlock from the ThreadBase mutex.
+    getAsyncCommandThread().add(std::string("asyncBroadcast-").append(mThreadName),
+        [wpThis = wp<ThreadBase>::fromExisting(this)]() {
+            if (const auto thread = wpThis.promote()) {
+                audio_utils::lock_guard lg(thread->mutex());
+                thread->broadcast_l();
+            }
+        });
+}
+
 // Call only from threadLoop() or when it is idle.
 // Do not call from high performance code as this may do binder rpc to the MediaMetrics service.
 void ThreadBase::sendStatistics(bool force)

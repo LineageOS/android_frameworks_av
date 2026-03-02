@@ -358,6 +358,11 @@ public:
 
     virtual void broadcast_l() REQUIRES(mutex()) = 0;
 
+    // asyncBroadcast() signals the Thread asynchronously via a separate thread.
+    // It may be called without holding the ThreadBase mutex and is used to avoid
+    // deadlocks in complex call stacks.
+    virtual void asyncBroadcast() = 0;
+
     virtual bool isTimestampCorrectionEnabled_l() const REQUIRES(mutex()) = 0;
 
     virtual bool isMsdDevice() const = 0;
