@@ -4754,16 +4754,24 @@ status_t AudioPolicyManager::setDevicesRoleForStrategy(product_strategy_t strate
 
     checkForDeviceAndOutputChanges();
 
-    bool forceVolumeReeval = false;
-    // FIXME: workaround for truncated touch sounds
-    // to be removed when the problem is handled by system UI
-    uint32_t delayMs = 0;
-    if (strategy == mCommunnicationStrategy) {
-        forceVolumeReeval = true;
-        delayMs = TOUCH_SOUND_FIXED_DELAY_MS;
+    if (strategy == mCommunnicationStrategy &&
+            std::any_of(devices.begin(), devices.end(), [](const auto& x) {
+                return audio_is_bluetooth_out_sco_device(x.mType);
+                })) {
+        updateCallAndOutputRouting(/*forceVolumeReeval=*/ true, /*delayMs=*/ 0);
         updateInputRouting();
+    } else {
+        bool forceVolumeReeval = false;
+        // FIXME: workaround for truncated touch sounds
+        // to be removed when the problem is handled by system UI
+        uint32_t delayMs = 0;
+        if (strategy == mCommunnicationStrategy) {
+            forceVolumeReeval = true;
+            delayMs = TOUCH_SOUND_FIXED_DELAY_MS;
+            updateInputRouting();
+        }
+        updateCallAndOutputRouting(forceVolumeReeval, delayMs);
     }
-    updateCallAndOutputRouting(forceVolumeReeval, delayMs);
 
     return NO_ERROR;
 }
