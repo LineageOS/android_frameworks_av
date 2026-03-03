@@ -23,6 +23,7 @@
 #include <mutex>
 #include <sys/poll.h>
 #include <time.h>
+#include <future>
 #include <thread>
 #include <vector>
 
@@ -55,12 +56,17 @@ protected:
     void doSendEvent(mtp_event me);
     bool openEndpoints(bool ptp);
 
+    void setClosed(bool closed);
+
     static int getPacketSize(int ffs_fd);
 
     bool mCanceled;
     bool mBatchCancel;
+    bool mClosed = true;
 
+    std::mutex mChildThreadsLock;
     std::vector<std::thread> mChildThreads;
+    std::vector<std::future<void>> mChildFutures;
 
     android::base::unique_fd mControl;
     // "in" from the host's perspective => sink for mtp server

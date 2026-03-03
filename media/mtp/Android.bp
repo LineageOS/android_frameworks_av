@@ -68,6 +68,8 @@ cc_defaults {
         "libbase",
         "liblog",
         "libusbhost",
+        "server_configurable_flags",
+        "android.hardware.usb.flags-aconfig-cc-lib",
     ],
     header_libs: ["libcutils_headers"],
 }
