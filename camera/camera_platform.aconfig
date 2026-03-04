@@ -323,16 +323,6 @@ flag {
 
 flag {
     namespace: "camera_platform"
-    name: "reset_listener_after_adopt_shell_permission"
-    description: "Update listener permission after the app adopts shell permission"
-    bug: "456033877"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    namespace: "camera_platform"
     name: "output_configuration_get_usage"
     is_exported: true
     description: "Unhide the getUsage function in OutputConfiguration"

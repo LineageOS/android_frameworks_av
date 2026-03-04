@@ -16,6 +16,8 @@
 
 #include <android-base/logging.h>
 #include <android-base/properties.h>
+#include <android_hardware_usb_flags.h>
+#include <algorithm>
 #include <asyncio/AsyncIO.h>
 #include <dirent.h>
 #include <errno.h>
@@ -74,9 +76,19 @@ int MtpFfsHandle::getPacketSize(int ffs_fd) {
 MtpFfsHandle::MtpFfsHandle(int controlFd) {
     mControl.reset(controlFd);
     mBatchCancel = android::base::GetBoolProperty("sys.usb.mtp.batchcancel", false);
+    setClosed(true);
 }
 
-MtpFfsHandle::~MtpFfsHandle() {}
+MtpFfsHandle::~MtpFfsHandle() {
+    close();
+}
+
+void MtpFfsHandle::setClosed(bool closed) {
+    if (android::hardware::usb::flags::mtp_ffs_handle_close_concurrency_fix()) {
+        std::lock_guard<std::mutex> lock(mChildThreadsLock);
+        mClosed = closed;
+    }
+}
 
 void MtpFfsHandle::closeEndpoints() {
     mIntr.reset();
@@ -292,18 +304,38 @@ int MtpFfsHandle::start(bool ptp) {
     mPollFds[1].events = POLLIN;
 
     mCanceled = false;
+    setClosed(false);
     return 0;
 }
 
 void MtpFfsHandle::close() {
-    // Join all child threads before destruction
-    int count = mChildThreads.size();
-    for (int i = 0; i < count; i++) {
-        mChildThreads[i].join();
-    }
-    mChildThreads.clear();
+    if (android::hardware::usb::flags::mtp_ffs_handle_close_concurrency_fix()) {
+        std::vector<std::future<void>> futuresToJoin;
+        {
+            std::lock_guard<std::mutex> lock(mChildThreadsLock);
+            mClosed = true;
+            futuresToJoin = std::move(mChildFutures);
+        }
 
-    io_destroy(mCtx);
+        // Join all child threads before destruction
+        for (auto& f : futuresToJoin) {
+            if (f.valid()) {
+                f.wait();
+            }
+        }
+    } else {
+        // Join all child threads before destruction
+        int count = mChildThreads.size();
+        for (int i = 0; i < count; i++) {
+            mChildThreads[i].join();
+        }
+        mChildThreads.clear();
+    }
+
+    if (mCtx) {
+        io_destroy(mCtx);
+        mCtx = 0;
+    }
     closeEndpoints();
     closeConfig();
 }
@@ -675,6 +707,35 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
 int MtpFfsHandle::sendEvent(mtp_event me) {
     // Mimic the behavior of f_mtp by sending the event async.
     // Events aren't critical to the connection, so we don't need to check the return value.
+    if (android::hardware::usb::flags::mtp_ffs_handle_close_concurrency_fix()) {
+        char *temp = new char[me.length];
+        memcpy(temp, me.data, me.length);
+        me.data = temp;
+
+        std::lock_guard<std::mutex> lock(mChildThreadsLock);
+        if (mClosed) {
+            delete[] temp;
+            return -1;
+        }
+
+        // Reap finished threads to prevent memory leaks
+        mChildFutures.erase(
+            std::remove_if(mChildFutures.begin(), mChildFutures.end(),
+                [](std::future<void>& f) {
+                    return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+                }),
+            mChildFutures.end()
+        );
+
+        auto t = std::async(std::launch::async, [this, me]() {
+            return this->doSendEvent(me);
+        });
+
+        // Store the thread object for later joining
+        mChildFutures.emplace_back(std::move(t));
+        return 0;
+    }
+
     char *temp = new char[me.length];
     memcpy(temp, me.data, me.length);
     me.data = temp;

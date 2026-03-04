@@ -275,7 +275,7 @@ void requestStreamBuffers(RequestBufferStates& states,
                 } else {
                     ALOGE("%s: Can't get output buffer for stream %d: %s (%d)",
                             __FUNCTION__, streamId, strerror(-res), res);
-                    if (res == TIMED_OUT || res == NO_MEMORY) {
+                    if (res == TIMED_OUT || res == NO_MEMORY || res == WOULD_BLOCK) {
                         bufRet.val.set<Tag::error>(StreamBufferRequestError::NO_BUFFER_AVAILABLE);
                     } else if (res == INVALID_OPERATION) {
                         bufRet.val.set<Tag::error>(StreamBufferRequestError::MAX_BUFFER_EXCEEDED);

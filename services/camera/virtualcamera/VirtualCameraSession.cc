@@ -404,7 +404,8 @@ ndk::ScopedAStatus VirtualCameraSession::close() {
         mRenderThread = nullptr;
       }
 
-      if (mVirtualCameraClientCallback != nullptr) {
+      if (mVirtualCameraClientCallback != nullptr &&
+          mCurrentInputStreamId != kInvalidStreamId) {
         ALOGV("Calling onStreamClosed for %d", mCurrentInputStreamId);
         mVirtualCameraClientCallback->onStreamClosed(mCurrentInputStreamId);
       }

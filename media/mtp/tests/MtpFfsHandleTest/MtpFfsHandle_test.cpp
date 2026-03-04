@@ -17,11 +17,16 @@
 
 #include <android-base/unique_fd.h>
 #include <android-base/test_utils.h>
+#include <android_hardware_usb_flags.h>
+#include <atomic>
 #include <fcntl.h>
 #include <gtest/gtest.h>
+#include <iostream>
 #include <memory>
 #include <random>
 #include <string>
+#include <sys/poll.h>
+#include <thread>
 #include <unistd.h>
 #include <log/log.h>
 
@@ -44,6 +49,14 @@ static const std::string dummyDataStr =
     "oftware\n * distributed under the License is distributed on an \"AS IS\" "
     "BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o"
     "r im";
+
+constexpr int TEST_THREADS = 5;
+constexpr int TEST_SEND_SLEEP_US = 100;
+constexpr int TEST_RUN_DURATION_US = 50000;
+constexpr int TEST_REAP_WAIT_US = 5000;
+constexpr int TEST_POLL_TIMEOUT_MS = 1000;
+constexpr int TEST_REAP_COUNT = 50;
+constexpr int TEST_SEND_INTERVAL_US = 1000;
 
 /**
  * Functional tests for the MtpFfsHandle class. Ensures header and data integrity
@@ -87,8 +100,14 @@ protected:
         EXPECT_EQ(handle->start(false), 0);
     }
 
-    ~MtpFfsHandleTest() {
-        handle->close();
+    ~MtpFfsHandleTest() {}
+
+    size_t getChildThreadsCount() {
+        std::lock_guard<std::mutex> lock(handle->mChildThreadsLock);
+        if (android::hardware::usb::flags::mtp_ffs_handle_close_concurrency_fix()) {
+            return handle->mChildFutures.size();
+        }
+        return handle->mChildThreads.size();
     }
 };
 
@@ -383,6 +402,87 @@ TYPED_TEST(MtpFfsHandleTest, testSendEvent) {
     this->handle->sendEvent(event);
     read(this->intr, buf, TEST_PACKET_SIZE);
     EXPECT_STREQ(buf, dummyDataStr.c_str());
+}
+
+TYPED_TEST(MtpFfsHandleTest, testSendEventConcurrency) {
+    if (!android::hardware::usb::flags::mtp_ffs_handle_close_concurrency_fix()) {
+        GTEST_SKIP() << "Skipping test because mtp_ffs_handle_close_concurrency_fix is disabled";
+    }
+
+    std::atomic<bool> stop{false};
+    std::vector<std::thread> threads;
+
+    struct mtp_event event;
+    event.length = TEST_PACKET_SIZE;
+    event.data = const_cast<char*>(dummyDataStr.c_str());
+
+    // Spawn threads that continuously send events
+    for (int i = 0; i < TEST_THREADS; ++i) {
+        threads.emplace_back([this, &stop, event]() {
+            while (!stop.load()) {
+                this->handle->sendEvent(event);
+                usleep(TEST_SEND_SLEEP_US);
+            }
+        });
+    }
+
+    // Let them run for a moment
+    usleep(TEST_RUN_DURATION_US);
+
+    // Call close while events are being sent to trigger the race condition
+    this->handle->close();
+
+    // Stop the sending threads
+    stop.store(true);
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    // If we reach here without std::terminate being called, the fix works.
+}
+
+TYPED_TEST(MtpFfsHandleTest, testSendEventReaping) {
+    if (!android::hardware::usb::flags::mtp_ffs_handle_close_concurrency_fix()) {
+        GTEST_SKIP() << "Skipping test because mtp_ffs_handle_close_concurrency_fix is disabled";
+    }
+
+    struct mtp_event event;
+    event.length = TEST_PACKET_SIZE;
+    event.data = const_cast<char*>(dummyDataStr.c_str());
+
+    // Send a bunch of events. Wait for them to finish.
+    for (int i = 0; i < TEST_REAP_COUNT; ++i) {
+        this->handle->sendEvent(event);
+        usleep(TEST_SEND_INTERVAL_US);
+    }
+
+    // Drain the pipe so threads can finish
+    char buf[TEST_PACKET_SIZE + 1];
+    buf[TEST_PACKET_SIZE] = '\0';
+    struct pollfd pfd = { .fd = this->intr, .events = POLLIN };
+    for (int i = 0; i < TEST_REAP_COUNT; ++i) {
+        if (poll(&pfd, 1, TEST_POLL_TIMEOUT_MS) <= 0) {
+            FAIL() << "Timeout waiting for event " << i;
+        }
+        read(this->intr, buf, TEST_PACKET_SIZE);
+    }
+
+    // Give them a tiny bit more time to be marked as ready
+    usleep(TEST_REAP_WAIT_US);
+
+    // Send one more event to trigger the reaping
+    this->handle->sendEvent(event);
+
+    // Drain the last one
+    if (poll(&pfd, 1, TEST_POLL_TIMEOUT_MS) <= 0) {
+        FAIL() << "Timeout waiting for last event";
+    }
+    read(this->intr, buf, TEST_PACKET_SIZE);
+
+    // After reaping, the thread vector shouldn't contain 51 threads.
+    // Given the small sleep, we expect most, if not all, of the first 50
+    // to have finished and been reaped.
+    EXPECT_LT(this->getChildThreadsCount(), 51u);
 }
 
 } // namespace android

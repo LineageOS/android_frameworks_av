@@ -16,6 +16,7 @@
 
 #include <android-base/logging.h>
 #include <android-base/properties.h>
+#include <android_hardware_usb_flags.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -139,6 +140,7 @@ int MtpFfsCompatHandle::start(bool ptp) {
             mMaxWrite /= 2;
             mMaxRead /=2;
         } else {
+            setClosed(false);
             return 0;
         }
     }
@@ -146,6 +148,7 @@ int MtpFfsCompatHandle::start(bool ptp) {
     mMaxWrite = USB_FFS_MAX_WRITE;
     mMaxRead = USB_FFS_MAX_READ;
     PLOG(ERROR) << "Functionfs could not allocate any memory!";
+    setClosed(false);
     return 0;
 }
 

@@ -31,6 +31,16 @@ interface IAudioManagerNative {
         FULL,
     }
 
+    enum HardeningExemptionReason {
+        NONE,
+        SYSTEM_USAGE,
+        PRIVILEGED_APP,
+        FLAG_DISABLED,
+        ALARM,
+        OVERRIDE,
+        TARGET_SDK,
+    }
+
     /**
      * audioserver is muting playback due to hardening.
      * Calls which aren't from uid 1041 are dropped.
@@ -38,8 +48,11 @@ interface IAudioManagerNative {
      * @param type - the level of playback restriction which was hit (full or partial)
      * @param bypassed - true if the client should be muted but was exempted (for example due to a
      * certain audio usage to prevent regressions)
+     * @param reason - reason for the exemption if bypassed is true
+     * @param usage - the audio usage of the playback
      */
-    oneway void playbackHardeningEvent(in int uid, in HardeningType type, in boolean bypassed);
+    oneway void playbackHardeningEvent(in int uid, in HardeningType type, in boolean bypassed,
+                                       in HardeningExemptionReason reason, in int usage);
 
     /**
      * Block until AudioService synchronizes pending permission state with audioserver.
