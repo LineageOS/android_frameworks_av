@@ -151,6 +151,44 @@ TEST_F(VirtualCameraRenderThreadTest, FlushReturnsErrorForInFlightRequests) {
   mRenderThread->flush();
 }
 
+TEST_F(VirtualCameraRenderThreadTest, StateTransitions) {
+  using State = VirtualCameraRenderThread::State;
+
+  // Initially thread is not started, should be in IDLE state.
+  // Wait for state should return immediately if it's already in that state.
+  mRenderThread->waitForState(State::IDLE);
+
+  ASSERT_TRUE(mRenderThread->start());
+  // After start, it should still be IDLE (waiting in dequeueTask).
+  mRenderThread->waitForState(State::IDLE);
+
+  const int frameNumber = 42;
+  const int streamId = 1;
+  const int bufferId = 1234;
+
+  EXPECT_CALL(*mMockCameraDeviceCallback, notify(testing::_))
+      .WillRepeatedly(testing::Invoke([](const std::vector<NotifyMsg>&) {
+        return ndk::ScopedAStatus::ok();
+      }));
+  EXPECT_CALL(*mMockCameraDeviceCallback, processCaptureResult(testing::_))
+      .WillRepeatedly(testing::Invoke([](const std::vector<CaptureResult>&) {
+        return ndk::ScopedAStatus::ok();
+      }));
+
+  mRenderThread->enqueueTask(std::make_unique<ProcessCaptureRequestTask>(
+      frameNumber, std::vector<CaptureRequestBuffer>{
+                       CaptureRequestBuffer(streamId, bufferId)}));
+
+  // It should reach PROCESSING state eventually.
+  mRenderThread->waitForState(State::PROCESSING);
+
+  // After processing, it should go back to IDLE.
+  mRenderThread->waitForState(State::IDLE);
+
+  // Test stop.
+  mRenderThread->stop();
+}
+
 }  // namespace
 }  // namespace virtualcamera
 }  // namespace companion
