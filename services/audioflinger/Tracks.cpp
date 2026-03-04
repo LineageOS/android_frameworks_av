@@ -337,8 +337,7 @@ void TrackBase::deferRestartIfDisabled()
             if (actual) actual->restartIfDisabled();
         });
     ALOGV("%s signal playback thread", __func__);
-    audio_utils::lock_guard _l(thread->mutex());
-    thread->broadcast_l();
+    thread->asyncBroadcast();
 }
 
 void TrackBase::beginBatteryAttribution() {
