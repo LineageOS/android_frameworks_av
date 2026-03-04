@@ -32,12 +32,10 @@
 #include <vector>
 
 #include "VirtualCameraCaptureResult.h"
-#include "VirtualCameraDevice.h"
 #include "VirtualCameraImageHandler.h"
 #include "VirtualCameraImagePassthroughHandler.h"
 #include "VirtualCameraImageTransformingHandler.h"
 #include "VirtualCameraSessionContext.h"
-#include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BufferStatus.h"
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/CaptureResult.h"
@@ -215,6 +213,8 @@ void VirtualCameraRenderThread::flush() {
   if (mImageHandler != nullptr) {
     mImageHandler->interruptWait();
   }
+  mThrottlingCondVar.notify_all();
+  mTaskReadyCondVar.notify_all();
 }
 
 bool VirtualCameraRenderThread::start() {
@@ -231,6 +231,7 @@ void VirtualCameraRenderThread::stop() {
     if (mImageHandler != nullptr) {
       mImageHandler->interruptWait();
     }
+    mThrottlingCondVar.notify_all();
     mTaskReadyCondVar.notify_one();
   }
 }
@@ -477,7 +478,10 @@ void VirtualCameraRenderThread::throttleRendering(
     std::chrono::nanoseconds beforeSleep =
         std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now().time_since_epoch());
-    std::this_thread::sleep_for(sleepTime);
+    {
+      std::unique_lock<std::mutex> lock(mLock);
+      mThrottlingCondVar.wait_for(lock, sleepTime);
+    }
     std::chrono::nanoseconds after_sleep =
         std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now().time_since_epoch());
