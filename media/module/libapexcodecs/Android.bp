@@ -64,6 +64,9 @@ cc_library {
     name: "libcom.android.media.swcodec.apexcodecs",
     defaults: [
         "libcom.android.media.swcodec.apexcodecs-defaults",
+        // Temporarily disable bti-report flag until GNU Note
+        // is added properly to libopus_lfi
+        "no_bti",
     ],
 
     visibility: [
