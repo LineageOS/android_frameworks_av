@@ -154,7 +154,7 @@ size_t Camera3IOStreamBase::getMaxCachedOutputBuffersLocked() const {
     return mMaxCachedBufferCount;
 }
 
-status_t Camera3IOStreamBase::disconnectLocked() {
+status_t Camera3IOStreamBase::disconnectLocked(bool force) {
     switch (mState) {
         case STATE_IN_RECONFIG:
         case STATE_CONFIGURED:
@@ -166,6 +166,10 @@ status_t Camera3IOStreamBase::disconnectLocked() {
             ALOGV("%s: Stream %d: Already disconnected",
                   __FUNCTION__, mId);
             return -ENOTCONN;
+    }
+
+    if (flags::seamless_transitions() && force) {
+        return OK;
     }
 
     if (mHandoutTotalBufferCount > 0) {

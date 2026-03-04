@@ -77,7 +77,7 @@ class Camera3InputStream : public Camera3IOStreamBase,
     virtual status_t returnInputBufferLocked(
             const camera_stream_buffer &buffer);
     virtual status_t getInputSurfaceLocked(sp<Surface> *surface);
-    virtual status_t disconnectLocked();
+    virtual status_t disconnectLocked(bool force = false);
 
     virtual status_t configureQueueLocked();
 

@@ -221,15 +221,11 @@ Camera3OutputStream::Camera3OutputStream(int id, camera_stream_type_t type,
 Camera3OutputStream::~Camera3OutputStream() {
     disconnectLocked();
     if (flags::seamless_transitions()) {
-        for (const auto& removedConsumer : mRemovedConsumers) {
-            ALOGE("%s: Stream %d: Disconnecting from removed surface %s that still has"
-                    " pending buffers: %zu!", __FUNCTION__, mId,
-                    removedConsumer.second.mConsumer->getConsumerName().c_str(),
-                    removedConsumer.second.mHandoutTotalBufferCount);
-            native_window_api_disconnect(removedConsumer.second.mConsumer.get(),
-                    NATIVE_WINDOW_API_CAMERA);
+        if (!mRemovedConsumers.empty()) {
+            ALOGE("%s: Stream %d: Clearing removed surfaces that still has"
+                    " pending buffers!", __FUNCTION__, mId);
+            mRemovedConsumers.clear();
         }
-        mRemovedConsumers.clear();
     }
 }
 
@@ -384,9 +380,6 @@ bool Camera3OutputStream::processRemovedConsumerLocked(
     }
 
     if ((*removedConsumer).second.mHandoutTotalBufferCount == 0 || res == NO_INIT) {
-        ALOGE("%s: Disconnecting from removed native window!", __FUNCTION__);
-        native_window_api_disconnect((*removedConsumer).second.mConsumer.get(),
-                NATIVE_WINDOW_API_CAMERA);
         removedConsumer = mRemovedConsumers.erase(removedConsumer);
     } else {
         removedConsumer++;
@@ -1028,10 +1021,10 @@ void Camera3OutputStream::onCachedBufferQueued() {
     mOutputBufferReturnedSignal.signal();
 }
 
-status_t Camera3OutputStream::disconnectLocked() {
+status_t Camera3OutputStream::disconnectLocked(bool force) {
     status_t res;
 
-    if ((res = Camera3IOStreamBase::disconnectLocked()) != OK) {
+    if ((res = Camera3IOStreamBase::disconnectLocked(force)) != OK) {
         return res;
     }
 
@@ -1243,13 +1236,14 @@ status_t Camera3OutputStream::updateStream(const std::vector<SurfaceHolder> &out
     Mutex::Autolock l(mLock);
 
     if (!removedSurfaceIds.empty() && (mConsumer.get() != nullptr)) {
-        if (mHandoutTotalBufferCount == 0) {
-            auto ret = disconnectLocked();
-            if (ret != OK) {
-                return ret;
-            }
-        } else {
-            RemovedConsumer removedConsumer = {mHandoutTotalBufferCount, mConsumer};
+        RemovedConsumer removedConsumer = {mHandoutTotalBufferCount, mConsumer};
+
+        auto ret = disconnectLocked(true /*force*/);
+        if (ret != OK) {
+            return ret;
+        }
+
+        if (mHandoutTotalBufferCount > 0) {
             mRemovedConsumers.emplace(mCurrentSurfaceId, removedConsumer);
         }
         mConsumer = nullptr;
