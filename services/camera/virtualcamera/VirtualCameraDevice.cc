@@ -1032,8 +1032,8 @@ std::shared_ptr<VirtualCameraDevice> VirtualCameraDevice::sharedFromThis() {
   return ref<VirtualCameraDevice>();
 }
 
-void VirtualCameraDevice::closeSession() {
-  ALOGV("Close all sessions");
+void VirtualCameraDevice::closeSession(bool notifyError) {
+  ALOGV("Close all sessions. notifyError %d", notifyError);
   std::shared_ptr<VirtualCameraSession> session;
   {
     std::lock_guard<std::mutex> lock(mSessionLock);
@@ -1041,7 +1041,11 @@ void VirtualCameraDevice::closeSession() {
     mSession.reset();
   }
   if (session != nullptr) {
-    session->close();
+    if (notifyError) {
+      session->onSessionError();
+    } else {
+      session->close();
+    }
   }
 }
 

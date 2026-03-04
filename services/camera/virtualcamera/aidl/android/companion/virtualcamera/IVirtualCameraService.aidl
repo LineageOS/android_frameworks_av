@@ -42,4 +42,10 @@ interface IVirtualCameraService {
      * the camera device in the camera framework.
      */
     @utf8InCpp String getCameraId(in IBinder token);
+
+    /**
+     * Closes any open session for the camera corresponding to the given binder token and notifies
+     * the camera framework of device error
+     */
+    void closeSession(in IBinder token);
 }

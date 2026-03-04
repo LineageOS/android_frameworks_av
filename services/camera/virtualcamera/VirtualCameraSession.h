@@ -112,6 +112,9 @@ class VirtualCameraSession
 
   std::set<int> getStreamIds() const EXCLUDES(mLock);
 
+  // Fatal session error, notifies framework and closes the session.
+  void onSessionError();
+
  private:
   ndk::ScopedAStatus processCaptureRequest(
       const ::aidl::android::hardware::camera::device::CaptureRequest& request)
@@ -120,9 +123,6 @@ class VirtualCameraSession
   bool isInFatalError() const {
     return mSessionContext.isInFatalError();
   }
-
-  // Callback for fatal session errors.
-  void onSessionError();
 
   std::weak_ptr<VirtualCameraDevice> mCameraDevice;
 
