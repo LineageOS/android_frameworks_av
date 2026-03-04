@@ -450,40 +450,32 @@ void ResourceManagerMetrics::pushCodecUsageMetrics(int32_t pid, uid_t uid, int e
 
     // TODO: Once RM starts tracking codec memory, set this up accordingly.
     long peakMemory = peakPixels;
-    if (android::media::codec::app_codec_usage_metrics()) {
-        int result = stats_write(
-            APP_MEDIA_CODEC_USAGE_REPORTED,
-            uid,
-            exitReason,
-            peakHwVideoDecoderCount,
-            peakHwVideoEncoderCount,
-            peakSwVideoDecoderCount,
-            peakSwVideoEncoderCount,
-            peakHwAudioDecoderCount,
-            peakHwAudioEncoderCount,
-            peakSwAudioDecoderCount,
-            peakSwAudioEncoderCount,
-            peakHwImageDecoderCount,
-            peakHwImageEncoderCount,
-            peakSwImageDecoderCount,
-            peakSwImageEncoderCount,
-            peakPixels,
-            peakMemory,
-            mTotalClientsCreated,
-            mTotalClientsKilled);
-        ALOGI("%s: Pushed APP_MEDIA_CODEC_USAGE_REPORTED atom: "
-              "Process[pid(%d): uid(%d) is %s] is %s %s. "
-              "Peak Codec Memory: %ld Total Codecs: %d Killed Codec: %d. Result: %d",
-              __func__, pid, uid, exitReason == 1 ? "Ended" : "Killed",
-              peakCodecLog.str().c_str(), peakPixelsLog.c_str(),
-              peakMemory, mTotalClientsCreated, mTotalClientsKilled, result);
-    } else {
-        ALOGI("%s: Concurrent Codec Usage Report for the Process[pid(%d): uid(%d) is %s] "
-              "is %s %s. Peak Codec Memory: %ld Total Codecs: %d Killed Codec: %d",
-              __func__, pid, uid, exitReason == 1 ? "Ended" : "Killed",
-              peakCodecLog.str().c_str(), peakPixelsLog.c_str(),
-              peakMemory, mTotalClientsCreated, mTotalClientsKilled);
-    }
+    int result = stats_write(
+        APP_MEDIA_CODEC_USAGE_REPORTED,
+        uid,
+        exitReason,
+        peakHwVideoDecoderCount,
+        peakHwVideoEncoderCount,
+        peakSwVideoDecoderCount,
+        peakSwVideoEncoderCount,
+        peakHwAudioDecoderCount,
+        peakHwAudioEncoderCount,
+        peakSwAudioDecoderCount,
+        peakSwAudioEncoderCount,
+        peakHwImageDecoderCount,
+        peakHwImageEncoderCount,
+        peakSwImageDecoderCount,
+        peakSwImageEncoderCount,
+        peakPixels,
+        peakMemory,
+        mTotalClientsCreated,
+        mTotalClientsKilled);
+    ALOGI("%s: Pushed APP_MEDIA_CODEC_USAGE_REPORTED atom: "
+          "Process[pid(%d): uid(%d) is %s] is %s %s. "
+          "Peak Codec Memory: %ld Total Codecs: %d Killed Codec: %d. Result: %d",
+          __func__, pid, uid, exitReason == 1 ? "Ended" : "Killed",
+          peakCodecLog.str().c_str(), peakPixelsLog.c_str(),
+          peakMemory, mTotalClientsCreated, mTotalClientsKilled, result);
 }
 
 inline void pushReclaimStats(int32_t callingPid,
