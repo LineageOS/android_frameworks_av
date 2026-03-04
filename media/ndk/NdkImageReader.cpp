@@ -151,8 +151,7 @@ AImageReader::FrameListener::setImageListener(AImageReader_ImageListener* listen
     return AMEDIA_OK;
 }
 
-void
-AImageReader::BufferRemovedListener::onBufferFreed(const wp<GraphicBuffer>& graphicBuffer) {
+void AImageReader::BufferRemovedListener::onBufferFreed(const sp<GraphicBuffer>& gBuffer) {
     sp<AImageReader> reader = mReader.promote();
     if (reader == nullptr) {
         ALOGW("A frame is available after AImageReader closed!");
@@ -163,7 +162,6 @@ AImageReader::BufferRemovedListener::onBufferFreed(const wp<GraphicBuffer>& grap
         return; // No callback registered
     }
 
-    sp<GraphicBuffer> gBuffer = graphicBuffer.promote();
     if (gBuffer == nullptr) {
         ALOGW("A buffer being freed has gone away!");
         return; // buffer is already destroyed
