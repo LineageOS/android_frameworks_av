@@ -18,6 +18,7 @@
 #pragma once
 
 #include "IAfPatchPanel.h"
+#include <audio_utils/SimpleLog.h>
 
 #include <map>  // avoid transitive dependency
 #include <set>  // avoid transitive dependency
@@ -152,6 +153,8 @@ private:
         std::set<audio_patch_handle_t> sw_patches;
     };
     std::map<audio_module_handle_t, ModuleConnections> mInsertedModules;
+
+    SimpleLog mEvents{128};
 };
 
 }  // namespace android
