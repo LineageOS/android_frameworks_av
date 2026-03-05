@@ -8796,17 +8796,21 @@ status_t AudioPolicyManager::setInputDevice(audio_io_handle_t input,
                         }
                         return result; });
             //only one input device for now
-            if (audio_is_remote_submix_device(device->type())) {
-                // remote submix HAL does not support audio conversion, need source device
-                // audio config to match the sink input descriptor audio config, otherwise AIDL
-                // HAL patching will fail
-                audio_port_config srcDevicePortConfig = {};
-                device->toAudioPortConfig(&srcDevicePortConfig, nullptr);
-                srcDevicePortConfig.sample_rate = inputDesc->getSamplingRate();
-                srcDevicePortConfig.channel_mask = inputDesc->getChannelMask();
-                srcDevicePortConfig.format = inputDesc->getFormat();
+
+            // Try to configure the source device to match the input stream parameters
+            // to avoid unnecessary Sample Rate Conversion (SRC) in the HAL,
+            // or to satisfy HALs that do not support SRC on patches.
+            audio_port_config srcDevicePortConfig = {};
+            device->toAudioPortConfig(&srcDevicePortConfig, nullptr);
+            srcDevicePortConfig.sample_rate = inputDesc->getSamplingRate();
+            srcDevicePortConfig.channel_mask = inputDesc->getChannelMask();
+            srcDevicePortConfig.format = inputDesc->getFormat();
+            // remote submix HAL does not support audio conversion
+            if (audio_is_remote_submix_device(device->type()) ||
+                    device->checkExactAudioProfile(&srcDevicePortConfig) == NO_ERROR) {
                 patchBuilder.addSource(srcDevicePortConfig);
             } else {
+                // use the cached default for the device
                 patchBuilder.addSource(device);
             }
             status = installPatch(__func__, patchHandle, inputDesc.get(), patchBuilder.patch(), 0);

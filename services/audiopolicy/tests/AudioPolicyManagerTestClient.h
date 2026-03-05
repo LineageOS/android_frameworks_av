@@ -283,7 +283,14 @@ public:
         mAudioParameters.add(
                 String8(AudioParameter::keyStreamSupportedFormats),
                 String8(formats.c_str()));
-        mAudioParameters.addInt(String8(AudioParameter::keyStreamSupportedSamplingRates), 48000);
+        std::string sampleRates;
+        for (auto sr : mSupportedSamplingRates) {
+            if (!sampleRates.empty()) sampleRates += AUDIO_PARAMETER_VALUE_LIST_SEPARATOR;
+            sampleRates += std::to_string(sr);
+        }
+        mAudioParameters.add(
+                String8(AudioParameter::keyStreamSupportedSamplingRates),
+                String8(sampleRates.c_str()));
         std::string channelMasks;
         for (const auto& cm : mSupportedChannelMasks) {
             if (!audio_channel_mask_is_valid(cm)) {
@@ -342,8 +349,11 @@ public:
         for (auto format : mSupportedFormats) {
             const int i = mixPort->num_audio_profiles;
             mixPort->audio_profiles[i].format = format;
-            mixPort->audio_profiles[i].num_sample_rates = 1;
-            mixPort->audio_profiles[i].sample_rates[0] = 48000;
+            mixPort->audio_profiles[i].num_sample_rates = 0;
+            for (auto sr : mSupportedSamplingRates) {
+                mixPort->audio_profiles[i].sample_rates[
+                        mixPort->audio_profiles[i].num_sample_rates++] = sr;
+            }
             mixPort->audio_profiles[i].num_channel_masks = 0;
             for (const auto& cm : mSupportedChannelMasks) {
                 if (audio_channel_mask_is_valid(cm) && audio_is_input_channel(cm) == isInput) {
@@ -371,6 +381,10 @@ public:
 
     void addSupportedChannelMask(audio_channel_mask_t channelMask) {
         mSupportedChannelMasks.insert(channelMask);
+    }
+
+    void addSupportedSamplingRate(int sampleRate) {
+        mSupportedSamplingRates.insert(sampleRate);
     }
 
     bool getTrackInternalMute(audio_port_handle_t portId) {
@@ -421,6 +435,7 @@ private:
     std::vector<struct audio_port_v7> mDisconnectedDevicePorts;
     std::set<audio_format_t> mSupportedFormats;
     std::set<audio_channel_mask_t> mSupportedChannelMasks;
+    std::set<int> mSupportedSamplingRates;
     std::map<audio_port_handle_t, bool> mTracksInternalMute;
     std::set<audio_io_handle_t> mOpenedInputs;
     std::map<audio_port_handle_t, float> mPortVolumes;
