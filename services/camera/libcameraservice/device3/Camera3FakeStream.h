@@ -130,7 +130,7 @@ class Camera3FakeStream :
             /*out*/
             sp<Fence> *releaseFenceOut);
 
-    virtual status_t disconnectLocked();
+    virtual status_t disconnectLocked(bool force = false);
 
   private:
 

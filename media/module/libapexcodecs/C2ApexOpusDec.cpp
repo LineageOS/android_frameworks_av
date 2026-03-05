@@ -19,7 +19,6 @@
 #include <utils/Log.h>
 
 #include <span>
-#include <sys/mman.h>
 
 #include <android-base/hex.h>
 #include <android_media_codec.h>
@@ -33,6 +32,7 @@
 #include "C2ApexOpusDec.h"
 
 extern "C" {
+    #include "libopus_lfi_bin_box.h"
     #include <opus.h>
     #include <opus_multistream.h>
 }
@@ -65,6 +65,22 @@ static uint64_t ns_to_samples(uint64_t ns, int rate) {
 
 constexpr size_t kMaxOutputBufferSize =
     kMaxOpusOutputPacketSizeSamples * kMaxChannels * sizeof(int16_t);
+
+class LfiAlloc {
+public:
+    explicit LfiAlloc(size_t size) {
+        mPtr = libopus_lfi_bin_box_malloc(size);
+    }
+    ~LfiAlloc() {
+        if (mPtr) {
+            libopus_lfi_bin_box_free(mPtr);
+        }
+    }
+
+    void *get() { return mPtr; }
+private:
+    void *mPtr;
+};
 
 }  // namespace
 
@@ -157,14 +173,12 @@ std::shared_ptr<C2Component::Traits> C2ApexOpusDec::MakeTraits() {
 
 // static
 void *C2ApexOpusDec::Map(void *addr, size_t size, int prot, int flags, int fd, off_t offset) {
-    // TODO
-    return ::mmap(addr, size, prot, flags, fd, offset);
+    return ::libopus_lfi_bin_box_mmap(addr, size, prot, flags, fd, offset);
 }
 
 // static
 int C2ApexOpusDec::Unmap(void *addr, size_t size) {
-    // TODO
-    return ::munmap(addr, size);
+    return ::libopus_lfi_bin_box_munmap(addr, size);
 }
 
 void C2ApexOpusDec::initDecoderStates() {
@@ -185,7 +199,7 @@ ApexCodec_Status C2ApexOpusDec::start() {
 ApexCodec_Status C2ApexOpusDec::flush() {
     ALOGV("flush");
     if (mDecoder) {
-        opus_multistream_decoder_ctl(mDecoder, OPUS_RESET_STATE);
+        LFI_CALL(opus_multistream_decoder_ctl, mDecoder, OPUS_RESET_STATE);
         mSamplesToDiscard = mSeekPreRoll;
         mSignalledOutputEos = false;
     }
@@ -194,7 +208,7 @@ ApexCodec_Status C2ApexOpusDec::flush() {
 
 ApexCodec_Status C2ApexOpusDec::reset() {
     if (mDecoder) {
-        opus_multistream_decoder_destroy(mDecoder);
+        LFI_CALL(opus_multistream_decoder_destroy, mDecoder);
         mDecoder = nullptr;
     }
     initDecoderStates();
@@ -272,34 +286,50 @@ ApexCodec_Status C2ApexOpusDec::process(
                     mSignalledError = true;
                     return APEXCODEC_STATUS_CORRUPTED;
                 }
-                uint8_t channel_mapping[kMaxChannels] = {0};
-                if (mHeader.channels <= kMaxChannelsWithDefaultLayout) {
-                    memcpy(&channel_mapping,
-                        kDefaultOpusChannelLayout,
-                        kMaxChannelsWithDefaultLayout);
-                } else {
-                    memcpy(&channel_mapping,
-                        mHeader.stream_map,
-                        mHeader.channels);
-                }
-                int status = OPUS_INVALID_STATE;
-                mDecoder = opus_multistream_decoder_create(kRate,
-                                                        mHeader.channels,
-                                                        mHeader.num_streams,
-                                                        mHeader.num_coupled,
-                                                        channel_mapping,
-                                                        &status);
-                if (!mDecoder || status != OPUS_OK) {
-                    ALOGE("opus_multistream_decoder_create failed status = %s",
-                        opus_strerror(status));
+                LfiAlloc lfiChannelMapping(kMaxChannels * sizeof(uint8_t));
+                uint8_t *channel_mapping = (uint8_t *)lfiChannelMapping.get();
+                if (!channel_mapping) {
+                    ALOGE("%s failed to allocate memory in sandbox for channel_mapping", __func__);
                     mSignalledError = true;
                     return APEXCODEC_STATUS_CORRUPTED;
                 }
-                status = opus_multistream_decoder_ctl(mDecoder,
-                                                    OPUS_SET_GAIN(mHeader.gain_db));
-                if (status != OPUS_OK) {
+                memset(channel_mapping, 0, kMaxChannels);
+                if (mHeader.channels <= kMaxChannelsWithDefaultLayout) {
+                    memcpy(channel_mapping,
+                        kDefaultOpusChannelLayout,
+                        kMaxChannelsWithDefaultLayout);
+                } else {
+                    memcpy(channel_mapping,
+                        mHeader.stream_map,
+                        mHeader.channels);
+                }
+                LfiAlloc lfiStatus(sizeof(int));
+                int *status = (int *)lfiStatus.get();
+                if (!status) {
+                    ALOGE("%s failed to allocate memory in sandbox for status", __func__);
+                    mSignalledError = true;
+                    return APEXCODEC_STATUS_CORRUPTED;
+                }
+                *status = OPUS_INVALID_STATE;
+                mDecoder = LFI_CALL(opus_multistream_decoder_create,
+                                    kRate,
+                                    mHeader.channels,
+                                    mHeader.num_streams,
+                                    mHeader.num_coupled,
+                                    channel_mapping,
+                                    status);
+                if (!mDecoder || *status != OPUS_OK) {
+                    ALOGE("opus_multistream_decoder_create failed status = %s",
+                        LFI_CALL(opus_strerror, *status));
+                    mSignalledError = true;
+                    return APEXCODEC_STATUS_CORRUPTED;
+                }
+                *status = LFI_CALL(opus_multistream_decoder_ctl,
+                                  mDecoder,
+                                  OPUS_SET_GAIN(mHeader.gain_db));
+                if (*status != OPUS_OK) {
                     ALOGE("Failed to set OPUS header gain; status = %s",
-                        opus_strerror(status));
+                        LFI_CALL(opus_strerror, *status));
                     mSignalledError = true;
                     return APEXCODEC_STATUS_CORRUPTED;
                 }
@@ -399,12 +429,13 @@ ApexCodec_Status C2ApexOpusDec::process(
 
         ALOGV("data = %p, inSize = %zu, outputBuffer.data = %p",
               data, inSize, outputBuffer.data);
-        int numSamples = opus_multistream_decode(mDecoder,
-                                                data,
-                                                inSize,
-                                                reinterpret_cast<int16_t *>(outputBuffer.data),
-                                                kMaxOpusOutputPacketSizeSamples,
-                                                0);
+        int numSamples = LFI_CALL(opus_multistream_decode,
+                                  mDecoder,
+                                  data,
+                                  inSize,
+                                  reinterpret_cast<int16_t *>(outputBuffer.data),
+                                  kMaxOpusOutputPacketSizeSamples,
+                                  0);
         if (numSamples < 0) {
             ALOGE("opus_multistream_decode returned numSamples %d", numSamples);
             numSamples = 0;

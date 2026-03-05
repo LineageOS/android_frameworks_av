@@ -336,7 +336,7 @@ class Camera3OutputStream :
             /*out*/
             sp<Fence> *releaseFenceOut);
 
-    virtual status_t disconnectLocked();
+    virtual status_t disconnectLocked(bool force = false);
     status_t fixUpHidlJpegBlobHeader(ANativeWindowBuffer* anwBuffer, int fence);
 
     status_t getEndpointUsageForSurface(uint64_t *usage, const sp<Surface>& surface);

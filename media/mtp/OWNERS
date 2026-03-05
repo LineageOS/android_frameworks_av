@@ -1,6 +1,2 @@
 set noparent
-nkapron@google.com
-febinthattil@google.com
-shubhankarm@google.com
-jameswei@google.com
-rmojumder@google.com
+file:platform/packages/services/Mtp:main:/OWNERS
