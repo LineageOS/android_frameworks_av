@@ -178,8 +178,7 @@ public:
                 .calculatedAs(MaxInputSizeSetter, mAacFormat, mChannelCount)
                 .build());
         C2Config::drc_compression_mode_t defaultDrcCompressionMode =
-                property_get_int32(PROP_DRC_OVERRIDE_HEAVY,
-                                   DRC_DEFAULT_MOBILE_DRC_HEAVY) == 1
+                DRC_DEFAULT_MOBILE_DRC_HEAVY == 1
                         ? C2Config::DRC_COMPRESSION_HEAVY
                         : C2Config::DRC_COMPRESSION_LIGHT;
         addParameter(
@@ -196,9 +195,7 @@ public:
                 .withSetter(Setter<decltype(*mDrcCompressMode)>::StrictValueWithNoDeps)
                 .build());
 
-        float defaultDrcTargetRefLevel = -0.25 * property_get_int32(
-                PROP_DRC_OVERRIDE_REF_LEVEL,
-                DRC_DEFAULT_MOBILE_REF_LEVEL);
+        float defaultDrcTargetRefLevel = -0.25 * DRC_DEFAULT_MOBILE_REF_LEVEL;
         addParameter(
                 DefineParam(mDrcTargetRefLevel, C2_PARAMKEY_DRC_TARGET_REFERENCE_LEVEL)
                 .withDefault(new C2StreamDrcTargetReferenceLevelTuning::input(
@@ -207,9 +204,7 @@ public:
                 .withSetter(Setter<decltype(*mDrcTargetRefLevel)>::StrictValueWithNoDeps)
                 .build());
 
-        float defaultDrcEncTargetLevel = -0.25 * property_get_int32(
-                PROP_DRC_OVERRIDE_ENC_LEVEL,
-                DRC_DEFAULT_MOBILE_ENC_LEVEL);
+        float defaultDrcEncTargetLevel = -0.25 * DRC_DEFAULT_MOBILE_ENC_LEVEL;
         addParameter(
                 DefineParam(mDrcEncTargetLevel, C2_PARAMKEY_DRC_ENCODED_TARGET_LEVEL)
                 .withDefault(new C2StreamDrcEncodedTargetLevelTuning::input(
@@ -218,9 +213,7 @@ public:
                 .withSetter(Setter<decltype(*mDrcEncTargetLevel)>::StrictValueWithNoDeps)
                 .build());
 
-        float defaultDrcBoostFactor = property_get_int32(
-                PROP_DRC_OVERRIDE_BOOST,
-                DRC_DEFAULT_MOBILE_DRC_BOOST) / 127.;
+        float defaultDrcBoostFactor = DRC_DEFAULT_MOBILE_DRC_BOOST / 127.;
         addParameter(
                 DefineParam(mDrcBoostFactor, C2_PARAMKEY_DRC_BOOST_FACTOR)
                 .withDefault(new C2StreamDrcBoostFactorTuning::input(
@@ -229,9 +222,7 @@ public:
                 .withSetter(Setter<decltype(*mDrcBoostFactor)>::StrictValueWithNoDeps)
                 .build());
 
-        float defaultDrcAttenuationFactor = property_get_int32(
-                PROP_DRC_OVERRIDE_CUT,
-                DRC_DEFAULT_MOBILE_DRC_CUT) / 127.;
+        float defaultDrcAttenuationFactor = DRC_DEFAULT_MOBILE_DRC_CUT / 127.;
         addParameter(
                 DefineParam(mDrcAttenuationFactor, C2_PARAMKEY_DRC_ATTENUATION_FACTOR)
                 .withDefault(new C2StreamDrcAttenuationFactorTuning::input(
@@ -240,8 +231,7 @@ public:
                 .withSetter(Setter<decltype(*mDrcAttenuationFactor)>::StrictValueWithNoDeps)
                 .build());
         C2Config::drc_effect_type_t defaultDrcEffectType =
-                (C2Config::drc_effect_type_t)property_get_int32(
-                        PROP_DRC_OVERRIDE_EFFECT, DRC_DEFAULT_MOBILE_DRC_EFFECT);
+                (C2Config::drc_effect_type_t)DRC_DEFAULT_MOBILE_DRC_EFFECT;
         addParameter(
                 DefineParam(mDrcEffectType, C2_PARAMKEY_DRC_EFFECT_TYPE)
                 .withDefault(new C2StreamDrcEffectTypeTuning::input(
