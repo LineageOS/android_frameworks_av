@@ -100,7 +100,7 @@ private:
     DeviceVector getDisabledDevicesForInputSource(
             const DeviceVector& availableInputDevices, audio_source_t inputSource) const;
 
-    bool isBtScoActive(DeviceVector& availableOutputDevices) const;
+    bool isBtScoActive(const DeviceVector& availableOutputDevices) const;
 
 };
 } // namespace audio_policy

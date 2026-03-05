@@ -2683,13 +2683,7 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
     outputDesc->setClientActive(client, true);
 
     if (client->hasPreferredDevice(true)) {
-        if (outputDesc->sameExclusivePreferredDevicesCount() > 0) {
-            // Preferred device may be exclusive, use only if no other active clients on this output
-            devices = DeviceVector(
-                        mAvailableOutputDevices.getDeviceFromId(client->preferredDeviceId()));
-        } else {
-            devices = getNewOutputDevices(outputDesc, false /*fromCache*/);
-        }
+        devices = getNewOutputDevices(outputDesc, false /*fromCache*/);
         if (devices != outputDesc->devices()) {
             checkStrategyRoute(clientStrategy, outputDesc->mIoHandle);
         }
@@ -8301,7 +8295,17 @@ DeviceVector AudioPolicyManager::getNewOutputDevices(const sp<SwAudioOutputDescr
     sp<DeviceDescriptor> device =
         findPreferredDevice(outputDesc, PRODUCT_STRATEGY_NONE, active, mAvailableOutputDevices);
     if (device != nullptr) {
-        return DeviceVector(device);
+        // Never honor explicit routing for SCO unless defined by communication strategy:
+        // (1) BT stack must be primed (done via setCommunicationDevice)
+        // (2) Required mutual exclusion with A2DP, which is enforced with the strategy routing
+        if (audio_is_bluetooth_out_sco_device(device->type())) {
+            if (isScoRequestedForComm()) {
+                return DeviceVector(device);
+            }
+            ALOGI("Suppressing explicit SCO preference");
+        } else {
+            return DeviceVector(device);
+        }
     }
 
     // Legacy Engine cannot take care of bus devices and mix, so we need to handle the conflict
@@ -8383,8 +8387,20 @@ sp<DeviceDescriptor> AudioPolicyManager::getNewInputDevice(
     // for other apps by setting a preferred device.
     bool active;
     device = findPreferredDevice(inputDesc, AUDIO_SOURCE_DEFAULT, active, mAvailableInputDevices);
+    bool ignorePreferredDevice = false;
     if (device != nullptr) {
-        return device;
+        // Never honor explicit routing for SCO unless defined by communication strategy:
+        // (1) BT stack must be primed (done via setCommunicationDevice)
+        // (2) Required mutual exclusion with A2DP, which is enforced with the strategy routing
+        if (audio_is_bluetooth_in_sco_device(device->type())) {
+            if (isScoRequestedForComm()) {
+                return device;
+            }
+            ignorePreferredDevice = true;
+            ALOGI("Suppressing explicit SCO input preference");
+        } else {
+            return device;
+        }
     }
 
     // If we are not in call and no client is active on this input, this methods returns
@@ -8408,7 +8424,7 @@ sp<DeviceDescriptor> AudioPolicyManager::getNewInputDevice(
     }
     if (attributes.source != AUDIO_SOURCE_DEFAULT) {
         device = mEngine->getInputDeviceForAttributes(
-                attributes, false /*ignorePreferredDevice*/, uid, session);
+                attributes, ignorePreferredDevice, uid, session);
     }
 
     if (device && com::android::media::audioserver::enable_strict_port_routing_checks()

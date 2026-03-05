@@ -5431,6 +5431,7 @@ bool PlaybackThread::waitingAsyncCallback()
 // shared by MIXER and DIRECT, overridden by DUPLICATING
 void PlaybackThread::threadLoop_standby()
 {
+    mLocalLog.log("threadLoop_standby");
     ALOGV("%s: audio hardware entering standby, mixer %p, suspend count %d",
             __func__, this, (int32_t)mSuspended);
     mOutput->standby();
@@ -8966,6 +8967,7 @@ unlock:
 void RecordThread::standbyIfNotAlreadyInStandby()
 {
     if (!mStandby) {
+        mLocalLog.log("standby");
         inputStandBy();
         mThreadMetrics.logEndInterval();
         mThreadSnapshot.onEnd();
@@ -10847,6 +10849,7 @@ NO_THREAD_SAFETY_ANALYSIS  // clang bug
     }
     mHalStream->standby();
     if (!mStandby) {
+        mLocalLog.log("standby");
         mThreadMetrics.logEndInterval();
         mThreadSnapshot.onEnd();
         mStandby = true;
@@ -11233,6 +11236,7 @@ size_t MmapThread::removeEffectChain_l(const sp<IAfEffectChain>& chain)
 
 void MmapThread::threadLoop_standby()
 {
+    mLocalLog.log("threadLoop_standby");
     mHalStream->standby();
 }
 
