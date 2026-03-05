@@ -181,6 +181,8 @@ public:
      */
     void setStopTime(const sp<TrackClientDescriptor>& client, nsecs_t sysTime);
 
+    product_strategy_t getMostRecentStrategy(int inPastMs) const;
+
     /**
      * Changes the client->active() state and the output descriptor's global active count,
      * along with the stream active count and mActiveClients.
