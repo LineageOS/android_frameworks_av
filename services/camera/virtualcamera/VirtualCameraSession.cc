@@ -379,7 +379,8 @@ VirtualCameraSession::VirtualCameraSession(
 }
 
 ndk::ScopedAStatus VirtualCameraSession::close() {
-  ALOGV("%s", __func__);
+  ALOGV("%s: isMultiInputStreamEnabled %d", __func__,
+        mSessionContext.isMultiInputStreamEnabled());
 
   if (mSessionContext.isMultiInputStreamEnabled()) {
     std::set<int> staleStream =
@@ -984,23 +985,10 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
 }
 
 void VirtualCameraSession::onSessionError() {
-  ALOGE(
-      "Fatal error detected, notifying framework and flushing all render "
-      "threads.");
-
+  ALOGE("Camera session error, notifying framework and closing all streams.");
   std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback;
   {
     std::lock_guard<std::mutex> lock(mLock);
-    // Flush the single-stream render thread if it's being used.
-    if (mRenderThread != nullptr) {
-      mRenderThread->flush();
-      mRenderThread->stop();
-    }
-    // Flush all multi-stream render threads if they are being used.
-    for (auto& [_, thread] : mRenderThreads) {
-      thread->flush();
-      thread->stop();
-    }
     cameraDeviceCallback = mCameraDeviceCallback;
   }
 
@@ -1012,6 +1000,9 @@ void VirtualCameraSession::onSessionError() {
                  .errorCode = ErrorCode::ERROR_DEVICE});
     cameraDeviceCallback->notify({msg});
   }
+
+  // close all threads and input streams
+  close();
 }
 
 }  // namespace virtualcamera

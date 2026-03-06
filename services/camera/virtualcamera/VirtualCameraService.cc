@@ -284,6 +284,7 @@ ndk::ScopedAStatus VirtualCameraService::registerCamera(
     const ::ndk::SpAIBinder& token,
     const VirtualCameraConfiguration& configuration,
     const std::string& cameraId, const int32_t deviceId, bool* _aidl_return) {
+  // TODO: b/489071771 - replace permission with ownership check
   if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
     return ndk::ScopedAStatus::fromExceptionCode(EX_SECURITY);
   }
@@ -352,6 +353,7 @@ ndk::ScopedAStatus VirtualCameraService::registerCameraNoCheck(
 
 ndk::ScopedAStatus VirtualCameraService::unregisterCamera(
     const ::ndk::SpAIBinder& token) {
+  // TODO: b/489071771 - replace permission with ownership check
   if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
     ALOGE("%s: caller (pid %d, uid %d) doesn't hold %s permission", __func__,
           getpid(), getuid(), kCreateVirtualDevicePermission);
@@ -382,6 +384,7 @@ ndk::ScopedAStatus VirtualCameraService::unregisterCamera(
 
 ndk::ScopedAStatus VirtualCameraService::getCameraId(
     const ::ndk::SpAIBinder& token, std::string* _aidl_return) {
+  // TODO: b/489071771 - replace permission with ownership check
   if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
     ALOGE("%s: caller (pid %d, uid %d) doesn't hold %s permission", __func__,
           getpid(), getuid(), kCreateVirtualDevicePermission);
@@ -404,6 +407,22 @@ ndk::ScopedAStatus VirtualCameraService::getCameraId(
 
   *_aidl_return = camera->getCameraId();
 
+  return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus VirtualCameraService::closeSession(
+    const ::ndk::SpAIBinder& token) {
+  // TODO: b/489071771 - replace permission with ownership check
+  if (!mPermissionProxy.checkCallingPermission(kCreateVirtualDevicePermission)) {
+    ALOGE("%s: caller (pid %d, uid %d) doesn't hold %s permission", __func__,
+          getpid(), getuid(), kCreateVirtualDevicePermission);
+    return ndk::ScopedAStatus::fromExceptionCode(EX_SECURITY);
+  }
+
+  auto camera = getCamera(token);
+  if (camera != nullptr) {
+    camera->closeSession(true);
+  }
   return ndk::ScopedAStatus::ok();
 }
 

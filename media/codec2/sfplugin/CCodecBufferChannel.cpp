@@ -873,6 +873,12 @@ bool CCodecBufferChannel::fetchAndCopyEncryptedInfoBuffer(const std::span<const 
     constexpr int kAllocGranule0 = 1024 * 64;
     constexpr int kAllocGranule1 = 1024 * 1024;
 
+    if (input.empty()) {
+        // A buffer size is zero if the input is EOS. The encrypted info buffer is not sent to
+        // the C2 HAL then. Returns true without creating a block.
+        return true;
+    }
+
     std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
 
     // round up encrypted sizes to limit fragmentation and encourage buffer reuse
@@ -1102,6 +1108,7 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
     }
 
     if (mSendEncryptedInfoBuffer) {
+        CHECK_GT(size, 0u);
         sp<android::hidl::memory::V1_0::IMemory> im = getSourceIMemory(memory);
         if (!im) {
             ALOGE("Failed to map hidl_memory");
@@ -1119,7 +1126,8 @@ status_t CCodecBufferChannel::attachEncryptedBuffer(
         if (!fetchAndCopyEncryptedInfoBuffer(inputBuffer, &encryptedBlock, &encryptedBufferSize)) {
             return UNKNOWN_ERROR;
         }
-
+        // Since size is not zero, encryptedBlock must not be null.
+        CHECK(encryptedBlock);
         buffer->meta()->setObject(
                 "encrypted-block",
                 new WrapperObject<std::shared_ptr<C2LinearBlock>>{encryptedBlock});

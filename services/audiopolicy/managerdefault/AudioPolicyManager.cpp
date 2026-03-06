@@ -2683,13 +2683,7 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
     outputDesc->setClientActive(client, true);
 
     if (client->hasPreferredDevice(true)) {
-        if (outputDesc->sameExclusivePreferredDevicesCount() > 0) {
-            // Preferred device may be exclusive, use only if no other active clients on this output
-            devices = DeviceVector(
-                        mAvailableOutputDevices.getDeviceFromId(client->preferredDeviceId()));
-        } else {
-            devices = getNewOutputDevices(outputDesc, false /*fromCache*/);
-        }
+        devices = getNewOutputDevices(outputDesc, false /*fromCache*/);
         if (devices != outputDesc->devices()) {
             checkStrategyRoute(clientStrategy, outputDesc->mIoHandle);
         }
@@ -8301,7 +8295,17 @@ DeviceVector AudioPolicyManager::getNewOutputDevices(const sp<SwAudioOutputDescr
     sp<DeviceDescriptor> device =
         findPreferredDevice(outputDesc, PRODUCT_STRATEGY_NONE, active, mAvailableOutputDevices);
     if (device != nullptr) {
-        return DeviceVector(device);
+        // Never honor explicit routing for SCO unless defined by communication strategy:
+        // (1) BT stack must be primed (done via setCommunicationDevice)
+        // (2) Required mutual exclusion with A2DP, which is enforced with the strategy routing
+        if (audio_is_bluetooth_out_sco_device(device->type())) {
+            if (isScoRequestedForComm()) {
+                return DeviceVector(device);
+            }
+            ALOGI("Suppressing explicit SCO preference");
+        } else {
+            return DeviceVector(device);
+        }
     }
 
     // Legacy Engine cannot take care of bus devices and mix, so we need to handle the conflict
@@ -8345,7 +8349,21 @@ DeviceVector AudioPolicyManager::getNewOutputDevices(const sp<SwAudioOutputDescr
             break;
         }
     }
-    ALOGV("%s selected devices %s", __func__, devices.toString().c_str());
+    if (devices.empty()) {
+        // Consider the selected route for the most recently active strategy. This ensures that, if
+        // we haven't yet moved to standby, but there are no recent clients, we still re-route that
+        // patch, which is important for cleaning stale SCO patches.
+        // 7000ms to encompass standby time.
+        const auto strat = outputDesc->getMostRecentStrategy(/* inPastMs */ 7000);
+
+        if (strat != PRODUCT_STRATEGY_NONE) {
+            devices = mEngine->getOutputDevicesForStrategy(strat, nullptr, fromCache);
+            ALOGI("%s io %d recent device override %s", __func__, outputDesc->mIoHandle,
+                  devices.toString().c_str());
+        }
+    }
+    ALOGV("%s io %d selected devices %s", __func__, outputDesc->mIoHandle,
+          devices.toString().c_str());
     return devices;
 }
 
@@ -8369,8 +8387,20 @@ sp<DeviceDescriptor> AudioPolicyManager::getNewInputDevice(
     // for other apps by setting a preferred device.
     bool active;
     device = findPreferredDevice(inputDesc, AUDIO_SOURCE_DEFAULT, active, mAvailableInputDevices);
+    bool ignorePreferredDevice = false;
     if (device != nullptr) {
-        return device;
+        // Never honor explicit routing for SCO unless defined by communication strategy:
+        // (1) BT stack must be primed (done via setCommunicationDevice)
+        // (2) Required mutual exclusion with A2DP, which is enforced with the strategy routing
+        if (audio_is_bluetooth_in_sco_device(device->type())) {
+            if (isScoRequestedForComm()) {
+                return device;
+            }
+            ignorePreferredDevice = true;
+            ALOGI("Suppressing explicit SCO input preference");
+        } else {
+            return device;
+        }
     }
 
     // If we are not in call and no client is active on this input, this methods returns
@@ -8394,7 +8424,7 @@ sp<DeviceDescriptor> AudioPolicyManager::getNewInputDevice(
     }
     if (attributes.source != AUDIO_SOURCE_DEFAULT) {
         device = mEngine->getInputDeviceForAttributes(
-                attributes, false /*ignorePreferredDevice*/, uid, session);
+                attributes, ignorePreferredDevice, uid, session);
     }
 
     if (device && com::android::media::audioserver::enable_strict_port_routing_checks()
@@ -8655,7 +8685,12 @@ uint32_t AudioPolicyManager::setOutputDevices(const char *caller,
     // no need to proceed if new device is not AUDIO_DEVICE_NONE and not routable to/from current
     // output profile or if new device is not routable AND previous device(s) is(are) still
     // available (otherwise reset device must be done on the output)
-    if (!devices.isEmpty() && filteredDevices.isEmpty() && !availPrevDevices.empty()) {
+    // SCO is an exception: we should never restore the previous route to SCO, since it has
+    // implications for the overall HAL state. In that case, we proceed and reset the route, similar
+    // to explicitly setting the device to NONE.
+    if (!devices.isEmpty() && filteredDevices.isEmpty() && !availPrevDevices.empty() &&
+        !std::any_of(availPrevDevices.begin(), availPrevDevices.end(),
+                     [](const auto& x) { return audio_is_bluetooth_out_sco_device(x->type()); })) {
         ALOGV("%s: %s unsupported device %s for output", __func__, logPrefix.c_str(),
               devices.toString().c_str());
         // restore previous device after evaluating strategy mute state

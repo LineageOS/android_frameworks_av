@@ -134,7 +134,7 @@ status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced
     return EngineBase::setForceUse(usage, config);
 }
 
-bool Engine::isBtScoActive(DeviceVector& availableOutputDevices) const {
+bool Engine::isBtScoActive(const DeviceVector& availableOutputDevices) const {
     // SCO is considered active if:
     // 1) a SCO device is connected
     // 2) the preferred device for PHONE strategy is BT SCO: this is controlled only by java
@@ -821,7 +821,11 @@ DeviceVector Engine::getOutputDevicesForStrategy(product_strategy_t strategy,
     // case the last active client route is used
     sp<DeviceDescriptor> device = findPreferredDevice(outputs, strategy, availableOutputDevices);
     if (device != nullptr) {
-        return DeviceVector(device);
+        // Ignore preferred device to SCO when BT SCO is not active via communication strategy
+        if (!audio_is_bluetooth_out_sco_device(device->type()) ||
+            isBtScoActive(availableOutputDevices)) {
+            return DeviceVector(device);
+        }
     }
 
     return fromCache? mDevicesForStrategies.at(strategy) : getDevicesForProductStrategy(strategy);
@@ -856,6 +860,7 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
     const auto &policyMixes = getApmObserver()->getAudioPolicyMixCollection();
     const auto availableInputDevices = getApmObserver()->getAvailableInputDevices();
     const auto &inputs = getApmObserver()->getInputs();
+    const DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
     std::string address;
 
     //
@@ -868,7 +873,11 @@ sp<DeviceDescriptor> Engine::getInputDeviceForAttributes(const audio_attributes_
     if (!ignorePreferredDevice) {
         device = findPreferredDevice(inputs, attr.source, availableInputDevices);
         if (device != nullptr) {
-            return device;
+            // Ignore preferred device to SCO when BT SCO is not active via communication strategy
+            if (!audio_is_bluetooth_in_sco_device(device->type()) ||
+                isBtScoActive(availableOutputDevices)) {
+                return device;
+            }
         }
     }
 

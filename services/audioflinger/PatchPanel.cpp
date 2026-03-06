@@ -29,6 +29,9 @@
 #include <media/PatchBuilder.h>
 #include <utils/Log.h>
 
+#include <sstream>
+#include <string>
+
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In
@@ -106,6 +109,38 @@ status_t PatchPanel::getAudioPort_l(struct audio_port_v7* port)
         return INVALID_OPERATION;
     }
     return hwDevice->getAudioPort(port);
+}
+
+static std::string patchToStr(const struct audio_patch& patch, audio_patch_handle_t id) {
+    std::stringstream result;
+    result << "patch " << id << " srcs";
+    for (unsigned int i = 0; i < patch.num_sources; ++i) {
+        const struct audio_port_config &port = patch.sources[i];
+        result << " {";
+        if (port.type == AUDIO_PORT_TYPE_DEVICE) {
+            result << "dev 0x" << std::hex << port.ext.device.type << std::dec;
+        } else if (port.type == AUDIO_PORT_TYPE_MIX) {
+            result << "mix " << port.ext.mix.handle;
+        } else {
+            result << "type " << port.type;
+        }
+        result << " id " << port.id << "}";
+    }
+
+    result << " sinks";
+    for (unsigned int i = 0; i < patch.num_sinks; ++i) {
+        const struct audio_port_config &port = patch.sinks[i];
+        result << " {";
+        if (port.type == AUDIO_PORT_TYPE_DEVICE) {
+            result << "dev 0x" << std::hex << port.ext.device.type << std::dec;
+        } else if (port.type == AUDIO_PORT_TYPE_MIX) {
+            result << "mix " << port.ext.mix.handle;
+        } else {
+            result << "type " << port.type;
+        }
+        result << " id " << port.id << "}";
+    }
+    return result.str();
 }
 
 /* Connect a patch between several source and sink ports */
@@ -476,6 +511,17 @@ exit:
         *handle = static_cast<audio_patch_handle_t>(
                 mAfPatchPanelCallback->nextUniqueId(AUDIO_UNIQUE_ID_USE_PATCH));
         newPatch.mHalHandle = halHandle;
+
+        const char* halAction = "none";
+        if (!(newPatch.isSoftware() || (endpointPatch && reuseExistingHalPatch))) {
+            if (reuseExistingHalPatch) {
+                halAction = "update";
+            } else {
+                halAction = "create";
+            }
+        }
+        mEvents.log("add %s hal %s", patchToStr(newPatch.mAudioPatch, *handle).c_str(), halAction);
+
         // Skip device effect:
         //  -for sw bridge as effect are likely held by endpoint patches
         //  -for endpoint reusing a HalPatch handle
@@ -887,7 +933,10 @@ status_t PatchPanel::releaseAudioPatch_l(audio_patch_handle_t handle)
             status = BAD_VALUE;
     }
 
-    erasePatch(handle, /* reuseExistingHalPatch= */ !doReleasePatch || isSwBridge);
+    std::string patchStr = patchToStr(removedPatch.mAudioPatch, handle);
+    const bool reuse = !doReleasePatch || isSwBridge;
+    erasePatch(handle, reuse);
+    mEvents.log("del %s reused %s", patchStr.c_str(), reuse ? "true" : "false");
     return status;
 }
 
@@ -1030,6 +1079,7 @@ void PatchPanel::dump(int fd) const
     if (!patchPanelDump.empty()) {
         write(fd, patchPanelDump.c_str(), patchPanelDump.size());
     }
+    mEvents.dump(fd, "  " /* prefix */);
 }
 
 } // namespace android
