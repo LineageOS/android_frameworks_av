@@ -2056,7 +2056,8 @@ void ThreadBase::broadcast_l()
 // static
 audio_utils::CommandThread& ThreadBase::getAsyncCommandThread()
 {
-    [[clang::no_destroy]] static audio_utils::CommandThread commandThread{};
+    [[clang::no_destroy]] static audio_utils::CommandThread commandThread{
+        audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_URGENT_AUDIO)};
     return commandThread;
 }
 
