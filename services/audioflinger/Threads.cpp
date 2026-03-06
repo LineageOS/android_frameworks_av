@@ -10719,10 +10719,14 @@ status_t MmapThread::startTrack(audio_port_handle_t portId)
         // force volume update when a new track is added
         mHalVolFloat = -1.0f;
     } else {
-        track->asIAfMmapTrack()->setSilenced_l(isClientSilenced_l(portId));
-        for (const auto& t : mActiveMmapTracksView) {
-            if (t->isSilenced_l() && t->uid() != track->uid()) {
-                t->invalidate();
+        const bool silenced = isClientSilenced_l(portId);
+        track->asIAfMmapTrack()->setSilenced_l(silenced);
+        // Only invalidate silenced MMAP tracks when a non-silenced track is started.
+        if (!silenced) {
+            for (const auto& t : mActiveMmapTracksView) {
+                if (t->isSilenced_l() && t->uid() != track->uid()) {
+                    t->invalidate();
+                }
             }
         }
     }
