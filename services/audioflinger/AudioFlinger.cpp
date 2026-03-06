@@ -2275,6 +2275,8 @@ AudioFlinger::NotificationClient::~NotificationClient()
 
 void AudioFlinger::NotificationClient::binderDied(const wp<IBinder>& who __unused)
 {
+    audio_utils::set_priority_for_binder_callback(__func__);
+
     const auto keep = sp<NotificationClient>::fromExisting(this);
     mAudioFlinger->removeNotificationClient(mPid);
 }
@@ -2282,6 +2284,8 @@ void AudioFlinger::NotificationClient::binderDied(const wp<IBinder>& who __unuse
 void AudioFlinger::NotificationClient::onStateChanged(
         const android::wp<IBinder>& who __unused, State state)
 {
+    audio_utils::set_priority_for_binder_callback(__func__);
+
     if (state == IBinder::FrozenStateChangeCallback::State::FROZEN) {
         mFrozen = true;
         mAudioFlinger->onClientFrozen(mPid);
@@ -2289,7 +2293,8 @@ void AudioFlinger::NotificationClient::onStateChanged(
         mFrozen = false;
         mAudioFlinger->onClientUnfrozen(mPid);
     }
-    ALOGW("%s: pid:%d  uid:%d  state:%s",
+    ALOGV("%s: priority: %d", __func__, audio_utils::get_thread_priority(gettid()));
+    ALOGD("%s: pid:%d  uid:%d  state:%s",
           __func__, mPid, mUid, (mFrozen ? "frozen" : "unfrozen"));
 }
 

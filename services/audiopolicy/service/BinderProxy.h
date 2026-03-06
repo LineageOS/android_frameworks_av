@@ -79,6 +79,7 @@ private:
         DeathRecipient(BinderProxy* proxy) : mProxy(proxy) {}
 
         void binderDied(const wp<IBinder>&) override {
+            audio_utils::set_priority_for_binder_callback(__func__);
             mProxy->binderDied();
         }
 

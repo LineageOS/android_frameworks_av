@@ -720,6 +720,8 @@ AudioPolicyService::NotificationClient::~NotificationClient()
 
 void AudioPolicyService::NotificationClient::binderDied(const wp<IBinder>& who __unused)
 {
+    audio_utils::set_priority_for_binder_callback(__func__);
+
     sp<NotificationClient> keep(this);
     sp<AudioPolicyService> service = mService.promote();
     if (service != 0) {
@@ -1560,6 +1562,8 @@ void AudioPolicyService::UidPolicy::unregisterSelf() {
 }
 
 void AudioPolicyService::UidPolicy::binderDied(__unused const wp<IBinder> &who) {
+    audio_utils::set_priority_for_binder_callback(__func__);
+
     audio_utils::lock_guard _l(mMutex);
     mCachedUids.clear();
     mObserverRegistered = false;

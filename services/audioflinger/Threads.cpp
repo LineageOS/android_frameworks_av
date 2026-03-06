@@ -1276,6 +1276,8 @@ void ThreadBase::resizeInputBuffer_l(int32_t /* maxSharedAudioHistoryMs */)
 
 void ThreadBase::PMDeathRecipient::binderDied(const wp<IBinder>& /* who */)
 {
+    audio_utils::set_priority_for_binder_callback(__func__);
+
     sp<ThreadBase> thread = mThread.promote();
     if (thread != 0) {
         thread->clearPowerManager();
