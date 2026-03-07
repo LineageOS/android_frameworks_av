@@ -2197,7 +2197,8 @@ status_t CCodecConfig::getConfigUpdateFromSdkParams(
     }
 
     if (android::media::codec::provider_->temporal_layer_encoding() &&
-        mDomain == (IS_VIDEO | IS_ENCODER) && !sdkParams->contains(KEY_TEMPORAL_LAYER_ID)) {
+        mDomain == (IS_VIDEO | IS_ENCODER) && configDomain == IS_CONFIG &&
+        !sdkParams->contains(KEY_TEMPORAL_LAYER_ID)) {
         // Don't update temporal layer index every frame if TEMPORAL_LAYER_ID is not specified in
         // configure() so an application doesn't get INFO_OUTPUT_FORMAT_CHANGED event due to
         // temporal layer index.
