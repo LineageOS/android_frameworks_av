@@ -155,7 +155,7 @@ struct AImageReader : public RefBase {
       public:
         explicit BufferRemovedListener(AImageReader* parent) : mReader(parent) {}
 
-        void onBufferFreed(const wp<GraphicBuffer>& graphicBuffer) override;
+        void onBufferFreed(const sp<GraphicBuffer>& graphicBuffer) override;
 
         media_status_t setBufferRemovedListener(AImageReader_BufferRemovedListener* listener);
 

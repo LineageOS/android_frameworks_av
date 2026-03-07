@@ -719,27 +719,24 @@ void C2SoftXheAacEnc::process(
                              + (mOutSampleRate / 2)) / mOutSampleRate;
         buffer = outputBuffers.front().buffer;
     }
-    if (eos || !outputBuffers.empty()) {
-        ordinal.frameIndex = mOutIndex++;
-        if (eos) {
-            cloneAndSend(
-                    inputIndex,
-                    work,
-                    FillWork(C2FrameData::FLAG_INCOMPLETE, ordinal, buffer));
-        } else {
-            // Mark the end of frame
-            FillWork((C2FrameData::flags_t)(0), ordinal, buffer)(work);
-        }
-    }
+
+    ordinal.frameIndex = mOutIndex++;
     if (eos) {
+        cloneAndSend(
+                inputIndex,
+                work,
+                FillWork(C2FrameData::FLAG_INCOMPLETE, ordinal, buffer));
         // Schedule a separate work without buffer to properly signal the end of the
         // (possibly shorter) last frame
-        C2WorkOrdinalStruct ordinal = work->input.ordinal;
-        ordinal.frameIndex = mOutIndex++;
-        ordinal.timestamp = (mNextFrameTimestampOutputTicks.value_or(0U).peeku() * 1'000'000LL
+        C2WorkOrdinalStruct eosOrdinal = work->input.ordinal;
+        eosOrdinal.frameIndex = mOutIndex++;
+        eosOrdinal.timestamp = (mNextFrameTimestampOutputTicks.value_or(0U).peeku() * 1'000'000LL
                              + (mOutSampleRate / 2)) / mOutSampleRate;
         // Mark the end of stream
-        FillWork(C2FrameData::FLAG_END_OF_STREAM, ordinal, nullptr)(work);
+        FillWork(C2FrameData::FLAG_END_OF_STREAM, eosOrdinal, nullptr)(work);
+    } else {
+        // Mark the end of frame
+        FillWork((C2FrameData::flags_t)(0), ordinal, buffer)(work);
     }
 }
 

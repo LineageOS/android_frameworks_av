@@ -86,7 +86,7 @@ class Camera3InputStream : public Camera3IOStreamBase,
     /**
      * BufferItemConsumer::BufferFreedListener interface
      */
-    virtual void onBufferFreed(const wp<GraphicBuffer>&) override;
+    virtual void onBufferFreed(const sp<GraphicBuffer>&) override;
 
 }; // class Camera3InputStream
 
