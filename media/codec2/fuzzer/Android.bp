@@ -80,7 +80,11 @@ cc_defaults {
 
 cc_fuzz {
     name: "C2FuzzerAvcDec",
-    defaults: ["C2Fuzzer-defaults-shipped"],
+    defaults: [
+        "C2Fuzzer-defaults-shipped",
+        //TODO: b/485868924
+        "no_bti",
+    ],
 
     cflags: [
         "-DC2COMPONENTNAME=\"c2.android.avc.decoder\"",
@@ -94,7 +98,11 @@ cc_fuzz {
 
 cc_fuzz {
     name: "C2FuzzerHevcDec",
-    defaults: ["C2Fuzzer-defaults-shipped"],
+    defaults: [
+        "C2Fuzzer-defaults-shipped",
+        //TODO: b/485868924
+        "no_bti",
+    ],
 
     cflags: [
         "-DC2COMPONENTNAME=\"c2.android.hevc.decoder\"",
@@ -108,7 +116,11 @@ cc_fuzz {
 
 cc_fuzz {
     name: "C2FuzzerMpeg2Dec",
-    defaults: ["C2Fuzzer-defaults-shipped"],
+    defaults: [
+        "C2Fuzzer-defaults-shipped",
+        //TODO: b/485868924
+        "no_bti",
+    ],
 
     cflags: [
         "-DC2COMPONENTNAME=\"c2.android.mpeg2.decoder\"",
@@ -382,7 +394,10 @@ cc_fuzz {
 
 cc_fuzz {
     name: "C2FuzzerXaacDec",
-    defaults: ["C2Fuzzer-defaults-experimental"],
+    defaults: [
+        "C2Fuzzer-defaults-experimental",
+        "no_bti",
+    ],
 
     cflags: [
         "-DC2COMPONENTNAME=\"c2.android.xaac.decoder\"",
