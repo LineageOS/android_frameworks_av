@@ -208,6 +208,7 @@ public:
     virtual bool isExternalTrack() const = 0;
 
     virtual void invalidate() = 0;
+    virtual void poison() = 0;
     virtual bool isInvalid() const = 0;
 
     virtual void terminate() = 0;

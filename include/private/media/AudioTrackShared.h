@@ -44,7 +44,7 @@ namespace android {
 #define CBLK_DISABLED   0x08 // output track disabled by AudioFlinger due to underrun,
                              // need to re-start.  Unlike CBLK_UNDERRUN, this is not set
                              // immediately, but only after a long string of underruns.
-// 0x10 unused
+#define CBLK_POISONED   0x10 // track buffer poisoned by AudioFlinger, cannot be restored
 #define CBLK_LOOP_CYCLE 0x20 // set by server each time a loop cycle other than final one completes
 #define CBLK_LOOP_FINAL 0x40 // set by server when the final loop cycle completes
 #define CBLK_BUFFER_END 0x80 // set by server when the position reaches end of buffer if not looping

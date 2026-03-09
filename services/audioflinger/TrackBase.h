@@ -80,6 +80,7 @@ public:
     bool isOutputTrack() const final { return (mType == TYPE_OUTPUT); }
     bool isPatchTrack() const final { return (mType == TYPE_PATCH); }
     bool isExternalTrack() const final { return !isOutputTrack() && !isPatchTrack(); }
+    void poison() override {}
     void invalidate() override {
                             if (mIsInvalid) return;
                             mTrackMetrics.logInvalidate();

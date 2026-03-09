@@ -2661,8 +2661,9 @@ nsecs_t AudioTrack::processAudioBuffer()
                 // FIXME bug 25195759
                 return 1000000;
             }
-            ALOGE("%s(%d): Error %d obtaining an audio buffer, giving up.",
-                    __func__, mPortId, err);
+            LOG_ALWAYS_FATAL_IF(err == PERMISSION_DENIED,
+                                "AudioTrack poisoned in callback transfer mode, aborting!");
+            ALOGE("%s(%d): Error %d obtaining an audio buffer, giving up.", __func__, mPortId, err);
             return NS_NEVER;
         }
 
@@ -2828,6 +2829,11 @@ status_t AudioTrack::restoreTrack_l(const char *from, bool forceRestore)
             .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
             .set(AMEDIAMETRICS_PROP_WHERE, from)
             .record(); });
+
+    if (mCblk != nullptr && (mCblk->mFlags & CBLK_POISONED)) {
+        ALOGW("Track %d poisoned, aborting restore", mPortId);
+        return PERMISSION_DENIED;
+    }
 
     ALOGW("%s(%d): dead IAudioTrack, %s, creating a new one from %s()",
             __func__, mPortId, isOffloadedOrDirect_l() ? "Offloaded or Direct" : "PCM", from);
