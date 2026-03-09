@@ -48,20 +48,9 @@ void ResourceManagerServiceNew::init() {
     setUpReclaimPolicies();
 }
 
-// Check whether the codec availability feature is on or off.
-inline bool IsCodecAvailabilityFeatureOn() {
-    if (android::media::codec::codec_availability() &&
-        android::media::codec::codec_availability_support()) {
-        return true;
-    }
-
-    return false;
-}
-
 // Check whether the codec availability metrics is on or off.
 inline bool IsCodecAvailabilityMetricsFeatureOn() {
-    if (IsCodecAvailabilityFeatureOn() &&
-        android::media::codec::codec_availability_metrics()) {
+    if (android::media::codec::codec_availability_metrics()) {
         return true;
     }
 
@@ -260,11 +249,6 @@ Status ResourceManagerServiceNew::getMediaResourceUsageReport(
     }
 
     resources->clear();
-    if (!android::media::codec::codec_availability() ||
-        !android::media::codec::codec_availability_support()) {
-        return Status::fromStatus(INVALID_OPERATION);
-    }
-
     {
         std::scoped_lock lock{mLock};
         *resources = mResourceTracker->getMediaResourceUsageReport();
