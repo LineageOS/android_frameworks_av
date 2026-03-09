@@ -88,7 +88,7 @@ aaudio_result_t AAudioServiceStreamMMAP::startDevice_l() {
     aaudio_result_t result = AAudioServiceStreamBase::startDevice_l();
     if (!mInService && result == AAUDIO_OK) {
         // Note that this can sometimes take 200 to 300 msec for a cold start!
-        result = startClient_l(mClientHandle);
+        result = startClient_l(mPortHandle);
     }
     return result;
 }
@@ -101,7 +101,7 @@ aaudio_result_t AAudioServiceStreamMMAP::pause_l() {
     aaudio_result_t result = AAudioServiceStreamBase::pause_l();
     // TODO put before base::pause()?
     if (!mInService) {
-        (void) stopClient_l(mClientHandle);
+        (void) stopClient_l(mPortHandle);
     }
     return result;
 }
@@ -113,7 +113,7 @@ aaudio_result_t AAudioServiceStreamMMAP::stop_l() {
     aaudio_result_t result = AAudioServiceStreamBase::stop_l();
     // TODO put before base::stop()?
     if (!mInService) {
-        (void) stopClient_l(mClientHandle);
+        (void) stopClient_l(mPortHandle);
     }
     return result;
 }
