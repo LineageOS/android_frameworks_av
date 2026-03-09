@@ -145,9 +145,6 @@ private:
 
     struct audio_mmap_buffer_info             mMmapBufferinfo;
 
-    // There is only one port associated with an MMAP endpoint.
-    audio_port_handle_t                       mPortHandle = AUDIO_PORT_HANDLE_NONE;
-
     android::AAudioService                    &mAAudioService;
 
     std::unique_ptr<SharedMemoryWrapper>      mAudioDataWrapper;
