@@ -113,6 +113,7 @@ status_t AudioTrackMmap::createTrack_l() {
 }
 
 AudioTrackMmap::~AudioTrackMmap() {
+    stopAndJoinCallbacks();
     if (mStream != nullptr) {
         mStream->safeReleaseClose();
         mStream.clear();
@@ -143,7 +144,6 @@ status_t AudioTrackMmap::start() {
 void AudioTrackMmap::stop() {
     AutoMutex lock(mLock);
     mStream->systemStopFromApp();
-    mStream->setOffloadEndOfStream();
     sp<AudioTrackThread> t = mAudioTrackThread;
     if (t != nullptr) {
         // causes wake up of the playback thread, that will callback the client for
@@ -392,6 +392,7 @@ int32_t AudioTrackMmap::aaudioPartialDataCallbackImpl(int32_t numFrames) {
             .mParams = numFrames,
     };
     mCbEvents.push_back(std::move(event));
+    mMmapCbCond.notify_one();
     return 0;
 }
 
@@ -407,6 +408,7 @@ void AudioTrackMmap::aaudioPresentationEndCallbackImpl() {
             .mEvent = EVENT_STREAM_END,
     };
     mCbEvents.push_back(std::move(event));
+    mMmapCbCond.notify_one();
 }
 
 //======================= Unsupported functions ===============================
