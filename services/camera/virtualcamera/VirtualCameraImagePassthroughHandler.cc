@@ -214,21 +214,10 @@ bool VirtualCameraImagePassthroughHandler::waitForInputFrame(
   if (mFrameAvailableFuture->wait_for(timeoutNs) != std::future_status::ready) {
     ALOGE("%s: timed out after %llu ns waiting for frame arrival", __func__,
           timeoutNs.count());
-    resetFrameAvailableSignalingMechanism();
     return false;
   }
 
-  bool frameAvailable = mFrameAvailableFuture->get();
-  resetFrameAvailableSignalingMechanism();
-  return frameAvailable;
-}
-
-void VirtualCameraImagePassthroughHandler::interruptWait() {
-  std::lock_guard<std::mutex> criticalSection{mFrameAvailableCallbackMutex};
-  if (!mFrameAvailablePromiseSignalled && mFrameAvailablePromise != nullptr) {
-    mFrameAvailablePromiseSignalled = true;
-    mFrameAvailablePromise->set_value(false);
-  }
+  return mFrameAvailableFuture->get();
 }
 
 void VirtualCameraImagePassthroughHandler::updateTexture() {

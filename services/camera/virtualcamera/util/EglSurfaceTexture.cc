@@ -30,7 +30,7 @@
 #include <mutex>
 
 #include "EglUtil.h"
-#include "android-base/thread_annotations.h"
+#include "android_companion_virtualdevice_flags.h"
 
 namespace android {
 namespace companion {
@@ -105,10 +105,6 @@ void EglSurfaceTexture::setFrameAvailableListener(
 
 bool EglSurfaceTexture::waitForNextFrame(const std::chrono::nanoseconds timeout) {
   std::unique_lock<std::mutex> lock(mWaitForFrameMutex);
-  base::ScopedLockAssertion lockAssertion(mWaitForFrameMutex);
-  if (std::exchange(mInterruptWait, false)) {
-    return false;
-  }
   mGlConsumer->updateTexImage();
   const long lastRenderedFrame = mGlConsumer->getFrameNumber();
   const long lastWaitedForFrame = mLastWaitedFrame.exchange(lastRenderedFrame);
@@ -121,26 +117,12 @@ bool EglSurfaceTexture::waitForNextFrame(const std::chrono::nanoseconds timeout)
       "%s waiting for max %lld ns. Last waited frame:%ld, last rendered "
       "frame:%ld",
       __func__, timeout.count(), lastWaitedForFrame, lastRenderedFrame);
-  mFrameAvailableCondition.wait_for(lock, timeout, [this]() {
-    base::ScopedLockAssertion lockAssertion(mWaitForFrameMutex);
-    if (std::exchange(mInterruptWait, false)) {
-      return true;
-    }
+  return mFrameAvailableCondition.wait_for(lock, timeout, [this]() {
     // Call updateTexImage to update the frame number.
     mGlConsumer->updateTexImage();
     const long lastRenderedFrame = mGlConsumer->getFrameNumber();
     return lastRenderedFrame > mLastWaitedFrame.exchange(lastRenderedFrame);
   });
-
-  // If we were notified, we need to check if it was because of an interrupt
-  // or because a new frame was available.
-  return mGlConsumer->getFrameNumber() > lastWaitedForFrame;
-}
-
-void EglSurfaceTexture::interruptWait() {
-  std::lock_guard<std::mutex> lock(mWaitForFrameMutex);
-  mInterruptWait = true;
-  mFrameAvailableCondition.notify_all();
 }
 
 std::chrono::nanoseconds EglSurfaceTexture::getTimestamp() const {

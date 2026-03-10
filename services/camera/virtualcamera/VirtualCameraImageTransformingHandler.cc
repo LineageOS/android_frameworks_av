@@ -166,10 +166,6 @@ bool VirtualCameraImageTransformingHandler::waitForInputFrame(
   return mEglSurfaceTexture->waitForNextFrame(timeout);
 }
 
-void VirtualCameraImageTransformingHandler::interruptWait() {
-  mEglSurfaceTexture->interruptWait();
-}
-
 void VirtualCameraImageTransformingHandler::updateTexture() {
   mEglSurfaceTexture->updateTexture();
 }

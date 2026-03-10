@@ -35,6 +35,11 @@
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/ICameraDeviceCallback.h"
 #include "gui/Surface.h"
+#include "ui/PixelFormat.h"
+#include "util/EglDisplayContext.h"
+#include "util/EglFramebuffer.h"
+#include "util/EglProgram.h"
+#include "util/EglSurfaceTexture.h"
 #include "util/Util.h"
 
 namespace android {
