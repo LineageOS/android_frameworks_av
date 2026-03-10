@@ -362,6 +362,11 @@ bool Camera3OutputStream::processRemovedConsumerLocked(
         ANativeWindowBuffer *anwBuffer, int anwReleaseFence) {
     bool bufferReturned = false;
 
+    // If the call to cancelBuffer is successful, then 'anwBuffer' will no longer
+    // be valid. Keep the buffer handle valid until it is needed for the
+    // 'onBufferFreed' bookkeeping callback.
+    sp<GraphicBuffer> graphicBuffer = GraphicBuffer::from(anwBuffer);
+
     sp<ANativeWindow> currentConsumer = (*removedConsumer).second.mConsumer;
     mLock.unlock();
     auto res = currentConsumer->cancelBuffer(currentConsumer.get(), anwBuffer,
