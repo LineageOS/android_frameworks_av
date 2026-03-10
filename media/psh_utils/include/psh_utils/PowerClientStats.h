@@ -66,6 +66,20 @@ public:
     void stop(int64_t actualNs) EXCLUDES(mMutex);
 
     /**
+     * Sets the freeze state for a pid.
+     * @param pid pid of app.
+     * @param frozen true if frozen.
+     * @return true if there is an active client track and the prior state was frozen or
+     *         the current state is frozen.
+     */
+    bool setFrozen(pid_t pid, bool frozen) EXCLUDES(mMutex);
+
+    /**
+     * Returns true if the pid is currently frozen.
+     */
+    bool isFrozen(pid_t pid) const EXCLUDES(mMutex);
+
+    /**
      * Adds a pid to the App for string printing.
      */
     void addPid(pid_t pid) EXCLUDES(mMutex);
@@ -108,6 +122,9 @@ private:
     std::shared_ptr<PowerStats> mCumulativeStats GUARDED_BY(mMutex) =
             std::make_shared<PowerStats>();
     std::shared_ptr<PowerStats> mMaxStats GUARDED_BY(mMutex);
+    std::set<pid_t> mFrozenPids GUARDED_BY(mMutex);
+    int64_t mFrozenWhileActive GUARDED_BY(mMutex) = 0;
+    int64_t mLastFrozenWhileActiveRealTimeNs GUARDED_BY(mMutex) = 0;
 };
 
 } // namespace android::media::psh_utils

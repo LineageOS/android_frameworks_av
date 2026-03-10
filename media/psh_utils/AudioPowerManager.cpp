@@ -81,6 +81,20 @@ std::unique_ptr<Token> AudioPowerManager::startThread(
     return token;
 }
 
+bool AudioPowerManager::setFrozen(pid_t pid, bool frozen) {
+    std::lock_guard l(mMutex);
+    const auto stats = getPowerClientStatsFromPid_l(pid);
+    if (stats == nullptr) return false;
+    return stats->setFrozen(pid, frozen);
+}
+
+bool AudioPowerManager::isFrozen(pid_t pid) const {
+    std::lock_guard l(mMutex);
+    const auto stats = getPowerClientStatsFromPid_l(pid);
+    if (stats == nullptr) return false;
+    return stats->isFrozen(pid);
+}
+
 std::string AudioPowerManager::toString() const {
     const std::string prefix("  ");
     std::string result;
@@ -123,6 +137,23 @@ void AudioPowerManager::stopClient(pid_t pid) {
         }
     }
     mPidToUid.erase(pid);
+}
+
+std::shared_ptr<PowerClientStats>
+AudioPowerManager::getPowerClientStatsFromPid_l(pid_t pid) const {
+    const auto pidit = mPidToUid.find(pid);
+    if (pidit == mPidToUid.end()) {
+        ALOGW("%s: pid %d doesn't exist (unexpected)", __func__, pid);
+        return {};
+    }
+
+    const uid_t uid = pidit->second;
+    const auto it = mPowerClientStats.find(uid);
+    if (it == mPowerClientStats.end()) {
+        ALOGW("%s: uid %d doesn't exist (unexpected)", __func__, uid);
+        return {};
+    }
+    return it->second;
 }
 
 void AudioPowerManager::clear_token_ptr(Token* token) {
