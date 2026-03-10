@@ -546,6 +546,7 @@ interface IAudioPolicyService {
         DEFAULT = 0,
         DISABLE = 1,
         ENABLE = 2,
+        THROW = 3,
     }
 
     /**
