@@ -3743,16 +3743,16 @@ getHardeningDecision(audio_usage_t usage, IAfThreadCallback& cb, uid_t uid) {
     }
 
     const auto& pp = cb.getPermissionProvider();
-    if (pp.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, uid) ||
-        pp.checkPermission(PermissionEnum::MODIFY_PHONE_STATE, uid)) {
+    if (pp.checkPermission(PermissionEnum::MODIFY_AUDIO_ROUTING, uid).value_or(false) ||
+        pp.checkPermission(PermissionEnum::MODIFY_PHONE_STATE, uid).value_or(false)) {
         return {EnforcementLevel::NONE, PRIVILEGED_APP};
     }
 
     if (hardening_strict()) {
         if (hardening_usage()) {
             if (usage == AUDIO_USAGE_ALARM) {
-                if (pp.checkPermission(PermissionEnum::SCHEDULE_EXACT_ALARM, uid) ||
-                    pp.checkPermission(PermissionEnum::USE_EXACT_ALARM, uid)) {
+                if (pp.checkPermission(PermissionEnum::SCHEDULE_EXACT_ALARM, uid).value_or(false) ||
+                    pp.checkPermission(PermissionEnum::USE_EXACT_ALARM, uid).value_or(false)) {
                     return {EnforcementLevel::PARTIAL, ALARM};
                 }
             }
