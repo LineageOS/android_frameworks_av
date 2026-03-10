@@ -647,18 +647,18 @@ status_t Camera3Device::dump(int fd, [[maybe_unused]] const Vector<String16> &ar
         lines = "    Last request sent:\n";
         LatestRequestInfo lastRequestInfo = getLatestRequestInfoLocked();
         // Print out output and input stream ids
-        if (flags::dumpsys_request_stream_ids()) {
-            if (lastRequestInfo.outputStreamIds.size() != 0) {
-                lines += "      Output Stream Ids:\n";
-                for (const auto &streamId: lastRequestInfo.outputStreamIds) {
-                    lines +=  "         " + std::to_string(streamId) + "\n";
-                }
-            }
-            if (lastRequestInfo.inputStreamId != -1) {
-                lines += "       Input Stream Id: " + std::to_string(lastRequestInfo.inputStreamId)
-                        + "\n";
+
+        if (lastRequestInfo.outputStreamIds.size() != 0) {
+            lines += "      Output Stream Ids:\n";
+            for (const auto &streamId: lastRequestInfo.outputStreamIds) {
+                lines +=  "         " + std::to_string(streamId) + "\n";
             }
         }
+        if (lastRequestInfo.inputStreamId != -1) {
+            lines += "       Input Stream Id: " + std::to_string(lastRequestInfo.inputStreamId)
+                    + "\n";
+        }
+
         // Keeping this write() outside the flagged if makes it easier while
         // removing the flag.
         write(fd, lines.c_str(), lines.size());
@@ -667,13 +667,12 @@ status_t Camera3Device::dump(int fd, [[maybe_unused]] const Vector<String16> &ar
         write(fd, lines.c_str(), lines.size());
 
         lastRequestSettings.dump(fd, /*verbosity=all info*/2, /*indentation*/6);
-        if (flags::dumpsys_request_stream_ids()) {
-            for (const auto& pair: lastRequestInfo.physicalRequestSettings) {
-                lines = "    Physical request settings for camera id " + pair.first + ":\n";
-                write(fd, lines.c_str(), lines.size());
-                pair.second.dump(fd, /*verbosity=all info*/2, /*indentation*/8);
-            }
+        for (const auto& pair: lastRequestInfo.physicalRequestSettings) {
+            lines = "    Physical request settings for camera id " + pair.first + ":\n";
+            write(fd, lines.c_str(), lines.size());
+            pair.second.dump(fd, /*verbosity=all info*/2, /*indentation*/8);
         }
+
     }
 
     if (dumpTemplates) {

@@ -120,16 +120,6 @@ flag {
 
 flag {
     namespace: "camera_platform"
-    name: "dumpsys_request_stream_ids"
-    description: "Add stream id information to last request dumpsys"
-    bug: "357913929"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    namespace: "camera_platform"
     name: "mirror_mode_shared_surfaces"
     is_exported: true
     description: "Support setting and getting mirror mode for shared surfaces"
