@@ -275,6 +275,7 @@ protected:
     void signalClientFlag(int32_t flag);
 
     void triggerEvents(AudioSystem::sync_event_t type) final;
+    void poison() final;
     void invalidate() final;
     void disable() final;
     bool isDisabled() const final;

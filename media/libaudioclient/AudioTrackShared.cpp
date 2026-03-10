@@ -191,6 +191,11 @@ status_t ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *reques
             status = DEAD_OBJECT;
             goto end;
         }
+        if (flags & CBLK_POISONED) {
+            ALOGV("Track poisoned");
+            status = PERMISSION_DENIED;
+            goto end;
+        }
         if (flags & CBLK_DISABLED) {
             ALOGV("Track disabled");
             status = NOT_ENOUGH_DATA;

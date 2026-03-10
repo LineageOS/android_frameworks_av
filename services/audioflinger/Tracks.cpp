@@ -2060,6 +2060,12 @@ status_t Track::setSyncEvent(
     return NO_ERROR;
 }
 
+void Track::poison()
+{
+    TrackBase::poison();
+    signalClientFlag(CBLK_POISONED);
+}
+
 void Track::invalidate()
 {
     TrackBase::invalidate();
