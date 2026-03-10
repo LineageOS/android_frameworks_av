@@ -62,6 +62,10 @@ aaudio_result_t AudioStreamInternalPlay::open(const AAudioStreamOpenRequest& ope
     aaudio_result_t result = AudioStreamInternal::open(openRequest);
     const bool useVolumeRamps = (getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE);
     if (result == AAUDIO_OK) {
+        mNanosPerBurst =
+                getDeviceFramesPerBurst() * AAUDIO_NANOS_PER_SECOND / getDeviceSampleRate();
+        LOG_ALWAYS_FATAL_IF(
+                mNanosPerBurst < 0 , "Nanos per burst is negative, %jd", mNanosPerBurst);
         result = mFlowGraph.configure(getFormat(),
                              getSamplesPerFrame(),
                              getSampleRate(),
@@ -923,9 +927,15 @@ void *AudioStreamInternalPlay::callbackLoop() {
                 // For data available callback, it doesn't transfer any data. Instead,
                 // it signals a notification to client to call write for data transfer.
                 const int32_t fullFrames = mAudioEndpoint->getFullFramesAvailable();
+                if (fullFrames <= 0) {
+                    // No need to fire data callback. The DSP may just start or slowly read.
+                    // Wait for a burst to check if there is data available.
+                    android::audio_utils::unique_lock ul(mStreamMutex);
+                    mCallbackCV.wait_for(ul, std::chrono::nanoseconds(mNanosPerBurst));
+                    continue;
+                }
                 timeoutNanosForDataAvailableCB =
-                        static_cast<int64_t>(fullFrames) * AAUDIO_NANOS_PER_SECOND
-                        / getSampleRate();
+                        fullFrames * AAUDIO_NANOS_PER_SECOND / getSampleRate();
                 callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), fullFrames);
             } else {
                 callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), mCallbackFrames);
@@ -977,15 +987,19 @@ void *AudioStreamInternalPlay::callbackLoop() {
                     mCallbackCV.wait_for(
                             ul, std::chrono::nanoseconds(timeoutNanosForDataAvailableCB),
                             [this]() REQUIRES(mStreamMutex) {
-                        return mDrainingNanosValid;
+                        return mDrainingNanosValid || !isActive();
                     });
+                    ALOGD("Stopping waiting for draining nanos, mDrainingNanosValid=%d, active=%d",
+                          mDrainingNanosValid, isActive());
                 }
                 if (mDrainingNanosValid) {
                     mCallbackCV.wait_for(ul, std::chrono::nanoseconds(mDrainingNanos),
                                          [this]() REQUIRES(mStreamMutex) {
                         return !mDraining;
                     });
-                    ALOGW_IF(mDraining, "After waiting for drain, still draining");
+                    ALOGW_IF(mDraining,
+                             "After waiting for drain, still draining, stream is %s active",
+                             isActive() ? "" : "not");
                     mDraining = false;
                 }
             }
@@ -1043,6 +1057,7 @@ void AudioStreamInternalPlay::onWakeUp_l(android::audio_utils::TimerQueue::handl
             mClockModel.setPositionAndTime(writeCounter, nowNanos);
             mClockModel.stop(nowNanos);
         }
+        mPendingStop = false;
     }
     processCommands();
     wakeupCallbackThread_l();
