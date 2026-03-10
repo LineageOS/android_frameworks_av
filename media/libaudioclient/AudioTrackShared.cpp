@@ -1041,7 +1041,7 @@ bool  AudioTrackServerProxy::setStreamEndDone() {
             (android_atomic_or(CBLK_STREAM_END_DONE, &cblk->mFlags) & CBLK_STREAM_END_DONE) != 0;
     if (!old) {
         (void) syscall(__NR_futex, &cblk->mFutex, mClientInServer ? FUTEX_WAKE_PRIVATE : FUTEX_WAKE,
-                1);
+                INT32_MAX);
     }
     return old;
 }
