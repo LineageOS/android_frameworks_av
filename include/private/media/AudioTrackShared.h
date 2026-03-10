@@ -36,7 +36,22 @@ namespace android {
 
 // ----------------------------------------------------------------------------
 
-// for audio_track_cblk_t::mFlags
+// The mCblk->mFutex (audio_track_cblk_t::mFutex) is used
+// to signal to the waiter a state change that must be processed.
+//
+// If the futex bits change in the window between futex value check
+// and the futex wait command, the wait is aborted with EAGAIN.
+// mFutex bits are cleared before the futex wait, and any bits that
+// were set prior to the clear (check of old value)
+// should be processed by the waiter and rechecked again.
+enum CblkFutexBits : int32_t { // could be unsigned, but int to match futex word type
+    CBLK_FUTEX_WAKE = 0x1,           // data buffer filled, wake is pending
+    CBLK_FUTEX_NOTIFY = 0x40000000,  // data path invalid or disabled
+};
+
+// The mCblk->mFlags (audio_track_cblk_t::mFlags) contains
+// state that may persist after the futex interaction.
+// These may be cleared elsewhere in the code.
 #define CBLK_UNDERRUN   0x01 // set by server immediately on output underrun, cleared by client
 #define CBLK_FORCEREADY 0x02 // set: track is considered ready immediately by AudioFlinger,
                              // clear: track is ready when buffer full
@@ -235,7 +250,6 @@ struct audio_track_cblk_t
 
     volatile    int32_t     mFutex;     // event flag: down (P) by client,
                                         // up (V) by server or binderDied() or interrupt()
-#define CBLK_FUTEX_WAKE 1               // if event flag bit is set, then a deferred wake is pending
 
 private:
 

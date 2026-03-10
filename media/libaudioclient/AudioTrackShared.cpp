@@ -318,7 +318,7 @@ status_t ClientProxy::obtainBuffer(Buffer* buffer, const struct timespec *reques
             break;
         }
 
-        int32_t old = android_atomic_and(~CBLK_FUTEX_WAKE, &cblk->mFutex);
+        int32_t old = android_atomic_and(~(CBLK_FUTEX_WAKE | CBLK_FUTEX_NOTIFY), &cblk->mFutex);
 
         // Check inactive to prevent waiting if the track has been disabled due to underrun
         // (or invalidated).  The subsequent call to obtainBufer will return NOT_ENOUGH_DATA
