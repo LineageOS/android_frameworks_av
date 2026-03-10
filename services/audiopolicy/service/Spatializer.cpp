@@ -20,28 +20,33 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include "Spatializer.h"
+#include "SpatializerHelper.h"
+
+// go/keep-sorted start
+#include <android/content/AttributionSourceState.h>
+#include <android/sysprop/BluetoothProperties.sysprop.h>
+#include <audio_utils/fixedfft.h>
+#include <audio_utils/threads.h>
+#include <cutils/bitops.h>
+#include <hardware/sensors.h>
+#include <media/MediaMetricsItem.h>
+#include <media/QuaternionUtil.h>
+#include <media/ShmemCompat.h>
+#include <media/stagefright/foundation/AHandler.h>
+#include <media/stagefright/foundation/AMessage.h>
+#include <mediautils/SchedulingPolicyService.h>
+#include <mediautils/ServiceUtilities.h>
+#include <utils/Thread.h>
+// go/keep-sorted end
+
+// go/keep-sorted start
 #include <algorithm>
 #include <inttypes.h>
 #include <limits.h>
 #include <stdint.h>
 #include <sys/types.h>
-
-#include <android/content/AttributionSourceState.h>
-#include <android/sysprop/BluetoothProperties.sysprop.h>
-#include <audio_utils/fixedfft.h>
-#include <cutils/bitops.h>
-#include <hardware/sensors.h>
-#include <media/stagefright/foundation/AHandler.h>
-#include <media/stagefright/foundation/AMessage.h>
-#include <media/MediaMetricsItem.h>
-#include <media/QuaternionUtil.h>
-#include <media/ShmemCompat.h>
-#include <mediautils/SchedulingPolicyService.h>
-#include <mediautils/ServiceUtilities.h>
-#include <utils/Thread.h>
-
-#include "Spatializer.h"
-#include "SpatializerHelper.h"
+// go/keep-sorted end
 
 namespace android {
 
@@ -535,6 +540,7 @@ status_t Spatializer::registerCallback(
 
 // IBinder::DeathRecipient
 void Spatializer::binderDied(__unused const wp<IBinder> &who) {
+    audio_utils::set_priority_for_binder_callback(__func__);
     {
         audio_utils::lock_guard lock(mMutex);
         mLevel = Spatialization::Level::NONE;

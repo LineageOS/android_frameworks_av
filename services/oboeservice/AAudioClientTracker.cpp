@@ -19,14 +19,17 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+// go/keep-sorted start
 #include <assert.h>
+#include <audio_utils/threads.h>
 #include <binder/IPCThreadState.h>
+#include <com_android_media_audioserver.h>
 #include <iomanip>
 #include <iostream>
 #include <map>
 #include <mutex>
 #include <utils/Singleton.h>
-#include <com_android_media_audioserver.h>
+// go/keep-sorted end
 
 #include "utility/AAudioUtilities.h"
 #include "AAudioEndpointManager.h"
@@ -205,6 +208,8 @@ aaudio_result_t AAudioClientTracker::NotificationClient::unregisterClientStream(
 
 // Close any open streams for the client.
 void AAudioClientTracker::NotificationClient::binderDied(const wp<IBinder>& who __unused) {
+    audio_utils::set_priority_for_binder_callback(__func__);
+
     AAudioService *aaudioService = AAudioClientTracker::getInstance().getAAudioService();
     if (aaudioService != nullptr) {
         // Copy the current list of streams to another vector because closing them below
