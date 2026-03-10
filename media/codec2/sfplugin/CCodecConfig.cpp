@@ -1071,7 +1071,7 @@ void CCodecConfig::initializeStandardParams() {
     }
 
     add(ConfigMapper(KEY_AUDIO_PRESENTATION_ID, C2_PARAMKEY_AUDIO_PRESENTATION_ID, "value")
-                .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ)));
+                .limitTo(D::AUDIO & (D::CONFIG | D::PARAM | D::READ)));
 
     /* still to do
        not yet used by MediaCodec, but defined as MediaFormat
