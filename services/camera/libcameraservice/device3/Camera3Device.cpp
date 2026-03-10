@@ -2524,8 +2524,9 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
             //not get drained.
             internalUpdateStatusLocked(STATUS_ACTIVE);
 
+            int32_t inputFormat = (mInputStream == nullptr) ? -1 : mInputStream->getFormat();
             mCameraServiceProxyWrapper->logStreamConfigured(mId, mOperatingMode,
-                    true /*internalReconfig*/, ns2ms(systemTime() - startTime));
+                    true /*internalReconfig*/, ns2ms(systemTime() - startTime), inputFormat);
         } else if (rc == DEAD_OBJECT) {
             // DEAD_OBJECT can be returned if either the consumer surface is
             // abandoned, or the HAL has died.

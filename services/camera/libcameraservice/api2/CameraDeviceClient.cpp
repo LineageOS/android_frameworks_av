@@ -935,8 +935,9 @@ binder::Status CameraDeviceClient::endConfigureLocked(int operatingMode,
 
         nsecs_t configureEnd = systemTime();
         int32_t configureDurationMs = ns2ms(configureEnd) - startTimeMs;
+        int32_t inputFormat = mInputStream.configured ? mInputStream.format : -1;
         mCameraServiceProxyWrapper->logStreamConfigured(mCameraIdStr, operatingMode,
-                false /*internalReconfig*/, configureDurationMs);
+                false /*internalReconfig*/, configureDurationMs, inputFormat);
     }
 
     return res;
