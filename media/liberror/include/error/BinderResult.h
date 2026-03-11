@@ -41,6 +41,14 @@ inline base::unexpected<binder::Status> unexpectedServiceException(int32_t servi
 }
 
 }  // namespace error
+// For result types where the primary is a bool, the bool conversion is error-prone (even explicit,
+// `if (result)` will bool convert on the container type).
+// This can't be eliminated for every expected<bool, E> due to specialization rules, but delete it
+// for the commonly used BinderResult type.
+// The conversion will continue to exist upstream, and the STL version of expected made the design
+// choice to have a bool operator in all cases.
+template <>
+constexpr base::expected<bool, binder::Status>::operator bool() const noexcept = delete;
 }  // namespace android
 
 inline std::string errorToString(const ::android::binder::Status& status) {
