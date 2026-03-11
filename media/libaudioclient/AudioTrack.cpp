@@ -352,9 +352,7 @@ void AudioTrack::stopAndJoinCallbacks() {
     stop();
     if (mAudioTrackThread != 0) { // not thread safe
         mAudioTrackThread->requestExit();   // see comment in AudioTrack.h
-        if (mProxy != nullptr) {
-            mProxy->interrupt();
-        }
+        mProxy->interrupt();
         mAudioTrackThread->requestExitAndWait();
         mAudioTrackThread.clear();
     }
@@ -3539,7 +3537,7 @@ uint32_t AudioTrack::getUnderrunCount_l() const
 uint32_t AudioTrack::getUnderrunFrames() const
 {
     AutoMutex lock(mLock);
-    return mProxy == nullptr ? 0 : mProxy->getUnderrunFrames();
+    return mProxy->getUnderrunFrames();
 }
 
 void AudioTrack::setLogSessionId(const char *logSessionId)

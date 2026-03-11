@@ -591,7 +591,6 @@ aaudio_result_t AudioStreamInternal::startCallback_l() {
 }
 
 aaudio_result_t AudioStreamInternal::requestStop_l() {
-    setState(AAUDIO_STREAM_STATE_STOPPING);
     aaudio_result_t result = stopCallback_l();
     if (result != AAUDIO_OK) {
         ALOGW("%s() stop callback returned %d, returning early", __func__, result);
@@ -620,6 +619,7 @@ aaudio_result_t AudioStreamInternal::requestStop_l() {
         // This should not happen, but adding a log for warning.
         ALOGW("%s prepareBuffersForStop_l returned %d", __func__, ret);
     }
+    setState(AAUDIO_STREAM_STATE_STOPPING);
     mAtomicInternalTimestamp.clear();
 
 #if 0
