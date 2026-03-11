@@ -144,6 +144,8 @@ public:
     bool mSharedMode;
     // latency in ms for camera open, close, or session creation.
     int mLatencyMs;
+    // Input stream format
+    int32_t mInputFormat;
 
     /*
      * A randomly generated identifier to map the open/active/idle/close stats to each other after
