@@ -431,8 +431,7 @@ void MediaCodecSource::signalBufferReturned(MediaBufferBase *buffer) {
 status_t MediaCodecSource::setEncodingBitrate(int32_t bitRate) {
     ALOGV("setEncodingBitrate (%d)", bitRate);
 
-    Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-    if (*encoder == NULL) {
+    if (mEncoder == NULL) {
         ALOGW("setEncodingBitrate (%d) : mEncoder is null", bitRate);
         return BAD_VALUE;
     }
@@ -440,16 +439,15 @@ status_t MediaCodecSource::setEncodingBitrate(int32_t bitRate) {
     sp<AMessage> params = new AMessage;
     params->setInt32("video-bitrate", bitRate);
 
-    return (*encoder)->setParameters(params);
+    return mEncoder->setParameters(params);
 }
 
 status_t MediaCodecSource::requestIDRFrame() {
-    Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-    if (*encoder == NULL) {
+    if (mEncoder == NULL) {
         ALOGW("requestIDRFrame : mEncoder is null");
         return BAD_VALUE;
     } else {
-        (*encoder)->requestIDRFrame();
+        mEncoder->requestIDRFrame();
         return OK;
     }
 }
@@ -508,8 +506,7 @@ void MediaCodecSource::adjustMediaFormatForConstantQuality(sp<AMessage>& format)
     AString outputMIME;
     CHECK(format->findString("mime", &outputMIME));
 
-    Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-    if ((*encoder)->getCodecInfo(&codecInfo) == OK && codecInfo != nullptr) {
+    if (mEncoder->getCodecInfo(&codecInfo) == OK && codecInfo != nullptr) {
         const std::shared_ptr<CodecCapabilities>& caps =
                 codecInfo->getCodecCapsFor(outputMIME.c_str());
         if (caps != nullptr) {
@@ -551,22 +548,21 @@ status_t MediaCodecSource::initEncoder() {
     AString name;
     status_t err = NO_INIT;
     if (mOutputFormat->findString("testing-name", &name)) {
-        Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-        *encoder = MediaCodec::CreateByComponentName(mCodecLooper, name);
+        mEncoder = MediaCodec::CreateByComponentName(mCodecLooper, name);
 
-        if (*encoder == NULL) {
+        if (mEncoder == NULL) {
             return NO_INIT;
         }
 
         mEncoderActivityNotify = new AMessage(kWhatEncoderActivity, mReflector);
-        (*encoder)->setCallback(mEncoderActivityNotify);
+        mEncoder->setCallback(mEncoderActivityNotify);
 
         if (android::media::mediarecorder::quality_setting_support()) {
             adjustMediaFormatForConstantQuality(mOutputFormat);
         }
         ALOGV("output format is '%s'", mOutputFormat->debugString(0).c_str());
 
-        err = (*encoder)->configure(
+        err = mEncoder->configure(
                     mOutputFormat,
                     NULL /* nativeWindow */,
                     NULL /* crypto */,
@@ -579,11 +575,10 @@ status_t MediaCodecSource::initEncoder() {
                 &matchingCodecs);
 
         for (size_t ix = 0; ix < matchingCodecs.size(); ++ix) {
-            Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-            *encoder = MediaCodec::CreateByComponentName(
+            mEncoder = MediaCodec::CreateByComponentName(
                     mCodecLooper, matchingCodecs[ix]);
 
-            if (*encoder == NULL) {
+            if (mEncoder == NULL) {
                 continue;
             }
 
@@ -593,9 +588,9 @@ status_t MediaCodecSource::initEncoder() {
             ALOGV("output format is '%s'", mOutputFormat->debugString(0).c_str());
 
             mEncoderActivityNotify = new AMessage(kWhatEncoderActivity, mReflector);
-            (*encoder)->setCallback(mEncoderActivityNotify);
+            mEncoder->setCallback(mEncoderActivityNotify);
 
-            err = (*encoder)->configure(
+            err = mEncoder->configure(
                         mOutputFormat,
                         NULL /* nativeWindow */,
                         NULL /* crypto */,
@@ -604,8 +599,8 @@ status_t MediaCodecSource::initEncoder() {
             if (err == OK) {
                 break;
             }
-            (*encoder)->release();
-            *encoder = NULL;
+            mEncoder->release();
+            mEncoder = NULL;
         }
     }
 
@@ -613,14 +608,7 @@ status_t MediaCodecSource::initEncoder() {
         return err;
     }
 
-    {
-        Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-        if (*encoder == NULL) {
-            return NO_INIT;
-        }
-        (*encoder)->getOutputFormat(&mOutputFormat);
-    }
-
+    mEncoder->getOutputFormat(&mOutputFormat);
     sp<MetaData> meta = new MetaData;
     convertMessageToMetaData(mOutputFormat, meta);
     mMeta.lock().set(meta);
@@ -628,18 +616,13 @@ status_t MediaCodecSource::initEncoder() {
     if (mFlags & FLAG_USE_SURFACE_INPUT) {
         CHECK(mIsVideo);
 
-        Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-        if (*encoder == NULL) {
-            return NO_INIT;
-        }
-
         if (mPersistentSurface != NULL) {
             // When using persistent surface, we are only interested in the
             // consumer, but have to use PersistentSurface as a wrapper to
             // pass consumer over messages (similar to BufferProducerWrapper)
-            err = (*encoder)->setInputSurface(mPersistentSurface);
+            err = mEncoder->setInputSurface(mPersistentSurface);
         } else {
-            err = (*encoder)->createInputSurface(&mSurface);
+            err = mEncoder->createInputSurface(&mSurface);
         }
 
         if (err != OK) {
@@ -650,32 +633,22 @@ status_t MediaCodecSource::initEncoder() {
     sp<AMessage> inputFormat;
     int32_t usingSwReadOften;
     mSetEncoderFormat = false;
-
-    {
-        Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-        if (*encoder != NULL && (*encoder)->getInputFormat(&inputFormat) == OK) {
-            mSetEncoderFormat = true;
-            if (inputFormat->findInt32("using-sw-read-often", &usingSwReadOften) &&
-                usingSwReadOften) {
-                // this is a SW encoder; signal source to allocate SW readable buffers
-                mEncoderFormat = kDefaultSwVideoEncoderFormat;
-            } else {
-                mEncoderFormat = kDefaultHwVideoEncoderFormat;
-            }
-            if (!inputFormat->findInt32("android._dataspace", &mEncoderDataSpace)) {
-                mEncoderDataSpace = kDefaultVideoEncoderDataSpace;
-            }
-            ALOGV("setting dataspace %#x, format %#x", mEncoderDataSpace, mEncoderFormat);
+    if (mEncoder->getInputFormat(&inputFormat) == OK) {
+        mSetEncoderFormat = true;
+        if (inputFormat->findInt32("using-sw-read-often", &usingSwReadOften)
+                && usingSwReadOften) {
+            // this is a SW encoder; signal source to allocate SW readable buffers
+            mEncoderFormat = kDefaultSwVideoEncoderFormat;
+        } else {
+            mEncoderFormat = kDefaultHwVideoEncoderFormat;
         }
+        if (!inputFormat->findInt32("android._dataspace", &mEncoderDataSpace)) {
+            mEncoderDataSpace = kDefaultVideoEncoderDataSpace;
+        }
+        ALOGV("setting dataspace %#x, format %#x", mEncoderDataSpace, mEncoderFormat);
     }
 
-    {
-        Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-        if (*encoder == NULL) {
-            return NO_INIT;
-        }
-        err = (*encoder)->start();
-    }
+    err = mEncoder->start();
 
     if (err != OK) {
         return err;
@@ -691,13 +664,12 @@ status_t MediaCodecSource::initEncoder() {
 }
 
 void MediaCodecSource::releaseEncoder() {
-    Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-    if (*encoder == NULL) {
+    if (mEncoder == NULL) {
         return;
     }
 
-    (*encoder)->release();
-    encoder->clear();
+    mEncoder->release();
+    mEncoder.clear();
 }
 
 status_t MediaCodecSource::postSynchronouslyAndReturnError(
@@ -763,28 +735,21 @@ void MediaCodecSource::signalEOS(status_t err) {
 
 void MediaCodecSource::resume(int64_t resumeStartTimeUs) {
     CHECK(mFlags & FLAG_USE_SURFACE_INPUT);
-    Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-    if (*encoder != NULL) {
+    if (mEncoder != NULL) {
         sp<AMessage> params = new AMessage;
         params->setInt32(PARAMETER_KEY_SUSPEND, false);
         if (resumeStartTimeUs > 0) {
             params->setInt64(PARAMETER_KEY_SUSPEND_TIME, resumeStartTimeUs);
         }
-        (*encoder)->setParameters(params);
+        mEncoder->setParameters(params);
     }
 }
 
 status_t MediaCodecSource::feedEncoderInputBuffers() {
     MediaBufferBase* mbuf = NULL;
     while (!mAvailEncoderInputIndices.empty() && mPuller->readBuffer(&mbuf)) {
-        {
-            Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-            if (*encoder == NULL) {
-                if (mbuf != NULL) {
-                    mbuf->release();
-                }
-                return BAD_VALUE;
-            }
+        if (!mEncoder) {
+            return BAD_VALUE;
         }
         size_t bufferIndex = *mAvailEncoderInputIndices.begin();
         mAvailEncoderInputIndices.erase(mAvailEncoderInputIndices.begin());
@@ -826,15 +791,7 @@ status_t MediaCodecSource::feedEncoderInputBuffers() {
             }
 
             sp<MediaCodecBuffer> inbuf;
-            status_t err;
-            {
-                Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-                if (*encoder == NULL) {
-                    mbuf->release();
-                    return BAD_VALUE;
-                }
-                err = (*encoder)->getInputBuffer(bufferIndex, &inbuf);
-            }
+            status_t err = mEncoder->getInputBuffer(bufferIndex, &inbuf);
 
             if (err != OK || inbuf == NULL || inbuf->data() == NULL
                     || mbuf->data() == NULL || mbuf->size() == 0) {
@@ -862,10 +819,7 @@ status_t MediaCodecSource::feedEncoderInputBuffers() {
                     msg->setInt32(KEY_COLOR_TRANSFER, transfer);
                     msg->setInt32(KEY_COLOR_RANGE, range);
                     msg->setInt32("android._dataspace", dataspace);
-                    Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-                    if (*encoder != NULL) {
-                        (*encoder)->setParameters(msg);
-                    }
+                    mEncoder->setParameters(msg);
                 }
 
                 // video encoder will release MediaBuffer when done
@@ -879,14 +833,8 @@ status_t MediaCodecSource::feedEncoderInputBuffers() {
             flags = MediaCodec::BUFFER_FLAG_EOS;
         }
 
-        status_t err;
-        {
-            Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-            if (*encoder == NULL) {
-                return BAD_VALUE;
-            }
-            err = (*encoder)->queueInputBuffer(bufferIndex, 0, size, timeUs, flags);
-        }
+        status_t err = mEncoder->queueInputBuffer(
+                bufferIndex, 0, size, timeUs, flags);
 
         if (err != OK) {
             return err;
@@ -913,10 +861,7 @@ status_t MediaCodecSource::onStart(MetaData *params) {
             return OK;
         }
         if (mIsVideo) {
-            Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-            if (*encoder != NULL) {
-                (*encoder)->requestIDRFrame();
-            }
+            mEncoder->requestIDRFrame();
         }
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             resume(startTimeUs);
@@ -932,14 +877,13 @@ status_t MediaCodecSource::onStart(MetaData *params) {
     status_t err = OK;
 
     if (mFlags & FLAG_USE_SURFACE_INPUT) {
-        Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-        if (*encoder != NULL) {
+        if (mEncoder != NULL) {
             sp<AMessage> params = new AMessage;
             params->setInt32(PARAMETER_KEY_SUSPEND, false);
             if (startTimeUs >= 0) {
                 params->setInt64("skip-frames-before", startTimeUs);
             }
-            (*encoder)->setParameters(params);
+            mEncoder->setParameters(params);
         }
     } else {
         CHECK(mPuller != NULL);
@@ -966,14 +910,13 @@ status_t MediaCodecSource::onStart(MetaData *params) {
 }
 
 void MediaCodecSource::onPause(int64_t pauseStartTimeUs) {
-    Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
     if (mStopping || mOutput.lock()->mEncoderReachedEOS) {
         // Nothing to do
-    } else if ((mFlags & FLAG_USE_SURFACE_INPUT) && (*encoder != NULL)) {
+    } else if ((mFlags & FLAG_USE_SURFACE_INPUT) && (mEncoder != NULL)) {
         sp<AMessage> params = new AMessage;
         params->setInt32(PARAMETER_KEY_SUSPEND, true);
         params->setInt64(PARAMETER_KEY_SUSPEND_TIME, pauseStartTimeUs);
-        (*encoder)->setParameters(params);
+        mEncoder->setParameters(params);
     } else {
         CHECK(mPuller != NULL);
         mPuller->pause();
@@ -991,12 +934,9 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
-        {
-            Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-            if (*encoder == NULL) {
-                ALOGV("got msg '%s' after encoder shutdown.", msg->debugString().c_str());
-                break;
-            }
+        if (mEncoder == NULL) {
+            ALOGV("got msg '%s' after encoder shutdown.", msg->debugString().c_str());
+            break;
         }
 
         feedEncoderInputBuffers();
@@ -1004,11 +944,8 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
     }
     case kWhatEncoderActivity:
     {
-        {
-            Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-            if (*encoder == NULL) {
-                break;
-            }
+        if (mEncoder == NULL) {
+            break;
         }
 
         int32_t cbID;
@@ -1020,15 +957,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
             mAvailEncoderInputIndices.push_back(index);
             feedEncoderInputBuffers();
         } else if (cbID == MediaCodec::CB_OUTPUT_FORMAT_CHANGED) {
-            status_t err;
-            {
-                Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-                if (*encoder != NULL) {
-                    err = (*encoder)->getOutputFormat(&mOutputFormat);
-                } else {
-                    err = BAD_VALUE;
-                }
-            }
+            status_t err = mEncoder->getOutputFormat(&mOutputFormat);
             if (err != OK) {
                 signalEOS(err);
                 break;
@@ -1050,36 +979,20 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
             CHECK(msg->findInt32("flags", &flags));
 
             if (flags & MediaCodec::BUFFER_FLAG_EOS) {
-                {
-                    Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-                    if (*encoder != NULL) {
-                        (*encoder)->releaseOutputBuffer(index);
-                    }
-                }
+                mEncoder->releaseOutputBuffer(index);
                 signalEOS();
                 break;
             }
 
             sp<MediaCodecBuffer> outbuf;
-            status_t err;
-            {
-                Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-                if (*encoder != NULL) {
-                    err = (*encoder)->getOutputBuffer(index, &outbuf);
-                } else {
-                    err = BAD_VALUE;
-                }
-            }
+            status_t err = mEncoder->getOutputBuffer(index, &outbuf);
             if (err != OK || outbuf == NULL || outbuf->data() == NULL) {
                 signalEOS();
                 break;
             } else if (outbuf->size() == 0) {
                 // Zero length CSD buffers are not treated as an error
                 if (flags & MediaCodec::BUFFER_FLAG_CODECCONFIG) {
-                    Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-                    if (*encoder != NULL) {
-                        (*encoder)->releaseOutputBuffer(index);
-                    }
+                    mEncoder->releaseOutputBuffer(index);
                 } else {
                     signalEOS();
                 }
@@ -1148,12 +1061,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
                 output->mCond.signal();
             }
 
-            {
-                Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-                if (*encoder != NULL) {
-                    (*encoder)->releaseOutputBuffer(index);
-                }
-            }
+            mEncoder->releaseOutputBuffer(index);
        } else if (cbID == MediaCodec::CB_ERROR) {
             status_t err;
             CHECK(msg->findInt32("err", &err));
@@ -1215,25 +1123,13 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         // and wait for the EOS message. We cannot call source->stop() because
         // the encoder may still be processing input buffers.
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
-            {
-                Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-                if (*encoder != NULL) {
-                    (*encoder)->signalEndOfInputStream();
-                }
-            }
+            mEncoder->signalEndOfInputStream();
             // Increase the timeout if there is delay in the GraphicBufferSource
             sp<AMessage> inputFormat;
             int64_t stopTimeOffsetUs;
-            bool gotInputFormat = false;
-            {
-                Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-                if (*encoder != NULL && (*encoder)->getInputFormat(&inputFormat) == OK) {
-                    gotInputFormat = true;
-                }
-            }
-            if (gotInputFormat &&
-                inputFormat->findInt64("android._stop-time-offset-us", &stopTimeOffsetUs) &&
-                stopTimeOffsetUs > 0) {
+            if (mEncoder->getInputFormat(&inputFormat) == OK &&
+                    inputFormat->findInt64("android._stop-time-offset-us", &stopTimeOffsetUs) &&
+                    stopTimeOffsetUs > 0) {
                 if (stopTimeOffsetUs > kMaxStopTimeOffsetUs) {
                     ALOGW("Source stopTimeOffsetUs %lld too large, limit at %lld us",
                         (long long)stopTimeOffsetUs, (long long)kMaxStopTimeOffsetUs);
@@ -1294,8 +1190,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             sp<AMessage> params = new AMessage;
             params->setInt64(PARAMETER_KEY_OFFSET_TIME, mInputBufferTimeOffsetUs);
-            Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-            err = (*encoder != NULL) ? (*encoder)->setParameters(params) : BAD_VALUE;
+            err = mEncoder ? mEncoder->setParameters(params) : BAD_VALUE;
         }
 
         sp<AMessage> response = new AMessage;
@@ -1315,8 +1210,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             sp<AMessage> params = new AMessage;
             params->setInt64("stop-time-us", stopTimeUs);
-            Mutexed<sp<MediaCodec>>::Locked encoder(mEncoder);
-            err = (*encoder != NULL) ? (*encoder)->setParameters(params) : BAD_VALUE;
+            err = mEncoder ? mEncoder->setParameters(params) : BAD_VALUE;
         } else {
             err = mPuller->setStopTimeUs(stopTimeUs);
         }
