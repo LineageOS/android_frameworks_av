@@ -233,10 +233,11 @@ void AAudioServiceEndpointShared::handleDisconnectRegisteredStreamsAsync() {
     // When there is a routing changed, mmap stream should be disconnected. Set `mConnected`
     // as false here so that there won't be a new stream connected to this endpoint.
     mConnected.store(false);
-    std::thread asyncTask([holdEndpoint]() {
+    AAudioThread::getAsyncCommandThread().add(
+            "EndpointShared::handleDisconnectRegisteredStreamsAsync",
+            [holdEndpoint]() {
         // When handling disconnection, the service side has disconnected. In that case,
         // it should be safe to release all registered streams.
         holdEndpoint->releaseRegisteredStreams();
     });
-    asyncTask.detach();
 }

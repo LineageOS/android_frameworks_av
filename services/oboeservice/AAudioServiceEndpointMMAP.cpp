@@ -592,10 +592,10 @@ void AAudioServiceEndpointMMAP::handleTearDownAsync(audio_port_handle_t portHand
 void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
     ALOGD("%s(portHandle = %d) called", __func__, portHandle);
     const android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
-    std::thread asyncTask([holdEndpoint, portHandle]() {
+    AAudioThread::getAsyncCommandThread().add("EndpointMMAP::onTearDown",
+                                        [holdEndpoint, portHandle]() {
         holdEndpoint->handleTearDownAsync(portHandle);
     });
-    asyncTask.detach();
 }
 
 void AAudioServiceEndpointMMAP::onVolumeChanged(float volume) {
@@ -619,7 +619,8 @@ void AAudioServiceEndpointMMAP::onRoutingChanged(const android::DeviceIdVector& 
             // as false here so that there won't be a new stream connected to this endpoint.
             mConnected.store(false);
             const android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
-            std::thread asyncTask([holdEndpoint, deviceIds]() {
+            AAudioThread::getAsyncCommandThread().add("EndpointMMAP::onRoutingChanged",
+                                                [holdEndpoint, deviceIds]() {
                 ALOGD("onRoutingChanged() asyncTask launched");
                 // When routing changed, the stream is disconnected and cannot be used except for
                 // closing. In that case, it should be safe to release all registered streams.
@@ -628,7 +629,6 @@ void AAudioServiceEndpointMMAP::onRoutingChanged(const android::DeviceIdVector& 
                 holdEndpoint->releaseRegisteredStreams();
                 holdEndpoint->setDeviceIds(deviceIds);
             });
-            asyncTask.detach();
         } else {
             setDeviceIds(deviceIds);
         }
@@ -653,11 +653,11 @@ void AAudioServiceEndpointMMAP::onWakeUp(android::audio_utils::TimerQueue::handl
         // called close and it has gone. It was previously pending to drain all written data.
         // Here, a thread is spawned to release the stream to avoid dead lock.
         const android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
-        std::thread asyncTask([holdEndpoint]() {
+        AAudioThread::getAsyncCommandThread().add("EndpointMMAP::onWakeUp",
+                                            [holdEndpoint]() {
             ALOGD("onWakeUp() asyncTask to release client");
             holdEndpoint->releaseRegisteredStreams();
         });
-        asyncTask.detach();
     }
 }
 
