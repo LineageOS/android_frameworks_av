@@ -109,10 +109,51 @@ status_t AudioTrackMmap::createTrack_l() {
     attributes.content_type = static_cast<audio_content_type_t>(mStream->getContentType());
     AudioSystem::getStreamTypeForAttributes(attributes, mStreamType);
     mFrameCount = mStream->getBufferCapacity();
+    mRoutedDeviceIds = mStream->getDeviceIds();
+
+    mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK) + std::to_string(mPortId);
+    mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE)
+                    // the following are immutable
+            .set(AMEDIAMETRICS_PROP_FLAGS, toString(mFlags).c_str())
+            .set(AMEDIAMETRICS_PROP_ORIGINALFLAGS, toString(mOrigFlags).c_str())
+            .set(AMEDIAMETRICS_PROP_SESSIONID, (int32_t)mSessionId)
+            .set(AMEDIAMETRICS_PROP_LOGSESSIONID, mLogSessionId)
+            .set(AMEDIAMETRICS_PROP_PLAYERIID, mPlayerIId)
+            .set(AMEDIAMETRICS_PROP_TRACKID, mPortId) // dup from key
+            .set(AMEDIAMETRICS_PROP_CONTENTTYPE, toString(mAttributes.content_type).c_str())
+            .set(AMEDIAMETRICS_PROP_USAGE, toString(mAttributes.usage).c_str())
+            .set(AMEDIAMETRICS_PROP_THREADID, (int32_t)mOutput)
+            .set(AMEDIAMETRICS_PROP_SELECTEDDEVICEID, (int32_t)mSelectedDeviceId)
+            .set(AMEDIAMETRICS_PROP_ROUTEDDEVICEID, (int32_t)(getFirstDeviceId(mRoutedDeviceIds)))
+            .set(AMEDIAMETRICS_PROP_ROUTEDDEVICEIDS, toString(mRoutedDeviceIds).c_str())
+            .set(AMEDIAMETRICS_PROP_ENCODING, toString(mFormat).c_str())
+            .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
+            .set(AMEDIAMETRICS_PROP_FRAMECOUNT, (int32_t)mFrameCount)
+            .set(AMEDIAMETRICS_PROP_CODECPROVENANCE, mCodecProvenance.c_str())
+                    // the following are NOT immutable
+            .set(AMEDIAMETRICS_PROP_VOLUME_LEFT, (double)mVolume[AUDIO_INTERLEAVE_LEFT])
+            .set(AMEDIAMETRICS_PROP_VOLUME_RIGHT, (double)mVolume[AUDIO_INTERLEAVE_RIGHT])
+            .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+            .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)NO_ERROR)
+            .set(AMEDIAMETRICS_PROP_AUXEFFECTID, (int32_t)mAuxEffectId)
+            .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
+            .set(AMEDIAMETRICS_PROP_PLAYBACK_SPEED, (double)mPlaybackRate.mSpeed)
+            .set(AMEDIAMETRICS_PROP_PLAYBACK_PITCH, (double)mPlaybackRate.mPitch)
+            .set(AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE
+                    AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
+            .set(AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE
+                    AMEDIAMETRICS_PROP_PLAYBACK_SPEED, (double)mPlaybackRate.mSpeed)
+            .set(AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE
+                    AMEDIAMETRICS_PROP_PLAYBACK_PITCH, (double)mPlaybackRate.mPitch)
+            .record();
+
     return NO_ERROR;
 }
 
 AudioTrackMmap::~AudioTrackMmap() {
+    reportUnderrunFrames();
+    stopAndJoinCallbacks();
     if (mStream != nullptr) {
         mStream->safeReleaseClose();
         mStream.clear();
@@ -125,9 +166,23 @@ uint32_t AudioTrackMmap::getSampleRate() const {
 }
 
 status_t AudioTrackMmap::start() {
+    const int64_t beginNs = systemTime();
+    status_t status = NO_ERROR;
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_CALLERNAME,
+                     mCallerName.empty()
+                     ? AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN
+                     : mCallerName.c_str())
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
+                .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+                .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+                .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)status)
+                .record(); });
     AutoMutex lock(mLock);
-    const status_t status = mStream->systemStart() == AAUDIO_OK ? OK :
+    status = mStream->systemStart() == AAUDIO_OK ? OK :
             logIfErrorAndReturnStatus(DEAD_OBJECT, "Failed to start aaudio stream");
+    mState = STATE_ACTIVE;
     // resume or pause the callback thread as needed.
     sp<AudioTrackThread> t = mAudioTrackThread;
     if (t != nullptr) {
@@ -141,9 +196,22 @@ status_t AudioTrackMmap::start() {
 }
 
 void AudioTrackMmap::stop() {
+    const int64_t beginNs = systemTime();
+    mediametrics::Defer defer([&]() {
+        mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
+                .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+                .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+                .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, (int32_t)getBufferSizeInFrames())
+                .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t) getUnderrunCount_l())
+                .record();
+    });
     AutoMutex lock(mLock);
+    if (mState != STATE_ACTIVE && mState != STATE_PAUSED) {
+        return;
+    }
+    mState = STATE_STOPPING;
     mStream->systemStopFromApp();
-    mStream->setOffloadEndOfStream();
     sp<AudioTrackThread> t = mAudioTrackThread;
     if (t != nullptr) {
         // causes wake up of the playback thread, that will callback the client for
@@ -153,13 +221,32 @@ void AudioTrackMmap::stop() {
 }
 
 void AudioTrackMmap::pause() {
+    const int64_t beginNs = systemTime();
+    mediametrics::Defer defer([&]() {
+    mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_PAUSE)
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+            .record(); });
     AutoMutex lock(mLock);
     mStream->systemPause();
+    mState = mState == STATE_STOPPING ? STATE_PAUSED_STOPPING : STATE_PAUSED;
 }
 
 void AudioTrackMmap::flush() {
+    const int64_t beginNs = systemTime();
+    mediametrics::Defer defer([&]() {
+        mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_FLUSH)
+                .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+                .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+                .record(); });
     AutoMutex lock(mLock);
+    if (mState == STATE_ACTIVE) {
+        return;
+    }
     mStream->safeFlush();
+    mState = STATE_FLUSHED;
 }
 
 ssize_t AudioTrackMmap::getBufferSizeInFrames() {
@@ -223,6 +310,10 @@ uint32_t AudioTrackMmap::latency() {
 
 uint32_t AudioTrackMmap::getUnderrunCount() const {
     AutoMutex lock(mLock);
+    return getUnderrunCount_l();
+}
+
+uint32_t AudioTrackMmap::getUnderrunCount_l() const {
     return mStream->getXRunCount();
 }
 
@@ -262,6 +353,17 @@ status_t AudioTrackMmap::getTimestamp(AudioTimestamp& timestamp) {
 }
 
 status_t AudioTrackMmap::setOutputDevice(audio_port_handle_t deviceId) {
+    const int64_t beginNs = systemTime();
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_CALLERNAME,
+                     mCallerName.empty()
+                     ? AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN
+                     : mCallerName.c_str())
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETPREFERREDDEVICE)
+                .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+                .set(AMEDIAMETRICS_PROP_SELECTEDDEVICEID, (int32_t)deviceId)
+                .record(); });
     if (mSelectedDeviceId == deviceId) {
         return NO_ERROR;
     }
@@ -280,7 +382,8 @@ status_t AudioTrackMmap::setOutputDevice(audio_port_handle_t deviceId) {
 
 DeviceIdVector AudioTrackMmap::getRoutedDeviceIds() {
     AutoMutex lock(mLock);
-    return mStream->getDeviceIds();
+    mRoutedDeviceIds = mStream->getDeviceIds();
+    return mRoutedDeviceIds;
 }
 
 ssize_t AudioTrackMmap::write(const void* buffer, size_t size, bool blocking) {
@@ -330,6 +433,12 @@ nsecs_t AudioTrackMmap::processAudioBuffer() {
             } break;
             case EVENT_STREAM_END: {
                 callback->onStreamEnd();
+                {
+                    AutoMutex lock(mLock);
+                    if (mState == STATE_STOPPING) {
+                        mState = STATE_STOPPED;
+                    }
+                }
             } break;
             case EVENT_ROUTED_DEVICE_CHANGED: {
                 sp<AudioSystem::AudioDeviceCallback> callback;
@@ -374,6 +483,11 @@ uint32_t AudioTrackMmap::getUnderrunFrames() const {
     return getUnderrunCount();
 }
 
+void AudioTrackMmap::reportUnderrunFrames() {
+    AutoMutex lock(mLock);
+    mUnderrunFramesReported = getUnderrunCount_l();
+}
+
 //=============================================================================
 
 // static
@@ -392,6 +506,7 @@ int32_t AudioTrackMmap::aaudioPartialDataCallbackImpl(int32_t numFrames) {
             .mParams = numFrames,
     };
     mCbEvents.push_back(std::move(event));
+    mMmapCbCond.notify_one();
     return 0;
 }
 
@@ -407,6 +522,7 @@ void AudioTrackMmap::aaudioPresentationEndCallbackImpl() {
             .mEvent = EVENT_STREAM_END,
     };
     mCbEvents.push_back(std::move(event));
+    mMmapCbCond.notify_one();
 }
 
 //======================= Unsupported functions ===============================

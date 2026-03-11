@@ -81,9 +81,11 @@ protected:
     status_t createTrack_l() final;
     nsecs_t processAudioBuffer() final;
     void stopAndJoinCallbacks() final;
+    uint32_t getUnderrunCount_l() const final;
 
 private:
     status_t validateParameters();
+    void reportUnderrunFrames();
     int32_t aaudioPartialDataCallbackImpl(int32_t numFrames);
     void aaudioPresentationEndCallbackImpl();
 
