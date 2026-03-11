@@ -28,7 +28,7 @@ cc_test {
     ],
 
     static_libs: [
-        "libcom.android.media.swcodec.apexcodecs",
+        "libcom.android.media.swcodec.apexcodecs-testing",
     ],
 
     srcs: ["ApexCodecsTest.cpp"],
