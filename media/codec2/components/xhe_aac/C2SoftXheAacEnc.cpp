@@ -141,10 +141,18 @@ class C2SoftXheAacEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
                         })
                         .withSetter(ProfileLevelSetter)
                         .build());
+
+        addParameter(
+                DefineParam(mAudioPresentationId, C2_PARAMKEY_AUDIO_PRESENTATION_ID)
+                        .withDefault(new C2AudioPresentationIdTuning(0))
+                        .withFields({C2F(mAudioPresentationId, value).any()})
+                        .withSetter(Setter<decltype(*mAudioPresentationId)>::StrictValueWithNoDeps)
+                        .build());
     }
 
     uint32_t getSampleRate() const { return mSampleRate->value; }
     uint32_t getChannelCount() const { return mChannelCount->value; }
+    int32_t getStreamId() const { return static_cast<int32_t>(mAudioPresentationId->value); }
     uint32_t getBitrate() const { return mBitrate->value; }
     uint32_t getConstantRapInterval() const { return mKeyFramePeriodUs->value / 1000; }
     C2Config::bitrate_mode_t getBitrateMode() const { return mBitrateMode->value; }
@@ -189,6 +197,7 @@ class C2SoftXheAacEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mKeyFramePeriodUs;
     std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamQualityTuning::output> mQuality;
+    std::shared_ptr<C2AudioPresentationIdTuning> mAudioPresentationId;
 
     // These are not used internally, but are "out-parameters" used by successive components
     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
@@ -414,9 +423,8 @@ IIS_XHEAACENC_CONFIG_INSTANCE_HANDLE C2SoftXheAacEnc::setAudioParams() {
     }
 
     ALOGV("setting IIS_XHEAACENC_PARAMETER_STREAMID");
-    // Use stream id of 0.
     if (IIS_XHEAACENC_NO_ERROR != IIS_xHEAACEnc_Config_AddParamValueInt(
-            config, IIS_XHEAACENC_PARAMETER_STREAMID, 0)) {
+            config, IIS_XHEAACENC_PARAMETER_STREAMID, mIntf->getStreamId())) {
         ALOGE("Failed to set xHE-AAC encoder config parameters");
         return nullptr;
     }

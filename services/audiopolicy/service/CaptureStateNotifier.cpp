@@ -2,9 +2,12 @@
 
 #include "CaptureStateNotifier.h"
 
+// go/keep-sorted start
 #include <android/media/ICaptureStateListener.h>
+#include <audio_utils/threads.h>
 #include <binder/IBinder.h>
 #include <utils/Log.h>
+// go/keep-sorted end
 
 namespace android {
 
@@ -15,6 +18,7 @@ public:
     DeathRecipient(CaptureStateNotifier* notifier) : mNotifier(notifier) {}
 
     void binderDied(const wp<IBinder>&) override {
+        audio_utils::set_priority_for_binder_callback(__func__);
         mNotifier->binderDied();
     }
 

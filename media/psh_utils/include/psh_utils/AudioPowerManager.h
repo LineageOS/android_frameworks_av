@@ -62,6 +62,20 @@ public:
             pid_t pid, const std::string& wakeLockName,
             WakeFlag wakeFlag, const std::string& additional);
 
+    /**
+     * Sets the freeze state for a pid.
+     * @param pid pid of app.
+     * @param frozen true if frozen.
+     * @return true if there is an active client track for the uid associated with the pid
+     *         and either the prior state was frozen or the current state is frozen.
+     */
+    bool setFrozen(pid_t pid, bool frozen);
+
+    /**
+     * Returns true if the pid is currently frozen.
+     */
+    bool isFrozen(pid_t pid) const;
+
     std::string toString() const;
 
     static bool enabled();
@@ -70,6 +84,9 @@ private:
     // For AudioToken dtor only.
     void clear_token_ptr(Token* token);
     void stopClient(pid_t pid);
+
+    std::shared_ptr<PowerClientStats>
+    getPowerClientStatsFromPid_l(pid_t pid) const REQUIRES(mMutex);
 
     static constexpr size_t kHistory = 6;
 

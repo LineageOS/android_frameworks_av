@@ -58,7 +58,8 @@ private:
         void onOpen(sp<hardware::ICameraServiceProxy>& proxyBinder);
         void onClose(sp<hardware::ICameraServiceProxy>& proxyBinder, int32_t latencyMs,
                 bool deviceError, int32_t errorState);
-        void onStreamConfigured(int operatingMode, bool internalReconfig, int32_t latencyMs);
+        void onStreamConfigured(int operatingMode, bool internalReconfig,
+                                int32_t latencyMs, int32_t inputFormat);
         void onActive(sp<hardware::ICameraServiceProxy>& proxyBinder, float maxPreviewFps);
         void onIdle(sp<hardware::ICameraServiceProxy>& proxyBinder,
                 int64_t requestCount, int64_t resultErrorCount, bool deviceError,
@@ -109,7 +110,7 @@ public:
 
     // Stream configuration
     void logStreamConfigured(const std::string& id, int operatingMode, bool internalReconfig,
-            int32_t latencyMs);
+            int32_t latencyMs, int32_t inputFormat);
 
     // Session state becomes active
     void logActive(const std::string& id, float maxPreviewFps);

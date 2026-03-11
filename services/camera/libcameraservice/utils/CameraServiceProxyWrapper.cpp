@@ -74,7 +74,8 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onClose(
 }
 
 void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onStreamConfigured(
-        int operatingMode, bool internalReconfig, int32_t latencyMs) {
+        int operatingMode, bool internalReconfig, int32_t latencyMs,
+        int inputFormat) {
     Mutex::Autolock l(mLock);
 
     if (internalReconfig) {
@@ -82,6 +83,7 @@ void CameraServiceProxyWrapper::CameraSessionStatsWrapper::onStreamConfigured(
     } else {
         mSessionStats.mLatencyMs = latencyMs;
         mSessionStats.mSessionType = operatingMode;
+        mSessionStats.mInputFormat = inputFormat;
     }
 }
 
@@ -369,7 +371,7 @@ int CameraServiceProxyWrapper::getAutoframingOverride(const std::string& package
 }
 
 void CameraServiceProxyWrapper::logStreamConfigured(const std::string& id,
-        int operatingMode, bool internalConfig, int32_t latencyMs) {
+        int operatingMode, bool internalConfig, int32_t latencyMs, int32_t inputFormat) {
     std::shared_ptr<CameraSessionStatsWrapper> sessionStats;
     {
         Mutex::Autolock l(mLock);
@@ -381,9 +383,9 @@ void CameraServiceProxyWrapper::logStreamConfigured(const std::string& id,
         sessionStats = mSessionStatsMap[id];
     }
 
-    ALOGV("%s: id %s, operatingMode %d, internalConfig %d, latencyMs %d",
-            __FUNCTION__, id.c_str(), operatingMode, internalConfig, latencyMs);
-    sessionStats->onStreamConfigured(operatingMode, internalConfig, latencyMs);
+    ALOGV("%s: id %s, operatingMode %d, internalConfig %d, latencyMs %d, inputFormat %d",
+            __FUNCTION__, id.c_str(), operatingMode, internalConfig, latencyMs, inputFormat);
+    sessionStats->onStreamConfigured(operatingMode, internalConfig, latencyMs, inputFormat);
 }
 
 void CameraServiceProxyWrapper::logActive(const std::string& id, float maxPreviewFps) {

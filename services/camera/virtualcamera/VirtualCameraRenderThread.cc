@@ -57,6 +57,7 @@ namespace companion {
 namespace virtualcamera {
 
 using ::aidl::android::companion::virtualcamera::Format;
+using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::BufferStatus;
 using ::aidl::android::hardware::camera::device::CameraMetadata;
 using ::aidl::android::hardware::camera::device::CaptureResult;
@@ -67,7 +68,10 @@ using ::aidl::android::hardware::camera::device::NotifyMsg;
 using ::aidl::android::hardware::camera::device::ShutterMsg;
 using ::aidl::android::hardware::camera::device::Stream;
 using ::aidl::android::hardware::camera::device::StreamBuffer;
+using ::aidl::android::hardware::graphics::common::PixelFormat;
 using ::android::base::ScopedLockAssertion;
+
+using ::android::hardware::camera::common::helper::ExifUtils;
 
 namespace {
 
@@ -212,9 +216,6 @@ void VirtualCameraRenderThread::flush() {
     mCaptureRequestQueue.pop_front();
     completeCaptureRequestWithError(*task);
   }
-  if (mImageHandler != nullptr) {
-    mImageHandler->interruptWait();
-  }
 }
 
 bool VirtualCameraRenderThread::start() {
@@ -228,9 +229,6 @@ void VirtualCameraRenderThread::stop() {
   {
     std::lock_guard<std::mutex> lock(mLock);
     mPendingExit = true;
-    if (mImageHandler != nullptr) {
-      mImageHandler->interruptWait();
-    }
     mTaskReadyCondVar.notify_one();
   }
 }
