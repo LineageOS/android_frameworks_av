@@ -122,6 +122,7 @@ namespace audioserver_flags = com::android::media::audioserver;
 namespace android {
 
 using audioflinger::SyncEvent;
+using HardeningOverride = media::IAudioPolicyService::HardeningOverride;
 using media::IEffectClient;
 using content::AttributionSourceState;
 
@@ -5821,6 +5822,11 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
                         portMute = track->getPortVolume() == 0.f;
                         portVolumeMute = track->getPortMute();
                     }
+                    bool restricted = track->isPlaybackRestrictedControl();
+                    if (restricted &&
+                        mAfThreadCallback->getHardeningOverride() == HardeningOverride::THROW) {
+                        track->poison();
+                    }
                     track->processMuteEvent(*amn,
                             /*muteState=*/{/*muteFromMasterMute*/ masterVolume == 0.f,
                                            /*muteFromStreamVolume*/ portMute,
@@ -5829,8 +5835,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
                                            /*muteFromClientVolume*/ vlf == 0.f && vrf == 0.f,
                                            /*muteFromVolumeShaper*/ vh == 0.f,
                                            /*muteFromPortVolume*/ portVolumeMute,
-                                           /*muteFromOpAudioControl*/
-                                               track->isPlaybackRestrictedControl()});
+                                           /*muteFromOpAudioControl*/ restricted});
                 }
                 vlf *= volume;
                 vrf *= volume;
@@ -6039,6 +6044,11 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
                         getPortMute = track->getPortMute();
 
                     }
+                    bool restricted = track->isPlaybackRestrictedControl();
+                    if (restricted &&
+                        mAfThreadCallback->getHardeningOverride() == HardeningOverride::THROW) {
+                        track->poison();
+                    }
                     track->processMuteEvent(*amn,
                             /*muteState=*/{/*muteFromMasterMute*/ masterVolume == 0.f,
                                            /*muteFromStreamVolume*/ portMute,
@@ -6048,8 +6058,7 @@ PlaybackThread::mixer_state MixerThread::prepareTracks_l(
                                            /*muteFromClientVolume*/ vlf == 0.f && vrf == 0.f,
                                            /*muteFromVolumeShaper*/ vh == 0.f,
                                            /*muteFromPortVolume*/ getPortMute,
-                                           /*muteFromOpAudioControl*/
-                                                   track->isPlaybackRestrictedControl()});
+                                           /*muteFromOpAudioControl*/ restricted});
                 }
                 // now apply the master volume and stream type volume and shaper volume
                 vlf *= v * vh;
@@ -6814,6 +6823,10 @@ void DirectOutputThread::processVolume_l(const sp<IAfTrack>& track, bool lastTra
             portMute = track->getPortVolume() == 0.f;
             portVolumeMute = track->getPortMute();
         }
+        bool restricted = track->isPlaybackRestrictedControl();
+        if (restricted && mAfThreadCallback->getHardeningOverride() == HardeningOverride::THROW) {
+            track->poison();
+        }
         track->processMuteEvent(*amn,
                 /*muteState=*/{/*muteFromMasterMute*/ mMasterMute,
                                /*muteFromStreamVolume*/ portMute,
@@ -6822,8 +6835,7 @@ void DirectOutputThread::processVolume_l(const sp<IAfTrack>& track, bool lastTra
                                /*muteFromClientVolume*/ clientVolumeMute,
                                /*muteFromVolumeShaper*/ shaperVolume == 0.f,
                                /*muteFromPortVolume*/ portVolumeMute,
-                               /*muteFromOpAudioControl*/
-                                       track->isPlaybackRestrictedControl()});
+                               /*muteFromOpAudioControl*/ restricted});
 
         track->maybeLogPlaybackHardening(*amn);
     }

@@ -97,7 +97,7 @@ std::string AAudioServiceStreamBase::dump() const {
     result << "    0x" << std::setfill('0') << std::setw(8) << std::hex << mHandle
            << std::dec << std::setfill(' ') ;
     result << std::setw(6) << mMmapClient.attributionSource.uid;
-    result << std::setw(7) << mClientHandle;
+    result << std::setw(7) << mPortHandle;
     result << std::setw(4) << (isRunning() ? "yes" : " no");
     result << std::setw(6) << getState();
     result << std::setw(8) << "0x" << std::hex << getFormat() << std::dec;
@@ -190,7 +190,7 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
     if (!request.isInService()) {
         auto attr = AAudioServiceEndpoint::getAudioAttributesFrom(
                 &request.getConstantConfiguration());
-        result = mServiceEndpoint->createClient(mMmapClient, attr, &mClientHandle, &mIoHandle);
+        result = mServiceEndpoint->createClient(mMmapClient, attr, &mPortHandle, &mIoHandle);
         if (result != AAUDIO_OK) {
             goto error;
         }
@@ -240,14 +240,14 @@ aaudio_result_t AAudioServiceStreamBase::close_l(bool shouldDeferClose) {
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (shouldDeferClose && endpoint != nullptr) {
         mPendingClose = true;
-        endpoint->releaseClientWhenWakeUp(mClientHandle);
+        endpoint->releaseClientWhenWakeUp(mPortHandle);
         return AAUDIO_ERROR_WOULD_BLOCK;
     } else {
         ALOGW_IF(endpoint == nullptr,
                  "%s, close the stream when requesting defer as the endpoint is gone", __func__);
         // This will stop the stream, just in case it was not already stopped.
         stop_l();
-        releaseClient_l(mClientHandle);
+        releaseClient_l(mPortHandle);
         return closeAndClear();
     }
 }
@@ -262,7 +262,7 @@ aaudio_result_t AAudioServiceStreamBase::startDevice_l() {
         ALOGE("%s() endpoint was already disconnected", __func__);
         return AAUDIO_ERROR_DISCONNECTED;
     }
-    return endpoint->startStream(this, mClientHandle);
+    return endpoint->startStream(this, mPortHandle);
 }
 
 /**
@@ -313,7 +313,7 @@ aaudio_result_t AAudioServiceStreamBase::start_l() {
     if (result != AAUDIO_OK) goto error;
 
     // This should happen at the end of the start.
-    sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED, static_cast<int64_t>(mClientHandle));
+    sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED, static_cast<int64_t>(mPortHandle));
     setState(AAUDIO_STREAM_STATE_STARTED);
 
     return result;
@@ -350,7 +350,7 @@ aaudio_result_t AAudioServiceStreamBase::pause_l() {
         result =  AAUDIO_ERROR_INVALID_STATE; // for MediaMetric tracking
         return result;
     }
-    result = endpoint->stopStream(this, mClientHandle);
+    result = endpoint->stopStream(this, mPortHandle);
     if (result != AAUDIO_OK) {
         ALOGE("%s() mServiceEndpoint returned %d, %s", __func__, result, getTypeText());
         disconnect_l(); // TODO should we return or pause Base first?
@@ -395,7 +395,7 @@ aaudio_result_t AAudioServiceStreamBase::stop_l() {
         return result;
     }
     // TODO wait for data to be played out
-    result = endpoint->stopStream(this, mClientHandle);
+    result = endpoint->stopStream(this, mPortHandle);
     if (result != AAUDIO_OK) {
         ALOGE("%s() stopStream returned %d, %s", __func__, result, getTypeText());
         disconnect_l();
@@ -689,7 +689,7 @@ void AAudioServiceStreamBase::run() {
                     if (mPendingStop) {
                         mPendingStop = false;
                         sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED,
-                                         static_cast<int64_t>(mClientHandle));
+                                         static_cast<int64_t>(mPortHandle));
                         command->result = AAUDIO_OK;
                     } else {
                         command->result = start_l();
@@ -904,7 +904,7 @@ void AAudioServiceStreamBase::disconnect_l() {
 
         sendServiceEvent(AAUDIO_SERVICE_EVENT_DISCONNECTED);
         setDisconnected_l(true);
-        releaseClient_l(mClientHandle);
+        releaseClient_l(mPortHandle);
     }
 }
 

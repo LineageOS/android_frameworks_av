@@ -2060,6 +2060,12 @@ status_t Track::setSyncEvent(
     return NO_ERROR;
 }
 
+void Track::poison()
+{
+    TrackBase::poison();
+    signalClientFlag(CBLK_POISONED);
+}
+
 void Track::invalidate()
 {
     TrackBase::invalidate();
@@ -3727,7 +3733,7 @@ getHardeningDecision(audio_usage_t usage, IAfThreadCallback& cb, uid_t uid) {
     using com::android::media::permission::PermissionEnum;
 
     const auto overrided = cb.getHardeningOverride();
-    if (overrided == ENABLE) {
+    if (overrided == ENABLE || overrided == THROW) {
         return {EnforcementLevel::FULL, NONE};
     } else if (overrided == DISABLE) {
         return {EnforcementLevel::NONE, OVERRIDE};

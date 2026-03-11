@@ -513,8 +513,8 @@ aaudio_result_t AudioStreamTrack::write(const void *buffer,
     } else if (bytesWritten < 0) {
         ALOGE("invalid write, returned %d", (int)bytesWritten);
         // in this context, a DEAD_OBJECT is more likely to be a disconnect notification due to
-        // AudioTrack invalidation
-        if (bytesWritten == DEAD_OBJECT) {
+        // AudioTrack invalidation. PERMISSION_DENIED indicates a poisoned track.
+        if (bytesWritten == DEAD_OBJECT || bytesWritten == PERMISSION_DENIED) {
             setDisconnected();
             return AAUDIO_ERROR_DISCONNECTED;
         }
