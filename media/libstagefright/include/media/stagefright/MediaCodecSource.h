@@ -129,7 +129,7 @@ private:
     sp<AMessage> mOutputFormat;
     Mutexed<sp<MetaData>> mMeta;
     sp<Puller> mPuller;
-    sp<MediaCodec> mEncoder;
+    Mutexed<sp<MediaCodec>> mEncoder;
     uint32_t mFlags;
     List<sp<AReplyToken>> mStopReplyIDQueue;
     bool mIsVideo;
