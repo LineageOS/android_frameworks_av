@@ -56,6 +56,10 @@ using binder::Status;
 android::AAudioService::AAudioService()
     : BnAAudioService(),
       mAdapter(this) {
+    // Ensure sufficient incoming binder transaction priority.
+    setMinSchedulerPolicy(SCHED_NORMAL, ANDROID_PRIORITY_URGENT_AUDIO);
+    setInheritRt(true);
+
     // TODO consider using geteuid()
     // TODO b/182392769: use attribution source util
     mAudioClient.attributionSource.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
