@@ -372,12 +372,13 @@ int MtpFfsHandle::waitEvents(struct io_buffer *buf, int min_events, struct io_ev
             // show up as readable next iteration, but there will be fewer or no events to actually
             // wait for. Thus we never want io_getevents to block.
             int this_events = TEMP_FAILURE_RETRY(io_getevents(mCtx, 0, AIO_BUFS_MAX, events, &ZERO_TIMEOUT));
-            if (this_events == -1) {
+            if (this_events < 0) {
                 PLOG(ERROR) << "Mtp error getting events";
                 error = errno;
+                break;
             }
             // Add up the total amount of data and find errors on the way.
-            for (unsigned j = 0; j < static_cast<unsigned>(this_events); j++) {
+            for (int j = 0; j < this_events; j++) {
                 if (events[j].res < 0) {
                     errno = -events[j].res;
                     PLOG(ERROR) << "Mtp got error event at " << j << " and " << buf->actual << " total";
@@ -435,7 +436,10 @@ int MtpFfsHandle::cancelEvents(struct iocb **iocb, struct io_event *events, unsi
         errno = EIO;
     }
     int evs = TEMP_FAILURE_RETRY(io_getevents(mCtx, num_events, AIO_BUFS_MAX, events, nullptr));
-    if (static_cast<unsigned>(evs) != num_events) {
+    if (evs < 0) {
+        PLOG(ERROR) << "Mtp error getting events during cancel";
+        ret = -1;
+    } else if (static_cast<unsigned>(evs) != num_events) {
         PLOG(ERROR) << "Mtp couldn't cancel all requests, got " << evs;
         ret = -1;
     }
