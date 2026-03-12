@@ -114,3 +114,10 @@ aaudio_result_t AAudioThread::stop() {
         return AAUDIO_ERROR_INTERNAL;
     }
 }
+
+android::audio_utils::CommandThread& AAudioThread::getAsyncCommandThread() {
+    static android::audio_utils::CommandThread commandThread(
+            "AAudioAsyncCommand",
+            android::audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_URGENT_AUDIO));
+    return commandThread;
+}

@@ -18,9 +18,11 @@
 #define AAUDIO_THREAD_H
 
 #include <atomic>
+#include <memory>
 #include <thread>
 
 #include <aaudio/AAudio.h>
+#include <audio_utils/CommandThread.h>
 
 namespace aaudio {
 
@@ -65,6 +67,11 @@ public:
     virtual void run() {};
 
     void dispatch(); // called internally from 'C' thread wrapper
+
+    /**
+     * Get the singleton CommandThread for asynchronous tasks.
+     */
+    static android::audio_utils::CommandThread& getAsyncCommandThread();
 
 private:
 
