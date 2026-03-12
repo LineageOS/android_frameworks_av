@@ -60,7 +60,7 @@ public:
                                    int64_t streamUseCase, bool useReadoutTimestamp,
                                    int dataspace) override;
     status_t deleteInternalStreams() override;
-    status_t configureStream() override;
+    status_t configureStream(bool outputConnected = true) override;
     status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap, Vector<int32_t>* /*out*/outputStreamIds,
             int32_t* /*out*/currentStreamId) override;
     status_t insertCompositeStreamIds(std::vector<int32_t>* compositeStreamIds /*out*/) override;
