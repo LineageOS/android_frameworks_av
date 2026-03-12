@@ -124,8 +124,8 @@ class VirtualCameraRenderThread {
   void enqueueTask(std::unique_ptr<ProcessCaptureRequestTask> task)
       EXCLUDES(mLock);
 
-  // Flush all in-flight requests.
-  void flush() EXCLUDES(mLock);
+  // Flush all in-flight requests up to frameNumber (inclusive).
+  void flush(int frameNumber = -1) EXCLUDES(mLock);
 
   // Returns input surface corresponding to "virtual camera sensor".
   sp<Surface> getInputSurface();
@@ -218,6 +218,10 @@ class VirtualCameraRenderThread {
 
   // Number of consecutive timeouts.
   std::atomic<int> mWaitInputFrameTimeoutsCount{0};
+
+  // Keeps track of the currently processed frame number.
+  std::atomic<int> mProcessingFrameNumber{-1};
+  std::atomic<int> mMaxFrameToFlush{-1};
 
   // Acquisition timestamp of last frame.
   std::atomic<uint64_t> mLastAcquisitionTimestampNanoseconds;

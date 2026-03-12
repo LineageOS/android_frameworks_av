@@ -733,10 +733,12 @@ ndk::ScopedAStatus VirtualCameraSession::flush() {
   if (isInFatalError()) {
     return cameraStatus(Status::INTERNAL_ERROR);
   }
+  int flushFrame = mMaxFrameToFlush.exchange(-1, std::memory_order_relaxed);
+
   ALOGV("%s", __func__);
   std::lock_guard<std::mutex> lock(mLock);
   if (mRenderThread != nullptr) {
-    mRenderThread->flush();
+    mRenderThread->flush(flushFrame);
   }
   return ndk::ScopedAStatus::ok();
 }
@@ -821,9 +823,9 @@ ndk::ScopedAStatus VirtualCameraSession::switchToOffline(
 
 ndk::ScopedAStatus VirtualCameraSession::repeatingRequestEnd(
     int32_t in_frameNumber, const std::vector<int32_t>& in_streamIds) {
-  ALOGV("%s", __func__);
-  (void)in_frameNumber;
+  ALOGV("[%s] frameNumber:%d", __func__, in_frameNumber);
   (void)in_streamIds;
+  mMaxFrameToFlush.store(in_frameNumber, std::memory_order_relaxed);
   return ndk::ScopedAStatus::ok();
 }
 
@@ -833,10 +835,10 @@ std::set<int> VirtualCameraSession::getStreamIds() const {
 
 ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
     const CaptureRequest& request) {
+  ALOGV("%s: CaptureRequest { frameNumber:%d }", __func__, request.frameNumber);
   if (isInFatalError()) {
     return cameraStatus(Status::INTERNAL_ERROR);
   }
-  ALOGV("%s: CaptureRequest { frameNumber:%d }", __func__, request.frameNumber);
 
   std::shared_ptr<ICameraDeviceCallback> cameraCallback = nullptr;
   RequestSettings requestSettings;

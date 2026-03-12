@@ -193,6 +193,15 @@ void VirtualCameraRenderThread::requestTextureUpdate() {
 void VirtualCameraRenderThread::enqueueTask(
     std::unique_ptr<ProcessCaptureRequestTask> task) {
   std::lock_guard<std::mutex> lock(mLock);
+
+  int lastFlushedFrame = mMaxFrameToFlush.load(std::memory_order_relaxed);
+  if (task->getFrameNumber() <= lastFlushedFrame) {
+    ALOGV("%s: Flushing up to frame:%d, dropping task for frame:%d", __func__,
+          lastFlushedFrame, task->getFrameNumber());
+    completeCaptureRequestWithError(*task);
+    return;
+  }
+
   // When enqueuing process capture request task, clear the
   // mTextureUpdateRequested flag. If this flag is set, the texture was not
   // yet updated and it will be updated when processing
@@ -202,8 +211,17 @@ void VirtualCameraRenderThread::enqueueTask(
   mTaskReadyCondVar.notify_one();
 }
 
-void VirtualCameraRenderThread::flush() {
-  std::lock_guard<std::mutex> lock(mLock);
+void VirtualCameraRenderThread::flush(int frameNumber) {
+  ALOGV("[%s] Flushing up to frame:%d", __func__, frameNumber);
+  std::unique_lock<std::mutex> lock(mLock);
+  ScopedLockAssertion lockAssertion(mLock);
+
+  int flushFrame = std::max(
+      frameNumber, mProcessingFrameNumber.load(std::memory_order_relaxed));
+  mMaxFrameToFlush.store(flushFrame, std::memory_order_relaxed);
+
+  // First empty the queue to be sure that none of the queued
+  // request will be processed after the flush.
   while (!mCaptureRequestQueue.empty()) {
     std::unique_ptr<ProcessCaptureRequestTask> task =
         std::move(mCaptureRequestQueue.front());
