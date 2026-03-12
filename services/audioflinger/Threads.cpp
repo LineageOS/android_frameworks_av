@@ -2059,8 +2059,9 @@ void ThreadBase::broadcast_l()
 // static
 audio_utils::CommandThread& ThreadBase::getAsyncCommandThread()
 {
-    [[clang::no_destroy]] static audio_utils::CommandThread commandThread{
-        audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_URGENT_AUDIO)};
+    [[clang::no_destroy]] static audio_utils::CommandThread commandThread(
+            "ThreadBaseAsyncCommand",
+            audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_URGENT_AUDIO));
     return commandThread;
 }
 
@@ -10826,18 +10827,33 @@ status_t MmapThread::releaseTrack(audio_port_handle_t portId)
         return NO_INIT;
     }
 
-    auto track = ThreadBase::getTrackById_l(portId);
-    if (track == nullptr) {
-        ALOGE("%s(%d), cannot find the track", __func__, portId);
-        return NAME_NOT_FOUND;
-    }
-
-    if (mActiveTracks.count(track) != 0) {
+    if (portId == mPortId) {
+        // If the portId is the same as thread's port id, the whole aaudio stream is gone. It is
+        // better for audioflinger to stop and release all active tracks.
+        auto tracks = mTracks;
         ul.unlock();
-        stopTrack(portId);
+        for (auto& track : tracks) {
+            // The portId equals to mPortId. In that case, any track id must not be the same
+            // as portId. Otherwise, there will be endless recursive loop.
+            LOG_ALWAYS_FATAL_IF(portId == track->portId(),
+                                "The track port id must not be the same as thread port id");
+            releaseTrack(track->portId());
+        }
         ul.lock();
+    } else {
+        auto track = ThreadBase::getTrackById_l(portId);
+        if (track == nullptr) {
+            ALOGE("%s(%d), cannot find the track", __func__, portId);
+            return NAME_NOT_FOUND;
+        }
+
+        if (mActiveTracks.count(track) != 0) {
+            ul.unlock();
+            stopTrack(portId);
+            ul.lock();
+        }
+        mTracks.remove(track);
     }
-    mTracks.remove(track);
 
     ul.unlock();
     if (isOutput()) {

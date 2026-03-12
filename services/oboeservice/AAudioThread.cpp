@@ -22,6 +22,8 @@
 #include <utils/Log.h>
 
 #include <aaudio/AAudio.h>
+#include <audio_utils/threads.h>
+#include <system/thread_defs.h>
 #include <utility/AAudioUtilities.h>
 
 #include "AAudioThread.h"
@@ -54,6 +56,23 @@ void AAudioThread::setup(const char *prefix) {
 }
 
 void AAudioThread::dispatch() {
+    if (mHasThread) {
+        android::audio_utils::set_thread_name(mThread, mName);
+        constexpr int kMinPriority =
+                android::audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_URGENT_AUDIO);
+        const int priority = android::audio_utils::get_thread_priority();
+        if (priority > kMinPriority) {  // lower priority is better.
+            const android::status_t status =
+                    android::audio_utils::set_thread_priority(kMinPriority);
+            if (status == android::OK) {
+                ALOGD("%s: elevating priority from %d to %d", __func__, priority, kMinPriority);
+            } else {
+                ALOGW("%s: could not set priority to %d, status %d",
+                        __func__, kMinPriority, status);
+            }
+        }
+    }
+
     if (mRunnable != nullptr) {
         mRunnable->run();
     } else {
@@ -94,4 +113,11 @@ aaudio_result_t AAudioThread::stop() {
         ALOGE("%s() the thread is not joinable", __func__);
         return AAUDIO_ERROR_INTERNAL;
     }
+}
+
+android::audio_utils::CommandThread& AAudioThread::getAsyncCommandThread() {
+    static android::audio_utils::CommandThread commandThread(
+            "AAudioAsyncCommand",
+            android::audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_URGENT_AUDIO));
+    return commandThread;
 }

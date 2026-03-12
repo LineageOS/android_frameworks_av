@@ -35,21 +35,24 @@ int32_t C2Decoder::createCodec2Component(string compName, AMediaFormat *format) 
     }
     // Configure the plugin with Input properties
     std::vector<C2Param *> configParam;
+    std::unique_ptr<C2StreamSampleRateInfo::output> sampleRateInfo;
+    std::unique_ptr<C2StreamChannelCountInfo::output> channelCountInfo;
+    std::unique_ptr<C2StreamPictureSizeInfo::output> outputSize;
+
     if (!strncmp(mime, "audio/", 6)) {
         int32_t sampleRate, numChannels;
         AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_SAMPLE_RATE, &sampleRate);
         AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &numChannels);
-        C2StreamSampleRateInfo::output sampleRateInfo(0u, sampleRate);
-        C2StreamChannelCountInfo::output channelCountInfo(0u, numChannels);
-        configParam.push_back(&sampleRateInfo);
-        configParam.push_back(&channelCountInfo);
-
+        sampleRateInfo.reset(new C2StreamSampleRateInfo::output(0u, sampleRate));
+        channelCountInfo.reset(new C2StreamChannelCountInfo::output(0u, numChannels));
+        configParam.push_back(sampleRateInfo.get());
+        configParam.push_back(channelCountInfo.get());
     } else {
         int32_t width, height;
         AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_WIDTH, &width);
         AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_HEIGHT, &height);
-        C2StreamPictureSizeInfo::input inputSize(0u, width, height);
-        configParam.push_back(&inputSize);
+        outputSize.reset(new C2StreamPictureSizeInfo::output(0u, width, height));
+        configParam.push_back(outputSize.get());
     }
 
     int64_t sTime = mStats->getCurTime();
@@ -95,13 +98,14 @@ int32_t C2Decoder::decodeFrames(uint8_t *inputBuffer, vector<AMediaCodecBufferIn
         }
 
         uint32_t flags = frameInfo[mNumInputFrame].flags;
-        if (flags == AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG) {
-            flags = C2FrameData::FLAG_CODEC_CONFIG;
+        uint32_t c2Flags = 0;
+        if (flags & AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG) {
+            c2Flags = C2FrameData::FLAG_CODEC_CONFIG;
         }
         if (mNumInputFrame == (frameInfo.size() - 1)) {
-            flags |= C2FrameData::FLAG_END_OF_STREAM;
+            c2Flags |= C2FrameData::FLAG_END_OF_STREAM;
         }
-        work->input.flags = (C2FrameData::flags_t)flags;
+        work->input.flags = (C2FrameData::flags_t)c2Flags;
         work->input.ordinal.timestamp = frameInfo[mNumInputFrame].presentationTimeUs;
         work->input.ordinal.frameIndex = mNumInputFrame;
         work->input.buffers.clear();
@@ -127,6 +131,7 @@ int32_t C2Decoder::decodeFrames(uint8_t *inputBuffer, vector<AMediaCodecBufferIn
         }
         work->worklets.clear();
         work->worklets.emplace_back(new C2Worklet);
+        work->worklets.front()->output.buffers.clear();
 
         std::list<std::unique_ptr<C2Work>> items;
         items.push_back(std::move(work));

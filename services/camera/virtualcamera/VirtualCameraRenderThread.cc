@@ -32,12 +32,10 @@
 #include <vector>
 
 #include "VirtualCameraCaptureResult.h"
-#include "VirtualCameraDevice.h"
 #include "VirtualCameraImageHandler.h"
 #include "VirtualCameraImagePassthroughHandler.h"
 #include "VirtualCameraImageTransformingHandler.h"
 #include "VirtualCameraSessionContext.h"
-#include "aidl/android/hardware/camera/common/Status.h"
 #include "aidl/android/hardware/camera/device/BufferStatus.h"
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/CaptureResult.h"
@@ -57,7 +55,6 @@ namespace companion {
 namespace virtualcamera {
 
 using ::aidl::android::companion::virtualcamera::Format;
-using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::BufferStatus;
 using ::aidl::android::hardware::camera::device::CameraMetadata;
 using ::aidl::android::hardware::camera::device::CaptureResult;
@@ -68,10 +65,7 @@ using ::aidl::android::hardware::camera::device::NotifyMsg;
 using ::aidl::android::hardware::camera::device::ShutterMsg;
 using ::aidl::android::hardware::camera::device::Stream;
 using ::aidl::android::hardware::camera::device::StreamBuffer;
-using ::aidl::android::hardware::graphics::common::PixelFormat;
 using ::android::base::ScopedLockAssertion;
-
-using ::android::hardware::camera::common::helper::ExifUtils;
 
 namespace {
 
@@ -199,6 +193,15 @@ void VirtualCameraRenderThread::requestTextureUpdate() {
 void VirtualCameraRenderThread::enqueueTask(
     std::unique_ptr<ProcessCaptureRequestTask> task) {
   std::lock_guard<std::mutex> lock(mLock);
+
+  int lastFlushedFrame = mMaxFrameToFlush.load(std::memory_order_relaxed);
+  if (task->getFrameNumber() <= lastFlushedFrame) {
+    ALOGV("%s: Flushing up to frame:%d, dropping task for frame:%d", __func__,
+          lastFlushedFrame, task->getFrameNumber());
+    completeCaptureRequestWithError(*task);
+    return;
+  }
+
   // When enqueuing process capture request task, clear the
   // mTextureUpdateRequested flag. If this flag is set, the texture was not
   // yet updated and it will be updated when processing
@@ -208,14 +211,28 @@ void VirtualCameraRenderThread::enqueueTask(
   mTaskReadyCondVar.notify_one();
 }
 
-void VirtualCameraRenderThread::flush() {
-  std::lock_guard<std::mutex> lock(mLock);
+void VirtualCameraRenderThread::flush(int frameNumber) {
+  ALOGV("[%s] Flushing up to frame:%d", __func__, frameNumber);
+  std::unique_lock<std::mutex> lock(mLock);
+  ScopedLockAssertion lockAssertion(mLock);
+
+  int flushFrame = std::max(
+      frameNumber, mProcessingFrameNumber.load(std::memory_order_relaxed));
+  mMaxFrameToFlush.store(flushFrame, std::memory_order_relaxed);
+
+  // First empty the queue to be sure that none of the queued
+  // request will be processed after the flush.
   while (!mCaptureRequestQueue.empty()) {
     std::unique_ptr<ProcessCaptureRequestTask> task =
         std::move(mCaptureRequestQueue.front());
     mCaptureRequestQueue.pop_front();
     completeCaptureRequestWithError(*task);
   }
+  if (mImageHandler != nullptr) {
+    mImageHandler->interruptWait();
+  }
+  mThrottlingCondVar.notify_all();
+  mTaskReadyCondVar.notify_all();
 }
 
 bool VirtualCameraRenderThread::start() {
@@ -229,6 +246,10 @@ void VirtualCameraRenderThread::stop() {
   {
     std::lock_guard<std::mutex> lock(mLock);
     mPendingExit = true;
+    if (mImageHandler != nullptr) {
+      mImageHandler->interruptWait();
+    }
+    mThrottlingCondVar.notify_all();
     mTaskReadyCondVar.notify_one();
   }
 }
@@ -475,7 +496,10 @@ void VirtualCameraRenderThread::throttleRendering(
     std::chrono::nanoseconds beforeSleep =
         std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now().time_since_epoch());
-    std::this_thread::sleep_for(sleepTime);
+    {
+      std::unique_lock<std::mutex> lock(mLock);
+      mThrottlingCondVar.wait_for(lock, sleepTime);
+    }
     std::chrono::nanoseconds after_sleep =
         std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now().time_since_epoch());

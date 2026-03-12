@@ -223,6 +223,7 @@ int32_t C2Encoder::encodeFrames(ifstream &eleStream, size_t inputBufferSize) {
 
         work->worklets.clear();
         work->worklets.emplace_back(new (std::nothrow) C2Worklet);
+        work->worklets.front()->output.buffers.clear();
 
         std::list<std::unique_ptr<C2Work>> items;
         items.push_back(std::move(work));

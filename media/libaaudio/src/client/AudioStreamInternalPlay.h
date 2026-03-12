@@ -201,6 +201,9 @@ private:
     // thread can use this value to drainStream and suspend.
     int64_t mDrainingNanos GUARDED_BY(mStreamMutex){0};
     bool mDrainingNanosValid GUARDED_BY(mStreamMutex){false};
+
+    // This value is calculated when opening. It will not changed after open.
+    int64_t mNanosPerBurst = 0;
 };
 
 } /* namespace aaudio */

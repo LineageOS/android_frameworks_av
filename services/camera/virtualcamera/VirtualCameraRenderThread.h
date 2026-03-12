@@ -35,11 +35,6 @@
 #include "aidl/android/hardware/camera/device/CameraMetadata.h"
 #include "aidl/android/hardware/camera/device/ICameraDeviceCallback.h"
 #include "gui/Surface.h"
-#include "ui/PixelFormat.h"
-#include "util/EglDisplayContext.h"
-#include "util/EglFramebuffer.h"
-#include "util/EglProgram.h"
-#include "util/EglSurfaceTexture.h"
 #include "util/Util.h"
 
 namespace android {
@@ -129,8 +124,8 @@ class VirtualCameraRenderThread {
   void enqueueTask(std::unique_ptr<ProcessCaptureRequestTask> task)
       EXCLUDES(mLock);
 
-  // Flush all in-flight requests.
-  void flush() EXCLUDES(mLock);
+  // Flush all in-flight requests up to frameNumber (inclusive).
+  void flush(int frameNumber = -1) EXCLUDES(mLock);
 
   // Returns input surface corresponding to "virtual camera sensor".
   sp<Surface> getInputSurface();
@@ -217,11 +212,16 @@ class VirtualCameraRenderThread {
   std::deque<std::unique_ptr<ProcessCaptureRequestTask>> mCaptureRequestQueue
       GUARDED_BY(mLock);
   std::condition_variable mTaskReadyCondVar;
+  std::condition_variable mThrottlingCondVar;
   volatile bool GUARDED_BY(mLock) mTextureUpdateRequested = false;
   volatile bool GUARDED_BY(mLock) mPendingExit = false;
 
   // Number of consecutive timeouts.
   std::atomic<int> mWaitInputFrameTimeoutsCount{0};
+
+  // Keeps track of the currently processed frame number.
+  std::atomic<int> mProcessingFrameNumber{-1};
+  std::atomic<int> mMaxFrameToFlush{-1};
 
   // Acquisition timestamp of last frame.
   std::atomic<uint64_t> mLastAcquisitionTimestampNanoseconds;

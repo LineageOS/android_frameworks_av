@@ -22,6 +22,8 @@
 #include <limits>
 #include <memory>
 
+#include <android/binder_process.h>
+
 #include "BenchmarkTestEnvironment.h"
 #include "C2Encoder.h"
 #include "Decoder.h"
@@ -176,6 +178,7 @@ INSTANTIATE_TEST_SUITE_P(
                           make_pair("crowd_1920x1080_25fps_4000kbps_h265.mkv", "hevc")));
 
 int main(int argc, char **argv) {
+    ABinderProcess_startThreadPool();
     gEnv = new (std::nothrow) BenchmarkTestEnvironment();
     ::testing::AddGlobalTestEnvironment(gEnv);
     ::testing::InitGoogleTest(&argc, argv);

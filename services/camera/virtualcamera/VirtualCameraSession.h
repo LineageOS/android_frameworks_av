@@ -17,6 +17,7 @@
 #ifndef ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERASESSION_H
 #define ANDROID_COMPANION_VIRTUALCAMERA_VIRTUALCAMERASESSION_H
 
+#include <atomic>
 #include <memory>
 #include <set>
 #include <vector>
@@ -164,6 +165,10 @@ class VirtualCameraSession
           halStreams);
 
   std::vector<int> mOpenStreams GUARDED_BY(mLock);
+
+  // Frame number of the last frame that was flushed.
+  // Requests with frame number less than or equal to this value are dropped.
+  std::atomic<int> mMaxFrameToFlush{-1};
 
   void createRenderThread(
       VirtualCameraDevice& virtualCamera,
