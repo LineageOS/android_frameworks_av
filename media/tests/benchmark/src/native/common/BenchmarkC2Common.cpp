@@ -19,6 +19,14 @@
 
 #include "BenchmarkC2Common.h"
 
+C2PooledBlockPool::BufferPoolVer BenchmarkC2Common::getBufferPoolVer() {
+    if (::aidl::android::hardware::media::c2::utils::IsSelected()) {
+        return C2PooledBlockPool::VER_AIDL2;
+    } else {
+        return C2PooledBlockPool::VER_HIDL;
+    }
+}
+
 int32_t BenchmarkC2Common::setupCodec2() {
     ALOGV("In %s", __func__);
     mClient = android::Codec2Client::CreateFromService("default");
@@ -33,13 +41,15 @@ int32_t BenchmarkC2Common::setupCodec2() {
     c2_status_t status = store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mLinearAllocator);
     if (status != C2_OK) return status;
 
-    mLinearPool = std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++);
+    mLinearPool = std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++,
+                                                      getBufferPoolVer());
     if (!mLinearPool) return -1;
 
     status = store->fetchAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &mGraphicAllocator);
     if (status != C2_OK) return status;
 
-    mGraphicPool = std::make_shared<C2PooledBlockPool>(mGraphicAllocator, mBlockPoolId++);
+    mGraphicPool = std::make_shared<C2PooledBlockPool>(mGraphicAllocator, mBlockPoolId++,
+                                                       getBufferPoolVer());
     if (!mGraphicPool) return -1;
 
     for (int i = 0; i < MAX_INPUT_BUFFERS; ++i) {

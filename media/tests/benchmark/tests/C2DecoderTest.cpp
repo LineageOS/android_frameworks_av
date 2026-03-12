@@ -26,6 +26,8 @@
 #include "C2Decoder.h"
 #include "Extractor.h"
 
+#include <android/binder_process.h>
+
 static BenchmarkTestEnvironment *gEnv = nullptr;
 
 class C2DecoderTest : public ::testing::TestWithParam<pair<string, string>> {
@@ -98,6 +100,7 @@ TEST_P(C2DecoderTest, Codec2Decode) {
         while (1) {
             void *csdBuffer = extractor->getCSDSample(info, idx);
             if (!csdBuffer || !info.size) break;
+            info.flags = AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG;
             // copy the meta data and buffer to be passed to decoder
             ASSERT_LE(inputBufferOffset + info.size, fileSize) << "Memory allocated not sufficient";
 
@@ -173,6 +176,7 @@ INSTANTIATE_TEST_SUITE_P(
                           make_pair("crowd_1920x1080_25fps_4000kbps_h265.mkv", "hevc")));
 
 int main(int argc, char **argv) {
+    ABinderProcess_startThreadPool();
     gEnv = new (std::nothrow) BenchmarkTestEnvironment();
     ::testing::AddGlobalTestEnvironment(gEnv);
     ::testing::InitGoogleTest(&argc, argv);

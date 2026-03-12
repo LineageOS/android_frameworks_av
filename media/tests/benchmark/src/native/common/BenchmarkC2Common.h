@@ -24,6 +24,7 @@
 
 #include <hidl/HidlSupport.h>
 
+#include <codec2/aidl/ParamTypes.h>
 #include <C2AllocatorIon.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
@@ -111,6 +112,8 @@ class BenchmarkC2Common {
           mGraphicPool(nullptr),
           mLinearAllocator(nullptr),
           mGraphicAllocator(nullptr) {}
+
+    C2PooledBlockPool::BufferPoolVer getBufferPoolVer();
 
     int32_t setupCodec2();
 
