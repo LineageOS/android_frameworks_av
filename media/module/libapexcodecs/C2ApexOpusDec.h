@@ -59,6 +59,8 @@ public:
             size_t *consumed,
             size_t *produced) override;
 
+    bool valid() const { return mInit; }
+
 private:
     void initDecoderStates();
 
@@ -91,6 +93,8 @@ private:
         }
         return true;
     }
+
+    bool mInit;
 
     std::unique_ptr<ApexConfigurableImpl> mConfigurable;
     std::shared_ptr<IntfImpl> mIntf;
