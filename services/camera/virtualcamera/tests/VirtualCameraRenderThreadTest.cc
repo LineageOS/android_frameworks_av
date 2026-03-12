@@ -148,7 +148,46 @@ TEST_F(VirtualCameraRenderThreadTest, FlushReturnsErrorForInFlightRequests) {
           CaptureRequestBuffer(firstStreamId, firstStreamBufferId),
           CaptureRequestBuffer(secondStreamId, secondStreamBufferId)}));
 
-  mRenderThread->flush();
+  mRenderThread->flush(frameNumber);
+}
+
+// Verifies that a task with a frame number higher than the last flushed frame
+// number is correctly enqueued and not dropped.
+TEST_F(VirtualCameraRenderThreadTest, EnqueueTask_EnqueuesFreshTask) {
+  const int flushedFrameNumber = 100;
+  const int taskFrameNumber = 101;
+  const int streamId = 1;
+  const int bufferId = 2;
+
+  mRenderThread->flush(flushedFrameNumber);
+
+  // Enqueueing a task with a frame number higher than the last flushed frame
+  // number should not trigger any immediate calls, as the task is queued.
+  EXPECT_CALL(*mMockCameraDeviceCallback, notify(testing::_)).Times(0);
+  EXPECT_CALL(*mMockCameraDeviceCallback, processCaptureResult(testing::_))
+      .Times(0);
+
+  mRenderThread->enqueueTask(std::make_unique<ProcessCaptureRequestTask>(
+      taskFrameNumber, std::vector<CaptureRequestBuffer>{
+                           CaptureRequestBuffer(streamId, bufferId)}));
+
+  // To verify the task was actually enqueued, we can flush again and check
+  // that the error callbacks are now invoked.
+  testing::Mock::VerifyAndClearExpectations(mMockCameraDeviceCallback.get());
+
+  EXPECT_CALL(*mMockCameraDeviceCallback,
+              notify(ElementsAre(IsRequestErrorNotifyMsg(taskFrameNumber))))
+      .WillOnce(Return(ndk::ScopedAStatus::ok()));
+  EXPECT_CALL(
+      *mMockCameraDeviceCallback,
+      processCaptureResult(ElementsAre(AllOf(
+          Field(&CaptureResult::frameNumber, taskFrameNumber),
+          Field(&CaptureResult::outputBuffers,
+                ElementsAre(IsStreamBufferWithStatus(
+                    streamId, bufferId, BufferStatus::ERROR)))))))
+      .WillOnce(Return(ndk::ScopedAStatus::ok()));
+
+  mRenderThread->flush(taskFrameNumber);
 }
 
 TEST_F(VirtualCameraRenderThreadTest, StateTransitions) {
