@@ -818,9 +818,6 @@ protected:
                     size_t count(const sp<IAfTrackBase>& track) const {
                         return mActiveTracks.count(track);
                     }
-                    auto erase(const std::set<sp<IAfTrackBase>>::iterator& it) {
-                        return mActiveTracks.erase(it);
-                    }
                     auto begin() {
                         return mActiveTracks.begin();
                     }

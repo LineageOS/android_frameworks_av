@@ -8415,9 +8415,6 @@ reacquire_wakelock:
         // reference to the (first and only) active fast track
         sp<IAfRecordTrack> fastTrack;
 
-        // reference to a fast track which is about to be removed
-        sp<IAfRecordTrack> fastTrackToRemove;
-
         bool silenceFastCapture = false;
 
         { // scope for mutex()
@@ -8454,18 +8451,15 @@ reacquire_wakelock:
 
             bool doBroadcast = false;
             bool allStopped = true;
-            for (auto it = mActiveTracks.begin() ; it != mActiveTracks.end(); ) {
-                if (activeTrack) {  // ensure track release is outside lock.
-                    oldActiveTracks.emplace_back(std::move(activeTrack));
-                }
-                activeTrack = (*it)->asIAfRecordTrack();
-                if (activeTrack->isTerminated()) {
-                    if (activeTrack->isFastTrack()) {
-                        ALOG_ASSERT(fastTrackToRemove == 0);
-                        fastTrackToRemove = activeTrack;
-                    }
-                    removeTrack_l(activeTrack);
-                    it = mActiveTracks.erase(it);
+
+            std::vector<std::pair<sp<IAfRecordTrack>,
+                                  bool /* fromTracksToo */>> activeTracksToRemove;
+            for (const auto& track: mActiveTracks) {
+                activeTrack = track->asIAfRecordTrack();
+                oldActiveTracks.emplace_back(activeTrack);
+
+                if (activeTrack->isTerminated() || activeTrack->isInvalid()) {
+                    activeTracksToRemove.emplace_back(activeTrack, /* fromTracksToo */ true);
                     continue;
                 }
 
@@ -8473,20 +8467,13 @@ reacquire_wakelock:
                 switch (activeTrackState) {
 
                 case IAfTrackBase::PAUSING:
-                    it = mActiveTracks.erase(it);
+                    activeTracksToRemove.emplace_back(activeTrack, /* fromTracksToo */ false);
                     activeTrack->setState(IAfTrackBase::PAUSED);
-                    if (activeTrack->isFastTrack()) {
-                        ALOGV("%s fast track is paused, thus removed from active list", __func__);
-                        // Keep a ref on fast track to wait for FastCapture thread to get updated
-                        // state before potential track removal
-                        fastTrackToRemove = activeTrack;
-                    }
                     doBroadcast = true;
                     continue;
 
                 case IAfTrackBase::STARTING_1:
                     sleepUs = 10000;
-                    ++it;
                     allStopped = false;
                     continue;
 
@@ -8537,18 +8524,20 @@ reacquire_wakelock:
                     }
                     if (invalidate) {
                         activeTrack->invalidate();
-                        fastTrackToRemove = activeTrack;
-                        removeTrack_l(activeTrack);
-                        it = mActiveTracks.erase(it);
+                        activeTracksToRemove.emplace_back(activeTrack, /* fromTracksToo */ true);
                         continue;
                     }
                     fastTrack = activeTrack;
                 }
 
                 activeTracks.push_back(activeTrack);
-                ++it;
             }
 
+            // update the active track list.
+            for (const auto& [track, fromTracksToo] : activeTracksToRemove) {
+                mActiveTracks.remove(track);
+                if (fromTracksToo) removeTrack_l(track);
+            }
             mActiveTracks.updatePowerState_l(this);
 
             // check if traces have been enabled.
@@ -8651,9 +8640,6 @@ reacquire_wakelock:
 #endif
             }
         }
-
-        // now run the fast track destructor with thread mutex unlocked
-        fastTrackToRemove.clear();
 
         // Read from HAL to keep up with fastest client if multiple active tracks, not slowest one.
         // Only the client(s) that are too slow will overrun. But if even the fastest client is too
