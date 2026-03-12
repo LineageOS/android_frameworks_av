@@ -212,6 +212,7 @@ class VirtualCameraRenderThread {
   std::deque<std::unique_ptr<ProcessCaptureRequestTask>> mCaptureRequestQueue
       GUARDED_BY(mLock);
   std::condition_variable mTaskReadyCondVar;
+  std::condition_variable mThrottlingCondVar;
   volatile bool GUARDED_BY(mLock) mTextureUpdateRequested = false;
   volatile bool GUARDED_BY(mLock) mPendingExit = false;
 
