@@ -183,6 +183,7 @@ cc_library {
     name: "libaaudio_internal_builder",
     defaults: ["libaaudio_defaults"],
     shared_libs: [
+        "android.media.audio-aconfig-cc",
         "libaaudio_internal_core",
         "libaaudio_internal_legacy",
         "libaaudio_internal_mmap",
@@ -238,6 +239,7 @@ cc_library {
     ],
     export_include_dirs: ["."],
     shared_libs: [
+        "android.media.audio-aconfig-cc",
         "framework-permission-aidl-cpp",
         "libaaudio_internal_core",
         "libaaudio_internal_utils",

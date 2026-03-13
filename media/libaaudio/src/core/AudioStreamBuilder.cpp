@@ -25,6 +25,7 @@
 #include <android/media/audio/common/AudioMMapPolicy.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
 #include <android/media/audio/common/AudioMMapPolicyType.h>
+#include <android_media_audio.h>
 #include <binding/AAudioBinderClient.h>
 #include <client/AudioStreamInternalCapture.h>
 #include <client/AudioStreamInternalPlay.h>
@@ -90,6 +91,25 @@ static aaudio_result_t builder_createStream(aaudio_direction_t direction,
             result = AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
     return result;
+}
+
+AudioStreamBuilder* AudioStreamBuilder::setRoutingChangedCallbackProc(
+        AAudioStream_routingChangedCallback proc) {
+    if (!android_media_audio_partial_flush_for_pcm_offload()) {
+        ALOGI("%s, ignored as the feature flag is not enabled.", __func__);
+        return this;
+    }
+    mRoutingChangedCallbackProc = proc;
+    return this;
+}
+
+AudioStreamBuilder* AudioStreamBuilder::setRoutingChangedCallbackUserData(void *userData) {
+    if (!android_media_audio_partial_flush_for_pcm_offload()) {
+        ALOGI("%s, ignored as the feature flag is not enabled.", __func__);
+        return this;
+    }
+    mRoutingChangedCallbackUserData = userData;
+    return this;
 }
 
 // Try to open using MMAP path if that is allowed.

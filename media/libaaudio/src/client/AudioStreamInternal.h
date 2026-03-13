@@ -21,6 +21,7 @@
 #include <aaudio/AAudio.h>
 #include <aaudio/BnAAudioClientCallback.h>
 #include <core/AudioStream.h>
+#include <media/AudioSystem.h>
 #include <utility/AudioClock.h>
 // go/keep-sorted end
 
@@ -273,6 +274,18 @@ private:
 
     audio_port_handle_t      mPortId = AUDIO_PORT_HANDLE_NONE;
     audio_io_handle_t        mIoHandle = AUDIO_IO_HANDLE_NONE;
+
+    class AAudioDeviceCallback : public android::AudioSystem::AudioDeviceCallback {
+    public:
+        explicit AAudioDeviceCallback(android::wp<AudioStreamInternal>&& stream)
+                : mStream(std::move(stream)) {}
+
+        void onAudioDeviceUpdate(audio_io_handle_t audioIo,
+                                 const android::DeviceIdVector& deviceIds) final;
+    private:
+        const android::wp<AudioStreamInternal> mStream;
+    };
+    sp<AAudioDeviceCallback> mDeviceCallback;
 
 };
 

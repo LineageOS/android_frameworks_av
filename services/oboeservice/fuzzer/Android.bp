@@ -39,6 +39,7 @@ cc_fuzz {
     ],
     shared_libs: [
         "aaudio-aidl-cpp",
+        "android.media.audio-aconfig-cc",
         "audioclient-types-aidl-cpp",
         "com.android.media.aaudio-aconfig-cc",
         "framework-permission-aidl-cpp",

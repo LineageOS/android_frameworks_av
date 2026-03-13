@@ -248,6 +248,12 @@ aaudio_result_t AudioStreamInternal::open(const AAudioStreamOpenRequest& openReq
 
     setState(AAUDIO_STREAM_STATE_OPEN);
 
+    if (!isInService() && getRoutingChangedCallback() != nullptr) {
+        mDeviceCallback = sp<AAudioDeviceCallback>::make(
+                android::wp<AudioStreamInternal>::fromExisting(this));
+        android::AudioSystem::addAudioDeviceCallback(mDeviceCallback, mIoHandle, mPortId);
+    }
+
     return result;
 
 error:
@@ -369,6 +375,9 @@ aaudio_result_t AudioStreamInternal::configureDataInformation(int32_t callbackFr
 aaudio_result_t AudioStreamInternal::release_l() {
     aaudio_result_t result = AAUDIO_OK;
     ALOGD("%s(): mServiceStreamHandle = 0x%08X", __func__, getServiceHandle());
+    if (mDeviceCallback != nullptr) {
+        android::AudioSystem::removeAudioDeviceCallback(mDeviceCallback, mIoHandle, mPortId);
+    }
     if (getServiceHandle() != AAUDIO_HANDLE_INVALID) {
         // Don't release a stream while it is running. Stop it first.
         // If DISCONNECTED then we should still try to stop in case the
@@ -1079,4 +1088,16 @@ android::binder::Status AudioStreamInternal::onWakeUp(
     std::lock_guard _l(mStreamMutex);
     onWakeUp_l(legacy);
     return android::binder::Status::ok();
+}
+
+//------------------------------------------------------------------------------
+// Implementation of AAudioDeviceCallback
+
+void AudioStreamInternal::AAudioDeviceCallback::onAudioDeviceUpdate(
+        audio_io_handle_t audioIo, const android::DeviceIdVector& deviceIds) {
+    auto stream = mStream.promote();
+    if (stream != nullptr && audioIo == stream->getIoHandle()) {
+        stream->setDeviceIds(deviceIds);
+        stream->maybeSignalRoutingChangedCallback();
+    }
 }
