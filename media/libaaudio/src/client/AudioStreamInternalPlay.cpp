@@ -1044,7 +1044,8 @@ void AudioStreamInternalPlay::onWakeUp_l(android::audio_utils::TimerQueue::handl
     if (mPendingStop) {
         // When onWakeUp is called, it indicates drain completion. `mPendingStop` indicates the
         // client has called stop before. In that case, update state and positions to stopped state.
-        setState(AAUDIO_STREAM_STATE_STOPPED);
+        // Note that we don't need to update stream state here as it should be updated from another
+        // service event.
         if (mUseDataAvailableCallback) {
             maybeCallPresentationEndCallback_l();
         }
