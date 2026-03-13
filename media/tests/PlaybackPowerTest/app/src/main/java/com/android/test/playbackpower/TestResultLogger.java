@@ -80,7 +80,9 @@ import org.json.JSONObject;
         Log.i(mLogTag, "Succeeded " + message);
         if (mInitialChargeCounter != UNSET) {
             logEvent(mChargeCounterTimeMs, "charge_counter_end", mChargeCounter);
-            long elapsedTimeSec = (mChargeCounterTimeMs - mInitialChargeCounterTimeMs) / 1000L;
+            long elapsedTimeMs = mChargeCounterTimeMs - mInitialChargeCounterTimeMs;
+            // Round to the nearest second.
+            long elapsedTimeSec = (elapsedTimeMs + 500L) / 1000L;
             long chargeCounterDifference = mInitialChargeCounter - mChargeCounter;
             logEvent(
                     mChargeCounterTimeMs,
