@@ -77,6 +77,19 @@ TEST_F(ExecutorTests, ShutdownTwice) {
     executor_.shutdown();
 }
 
+TEST_F(ExecutorTests, NameAndPriority) {
+    const std::string name = "test_executor";
+    const int priority = android::audio_utils::nice_to_unified_priority(5);
+    SingleThreadExecutor executor(name, priority);
+
+    auto future = submit(executor, [&]() {
+        EXPECT_EQ(name, android::audio_utils::get_thread_name());
+        EXPECT_EQ(priority, android::audio_utils::get_thread_priority());
+        return true;
+    });
+    EXPECT_TRUE(future.get());
+}
+
 TEST_F(ExecutorTests, Submit) {
     auto future = submit(executor_, [&]() { return 5; });
     EXPECT_EQ(future.get(), 5);

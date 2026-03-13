@@ -203,6 +203,7 @@ cc_library {
     export_include_dirs: ["."],
     shared_libs: [
         "libaaudio_internal_utils",
+        "libaudioutils",
         "libbinder",
         "libmediametrics",
     ],
