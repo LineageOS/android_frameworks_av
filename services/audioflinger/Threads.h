@@ -2436,6 +2436,7 @@ class MmapThread : public ThreadBase, public virtual IAfMmapThread
  protected:
     void dumpInternals_l(int fd, const Vector<String16>& args) override REQUIRES(mutex());
     void dumpTracks_l(int fd, const Vector<String16>& args) final REQUIRES(mutex());
+    void releaseAllTracks() EXCLUDES_ThreadBase_Mutex;
 
                 /**
                  * @brief mDeviceIds current device port unique identifiers
