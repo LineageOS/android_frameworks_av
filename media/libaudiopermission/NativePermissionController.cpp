@@ -161,14 +161,13 @@ BinderResult<bool> NativePermissionController::validateUidPackagePair(
 
 BinderResult<bool> NativePermissionController::checkPermission(PermissionEnum perm,
                                                                uid_t uid) const {
-    ALOGV("%s: checking %d for %u", __func__, static_cast<int>(perm), uid);
     if (uid == AID_ROOT || uid == AID_SYSTEM || uid == getuid()) return true;
     std::lock_guard l{m_};
     const auto& uids = permission_map_[static_cast<size_t>(perm)];
     if (!uids.empty()) {
         const bool ret = std::binary_search(uids.begin(), uids.end(), uid);
         // Log locally until all call-sites log errors well
-        ALOGD_IF(!ret, "%s: missing %d for %u", __func__, static_cast<int>(perm), uid);
+        ALOGV_IF(!ret, "%s: missing %d for %u", __func__, static_cast<int>(perm), uid);
         return ret;
     } else {
         return unexpectedExceptionCode(
