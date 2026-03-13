@@ -210,6 +210,7 @@ audio_attributes_t AAudioServiceEndpoint::getAudioAttributesFrom(
     } else {
         flags = static_cast<audio_flags_mask_t>(AUDIO_FLAG_LOW_LATENCY
                 | AAudioConvert_privacySensitiveToAudioFlagsMask(params->isPrivacySensitive()));
+        tags = params->getTagsAsString();
     }
     audio_attributes_t nativeAttributes = {
             .content_type = contentType,

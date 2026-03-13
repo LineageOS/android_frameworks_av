@@ -124,13 +124,18 @@ aaudio_result_t AudioStreamRecord::open(const AAudioStreamOpenRequest& openReque
 
     const audio_flags_mask_t attrFlags =
             AAudioConvert_privacySensitiveToAudioFlagsMask(openRequest.isPrivacySensitive());
-    const audio_attributes_t attributes = {
+    audio_attributes_t attributes = {
             .content_type = contentType,
             .usage = AUDIO_USAGE_UNKNOWN, // only used for output
             .source = source,
             .flags = attrFlags, // Different than the AUDIO_INPUT_FLAGS
             .tags = ""
     };
+    std::string tags = openRequest.getTagsAsString();
+    if (!tags.empty()) {
+        strncpy(attributes.tags, tags.c_str(), AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
+        attributes.tags[AUDIO_ATTRIBUTES_TAGS_MAX_SIZE - 1] = '\0';
+    }
 
     // TODO b/182392769: use attribution source util
     AttributionSourceState attributionSource;
