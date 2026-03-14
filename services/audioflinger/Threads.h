@@ -531,7 +531,7 @@ public:
 
     void broadcast_l() final REQUIRES(mutex());
 
-    void asyncBroadcast() final;
+    void asyncBroadcast(std::chrono::nanoseconds delay = std::chrono::nanoseconds(0)) final;
 
     bool isTimestampCorrectionEnabled_l() const override REQUIRES(mutex()) { return false; }
 
