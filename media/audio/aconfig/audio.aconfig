@@ -146,6 +146,16 @@ flag {
 }
 
 flag {
+    name: "persist_mode_assistant_volume_cache"
+    namespace: "media_audio"
+    description: "Persist the cached STREAM_ASSISTANT volume during MODE_ASSISTANT_CONVERSATION"
+    bug: "490036136"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "ring_my_car"
     namespace: "media_audio"
     description:

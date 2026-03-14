@@ -552,6 +552,10 @@ public:
     void onClientUnfrozen(pid_t pid __unused) override EXCLUDES_ThreadBase_Mutex {}
     void onClientFrozen(pid_t pid __unused) override EXCLUDES_ThreadBase_Mutex {}
 
+    // invalidateTracksForPid_l, invalidates tracks associated with pid.
+    // returns the port IDs of the tracks invalidated.
+    std::vector<audio_port_handle_t> invalidateTracksForPid_l(pid_t pid) REQUIRES(mutex());
+
     void onEffectEnable(const sp<IAfEffectModule>& effect) final EXCLUDES_ThreadBase_Mutex;
     void onEffectDisable(const sp<IAfEffectModule>& effect) final EXCLUDES_ThreadBase_Mutex;
 
@@ -2210,6 +2214,8 @@ public:
 
     std::string getLocalLogHeader() const override;
 
+    void onClientFrozen(pid_t pid) override EXCLUDES_ThreadBase_Mutex;
+
 protected:
     void dumpInternals_l(int fd, const Vector<String16>& args) override REQUIRES(mutex());
     void dumpTracks_l(int fd, const Vector<String16>& args) override REQUIRES(mutex());
@@ -2436,6 +2442,7 @@ class MmapThread : public ThreadBase, public virtual IAfMmapThread
  protected:
     void dumpInternals_l(int fd, const Vector<String16>& args) override REQUIRES(mutex());
     void dumpTracks_l(int fd, const Vector<String16>& args) final REQUIRES(mutex());
+    void releaseAllTracks() EXCLUDES_ThreadBase_Mutex;
 
                 /**
                  * @brief mDeviceIds current device port unique identifiers

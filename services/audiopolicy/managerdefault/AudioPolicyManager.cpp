@@ -1445,9 +1445,10 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     }
 
     // FIXME: in case of RENDER policy, the output capabilities should be checked
-    if ((secondaryMixes != nullptr && !secondaryMixes->empty())
-            && (!audio_is_linear_pcm(config->format) ||
-                    *flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)) {
+    if ((secondaryMixes != nullptr && !secondaryMixes->empty()) &&
+        (!audio_is_linear_pcm(config->format) ||
+         ((*flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) &&
+          !com::android::media::audioserver::capture_offloaded_audio()))) {
         ALOGD("%s: rejecting request as secondary mixes only support pcm", __func__);
         return BAD_VALUE;
     }
@@ -8149,14 +8150,14 @@ void AudioPolicyManager::checkSecondaryOutputs() {
                 clientsToInvalidate.push_back(client->portId());
                 continue;
             }
-            if (std::equal(
-                    client->getSecondaryOutputs().begin(),
-                    client->getSecondaryOutputs().end(),
-                    secondaryDescs.begin(), secondaryDescs.end())) {
+            if (std::equal(client->getSecondaryOutputs().begin(),
+                           client->getSecondaryOutputs().end(), secondaryDescs.begin(),
+                           secondaryDescs.end())) {
                 continue;
             }
-            if (client->flags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD
-                    || !audio_is_linear_pcm(client->config().format)) {
+            if ((client->flags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD &&
+                 !com::android::media::audioserver::capture_offloaded_audio()) ||
+                !audio_is_linear_pcm(client->config().format)) {
                 // If the format is not PCM, the tracks should be invalidated to get correct
                 // behavior when the secondary output is changed.
                 clientsToInvalidate.push_back(client->portId());
@@ -8685,18 +8686,28 @@ uint32_t AudioPolicyManager::setOutputDevices(const char *caller,
     // no need to proceed if new device is not AUDIO_DEVICE_NONE and not routable to/from current
     // output profile or if new device is not routable AND previous device(s) is(are) still
     // available (otherwise reset device must be done on the output)
-    // SCO is an exception: we should never restore the previous route to SCO, since it has
-    // implications for the overall HAL state. In that case, we proceed and reset the route, similar
-    // to explicitly setting the device to NONE.
-    if (!devices.isEmpty() && filteredDevices.isEmpty() && !availPrevDevices.empty() &&
-        !std::any_of(availPrevDevices.begin(), availPrevDevices.end(),
-                     [](const auto& x) { return audio_is_bluetooth_out_sco_device(x->type()); })) {
-        ALOGV("%s: %s unsupported device %s for output", __func__, logPrefix.c_str(),
-              devices.toString().c_str());
-        // restore previous device after evaluating strategy mute state
-        outputDesc->setDevices(prevDevices);
-        applyStreamVolumes(outputDesc, prevDevices.types(), delayMs, true /*force*/);
-        return muteWaitMs;
+    if (!devices.isEmpty() && filteredDevices.isEmpty() && !availPrevDevices.empty()) {
+        // SCO/A2DP is an exception: we should never restore the previous route to SCO, since it has
+        // implications for the overall HAL state. In that case, we proceed and reset the route,
+        // similar to explicitly setting the device to NONE.
+        if (std::any_of(availPrevDevices.begin(), availPrevDevices.end(), [](const auto& x) {
+                return audio_is_bluetooth_out_sco_device(x->type()) ||
+                       audio_is_a2dp_out_device(x->type());
+            })) {
+            ALOGV("%s: %s unsupported device %s for output %s with %d clients. However, force "
+                  "clearing prev device",
+                  __func__, logPrefix.c_str(), devices.toString().c_str(),
+                  outputDesc->info().c_str(),
+                  static_cast<int>(outputDesc->getActiveClients().size()));
+            force = true;
+        } else {
+            ALOGV("%s: %s unsupported device %s for output", __func__, logPrefix.c_str(),
+                  devices.toString().c_str());
+            // restore previous device after evaluating strategy mute state
+            outputDesc->setDevices(prevDevices);
+            applyStreamVolumes(outputDesc, prevDevices.types(), delayMs, true /*force*/);
+            return muteWaitMs;
+        }
     }
 
     // Do not change the routing if:

@@ -30,6 +30,7 @@
 #include <afutils/FallibleLockGuard.h>
 #include <afutils/Vibrator.h>
 #include <android/media/BnMmapStream.h>
+#include <android/binder_to_string.h>
 #include <audio_utils/MelProcessor.h>
 #include <audio_utils/Metadata.h>
 #include <audio_utils/Time.h>
@@ -1752,6 +1753,17 @@ void ThreadBase::disconnectEffectHandle(IAfEffectHandle* handle,
             effect->checkSuspendOnEffectEnabled(false, false /*threadLocked*/);
         }
     }
+}
+
+std::vector<audio_port_handle_t> ThreadBase::invalidateTracksForPid_l(pid_t pid) {
+    std::vector<audio_port_handle_t> portIds;
+    for (const auto& t : mTracks) {
+        if (t->creatorPid() == pid && t->isExternalTrack()) {
+            t->invalidate();
+            portIds.push_back(t->portId());
+        }
+    }
+    return portIds;
 }
 
 void ThreadBase::onEffectEnable(const sp<IAfEffectModule>& effect) {
@@ -8382,6 +8394,30 @@ void RecordThread::preExit()
     mStartStopCV.notify_all();
 }
 
+void RecordThread::onClientFrozen(pid_t pid)
+{
+    if (!property_get_bool("persist.audio.record_freeze_invalidate", false)) {
+        return;
+    }
+    // We must delay the invalidation until after the freeze transition
+    // to prevent creating excessive client activity during transition.
+    static constexpr auto kFreezeDelay = std::chrono::milliseconds(100);
+    const auto wpThis = wp<RecordThread>::fromExisting(this);
+    getAsyncCommandThread().add(
+            std::string("RecordThread::onClientFrozen-").append(mThreadName),
+            [wpThis, pid]() {
+                const auto recordThread = wpThis.promote();
+                if (recordThread) {
+                    audio_utils::lock_guard lg(recordThread->mutex());
+                    const auto portIds = recordThread->invalidateTracksForPid_l(pid);
+                    ALOGD_IF(!portIds.empty(), "onClientFrozen(%d): "
+                            "portIds %s invalidated for frozen pid %d",
+                            recordThread->id(),
+                            internal::ToString(portIds).c_str(), pid);
+                }
+            }, kFreezeDelay);
+}
+
 bool RecordThread::threadLoop()
 {
     nsecs_t lastWarning = 0;
@@ -10803,6 +10839,22 @@ status_t MmapThread::stopTrack(audio_port_handle_t portId)
     return NO_ERROR;
 }
 
+void MmapThread::releaseAllTracks() {
+    audio_utils::unique_lock ul {mutex()};
+    auto tracks = mTracks;
+    auto threadPortId = mPortId;
+    ul.unlock();
+    for (auto& track : tracks) {
+        // The portId equals to mPortId. In that case, any track id must not be the same
+        // as portId. Otherwise, there will be endless recursive loop.
+        LOG_ALWAYS_FATAL_IF(threadPortId == track->portId(),
+                            "The track port id must not be the same as thread port id");
+        releaseTrack(track->portId());
+    }
+    // DO NOT relock as our copy of track can be the last copy, the track dtor
+    // should be run without lock to prevent join deadlock
+}
+
 status_t MmapThread::releaseTrack(audio_port_handle_t portId)
 {
     ALOGV("%s handle %d", __func__, portId);
@@ -10816,16 +10868,8 @@ status_t MmapThread::releaseTrack(audio_port_handle_t portId)
     if (portId == mPortId) {
         // If the portId is the same as thread's port id, the whole aaudio stream is gone. It is
         // better for audioflinger to stop and release all active tracks.
-        auto tracks = mTracks;
         ul.unlock();
-        for (auto& track : tracks) {
-            // The portId equals to mPortId. In that case, any track id must not be the same
-            // as portId. Otherwise, there will be endless recursive loop.
-            LOG_ALWAYS_FATAL_IF(portId == track->portId(),
-                                "The track port id must not be the same as thread port id");
-            releaseTrack(track->portId());
-        }
-        ul.lock();
+        releaseAllTracks();
     } else {
         auto track = ThreadBase::getTrackById_l(portId);
         if (track == nullptr) {
@@ -10839,9 +10883,12 @@ status_t MmapThread::releaseTrack(audio_port_handle_t portId)
             ul.lock();
         }
         mTracks.remove(track);
+        // Unlock in case our copy of track is the last copy. The track destructor should be
+        // run without lock to avoid join deadlock.
+        ul.unlock();
     }
 
-    ul.unlock();
+    LOG_ALWAYS_FATAL_IF(ul.owns_lock(), "Must not own lock when releasing");
     if (isOutput()) {
         AudioSystem::releaseOutput(portId);
     } else {
