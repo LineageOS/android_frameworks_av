@@ -1445,9 +1445,10 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     }
 
     // FIXME: in case of RENDER policy, the output capabilities should be checked
-    if ((secondaryMixes != nullptr && !secondaryMixes->empty())
-            && (!audio_is_linear_pcm(config->format) ||
-                    *flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD)) {
+    if ((secondaryMixes != nullptr && !secondaryMixes->empty()) &&
+        (!audio_is_linear_pcm(config->format) ||
+         ((*flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) &&
+          !com::android::media::audioserver::capture_offloaded_audio()))) {
         ALOGD("%s: rejecting request as secondary mixes only support pcm", __func__);
         return BAD_VALUE;
     }
@@ -8149,14 +8150,14 @@ void AudioPolicyManager::checkSecondaryOutputs() {
                 clientsToInvalidate.push_back(client->portId());
                 continue;
             }
-            if (std::equal(
-                    client->getSecondaryOutputs().begin(),
-                    client->getSecondaryOutputs().end(),
-                    secondaryDescs.begin(), secondaryDescs.end())) {
+            if (std::equal(client->getSecondaryOutputs().begin(),
+                           client->getSecondaryOutputs().end(), secondaryDescs.begin(),
+                           secondaryDescs.end())) {
                 continue;
             }
-            if (client->flags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD
-                    || !audio_is_linear_pcm(client->config().format)) {
+            if ((client->flags() & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD &&
+                 !com::android::media::audioserver::capture_offloaded_audio()) ||
+                !audio_is_linear_pcm(client->config().format)) {
                 // If the format is not PCM, the tracks should be invalidated to get correct
                 // behavior when the secondary output is changed.
                 clientsToInvalidate.push_back(client->portId());
