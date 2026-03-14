@@ -51,6 +51,24 @@
       "parentUuid": "baa79864_21a0deec",
       "revId": "8e3f0f52e04d2498296c6e550f4b0b832229a1ed",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b2b12bed_a3826d3f",
+        "filename": "services/camera/libcameraservice/device3/Camera3Device.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 486,
+      "author": {
+        "id": 30766
+      },
+      "writtenOn": "2026-03-14T03:48:35Z",
+      "side": 1,
+      "message": "Acknowledged",
+      "parentUuid": "594f4cf3_fd23e5fc",
+      "revId": "8e3f0f52e04d2498296c6e550f4b0b832229a1ed",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ],
   "submitRequirementResults": [
