@@ -19,7 +19,7 @@
 #include <aidl/android/hardware/media/c2/BnGraphicBufferAllocator.h>
 
 #include <android-base/unique_fd.h>
-#include <gui/IGraphicBufferProducer.h>
+#include <gui/Surface.h>
 
 #include <memory>
 
@@ -52,8 +52,7 @@ public:
      * @param   maxDequeueBufferCount
      *                            Maximum # of pending allocations.
      */
-    bool configure(const ::android::sp<::android::IGraphicBufferProducer>& igbp,
-                   uint32_t generation,
+    bool configure(const ::android::sp<::android::Surface>& surface, uint32_t generation,
                    int maxDequeueBufferCount);
 
     /**
@@ -83,6 +82,14 @@ public:
      * @param   generation        generation # for the BufferQueue.
      */
     void onBufferAttached(uint32_t generation);
+
+    /**
+     * Notifies buffers being removed from the BufferQueue.
+     *
+     * @param   generation        generation # for the BufferQueue.
+     * @param   bufferIds         IDs of the buffers being removed.
+     */
+    void onBuffersRemoved(uint32_t generation, const std::vector<uint64_t>& bufferIds);
 
     /**
      * Retrieve frame event history from the crurrent surface if any.
@@ -125,10 +132,9 @@ public:
      * @param   input             input parameter for displaying.
      * @param   output            out parameter from Surface.
      */
-    c2_status_t displayBuffer(
-            const C2ConstGraphicBlock& block,
-            const ::android::IGraphicBufferProducer::QueueBufferInput& input,
-            ::android::IGraphicBufferProducer::QueueBufferOutput *output);
+    c2_status_t displayBuffer(const C2ConstGraphicBlock& block,
+                              const ::android::SurfaceQueueBufferInput& input,
+                              ::android::SurfaceQueueBufferOutput* output);
 
     /**
      * Notify stop()/release() is in progress.

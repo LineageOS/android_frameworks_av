@@ -16,7 +16,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "Codec2-GraphicBufferAllocator"
 
-
+#include <gui/Flags.h>
 #include <media/stagefright/foundation/ADebug.h>
 
 #include <codec2/aidl/GraphicBufferAllocator.h>
@@ -56,13 +56,11 @@ namespace aidl::android::hardware::media::c2::implementation {
     return ::ndk::ScopedAStatus::fromServiceSpecificError(ret);
 }
 
-bool GraphicBufferAllocator::configure(
-        const ::android::sp<IGraphicBufferProducer>& igbp,
-        uint32_t generation,
-        int maxDequeueBufferCount) {
+bool GraphicBufferAllocator::configure(const ::android::sp<Surface>& surface, uint32_t generation,
+                                       int maxDequeueBufferCount) {
     c2_status_t ret = C2_OK;
 
-    ret = mGraphicsTracker->configureGraphics(igbp, generation);
+    ret = mGraphicsTracker->configureGraphics(surface, generation);
     if (ret != C2_OK) {
         ALOGE("configuring igbp failed gen #(%d), configuring max dequeue count didn't happen",
               (unsigned int)generation);
@@ -96,6 +94,11 @@ void GraphicBufferAllocator::onBufferAttached(uint32_t generation) {
     mGraphicsTracker->onAttached(generation);
 }
 
+void GraphicBufferAllocator::onBuffersRemoved(uint32_t generation,
+                                              const std::vector<uint64_t>& bufferIds) {
+    mGraphicsTracker->onBuffersRemoved(generation, bufferIds);
+}
+
 void GraphicBufferAllocator::pollForRenderedFrames(FrameEventHistoryDelta* delta) {
     mGraphicsTracker->pollForRenderedFrames(delta);
 }
@@ -116,10 +119,9 @@ bool GraphicBufferAllocator::deallocate(const uint64_t id,
     return true;
 }
 
-c2_status_t GraphicBufferAllocator::displayBuffer(
-        const C2ConstGraphicBlock& block,
-        const IGraphicBufferProducer::QueueBufferInput& input,
-        IGraphicBufferProducer::QueueBufferOutput *output) {
+c2_status_t GraphicBufferAllocator::displayBuffer(const C2ConstGraphicBlock& block,
+                                                  const ::android::SurfaceQueueBufferInput& input,
+                                                  ::android::SurfaceQueueBufferOutput* output) {
     return mGraphicsTracker->render(block, input, output);
 }
 
