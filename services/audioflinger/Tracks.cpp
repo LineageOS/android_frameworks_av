@@ -3797,7 +3797,8 @@ AfPlaybackCommon::AfPlaybackCommon(IAfTrackBase& self, IAfThreadBase& thread,
     // Don't bother for trusted uids or tracks used for internal redirection
     if (!skipOpsForUid(attributionSource.uid) && shouldPlaybackHarden) {
         if (isOffloadOrMmap) {
-            mExecutor.emplace();
+            mExecutor.emplace("AfCommonAppOps",
+                    audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_AUDIO));
         }
         auto thread_wp = wp<IAfThreadBase>::fromExisting(&thread);
         mOpControlPartialSession.emplace(

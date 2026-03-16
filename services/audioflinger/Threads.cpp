@@ -8396,7 +8396,7 @@ void RecordThread::preExit()
 
 void RecordThread::onClientFrozen(pid_t pid)
 {
-    if (!property_get_bool("persist.audio.record_freeze_invalidate", false)) {
+    if (!property_get_bool("persist.audio.record_freeze_invalidate", true)) {
         return;
     }
     // We must delay the invalidation until after the freeze transition

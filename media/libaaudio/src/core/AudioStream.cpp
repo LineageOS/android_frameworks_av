@@ -23,10 +23,12 @@
 #include <aaudio/AAudio.h>
 #include <android-base/strings.h>
 #include <android/media/audio/common/FlushFromFrameSupport.h>
+#include <audio_utils/threads.h>
 #include <com_android_media_audioserver.h>
 #include <core/AudioStreamBuilder.h>
 #include <media/AudioSystem.h>
 #include <media/MediaMetricsItem.h>
+#include <system/thread_defs.h>
 #include <utility/AudioClock.h>
 #include <utility/AudioGlobal.h>
 #include <utils/Log.h>
@@ -137,7 +139,8 @@ aaudio_result_t AudioStream::open(const AAudioStreamOpenRequest& openRequest)
     mRoutingChangedCallbackProc = openRequest.getRoutingChangedCallbackProc();
     if (mRoutingChangedCallbackProc != nullptr) {
         mRoutingChangedCallbackUserData = openRequest.getRoutingChangedCallbackUserData();
-        mEventExecutor.emplace();
+        mEventExecutor.emplace("AudioStreamExecutor",
+                android::audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_URGENT_AUDIO));
     }
 
     return AAUDIO_OK;

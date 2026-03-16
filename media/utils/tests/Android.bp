@@ -291,6 +291,7 @@ cc_test {
     ],
 
     shared_libs: [
+        "libaudioutils",
         "liblog",
     ],
 

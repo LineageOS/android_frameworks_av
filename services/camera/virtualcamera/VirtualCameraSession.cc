@@ -390,7 +390,9 @@ ndk::ScopedAStatus VirtualCameraSession::close() {
       ALOGV(
           "VirtualCameraSession::close: closing input stream for thread id %d",
           streamId);
-      mVirtualCameraClientCallback->onStreamClosed(streamId);
+      if (mVirtualCameraClientCallback != nullptr) {
+        mVirtualCameraClientCallback->onStreamClosed(streamId);
+      }
     }
 
     closeUnusedRenderThreads();
@@ -639,7 +641,9 @@ ndk::ScopedAStatus VirtualCameraSession::configureMultiStream(
   for (int streamId : staleInputStreams) {
     ALOGV("configureMultiStream: closing input stream for thread id %d",
           streamId);
-    mVirtualCameraClientCallback->onStreamClosed(streamId);
+    if (mVirtualCameraClientCallback != nullptr) {
+      mVirtualCameraClientCallback->onStreamClosed(streamId);
+    }
   }
 
   // Now that the streams are closed, we can close the renderThread that were
@@ -674,20 +678,27 @@ void VirtualCameraSession::createRenderThread(
 
 void VirtualCameraSession::closeUnusedRenderThreads() {
   // Remove render threads that are no longer needed
-  std::lock_guard<std::mutex> lock(mLock);
-  const std::set<int> usedInputStreamIds =
-      mSessionContext.getUsedInputStreamIds();
-  auto it = mRenderThreads.begin();
-  while (it != mRenderThreads.end()) {
-    auto& [streamId, renderThread] = *it;
-    if (usedInputStreamIds.find(streamId) == usedInputStreamIds.end()) {
-      ALOGV("Closing thread for input stream %d", streamId);
-      renderThread->flush();
-      renderThread->stop();
-      it = mRenderThreads.erase(it);
-    } else {
-      ++it;
+  std::vector<std::unique_ptr<VirtualCameraRenderThread>> threadsToStop;
+  {
+    std::lock_guard<std::mutex> lock(mLock);
+    const std::set<int> usedInputStreamIds =
+        mSessionContext.getUsedInputStreamIds();
+    auto it = mRenderThreads.begin();
+    while (it != mRenderThreads.end()) {
+      auto& [streamId, renderThread] = *it;
+      if (usedInputStreamIds.find(streamId) == usedInputStreamIds.end()) {
+        ALOGV("Closing thread for input stream %d", streamId);
+        threadsToStop.push_back(std::move(it->second));
+        it = mRenderThreads.erase(it);
+      } else {
+        ++it;
+      }
     }
+  }
+
+  for (auto& renderThread : threadsToStop) {
+    renderThread->flush();
+    renderThread->stop();
   }
 }
 
@@ -987,10 +998,23 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
 }
 
 void VirtualCameraSession::onSessionError() {
-  ALOGE("Camera session error, notifying framework and closing all streams.");
+  ALOGW("Camera session error, notifying framework and stopping all streams.");
   std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback;
   {
     std::lock_guard<std::mutex> lock(mLock);
+    // Don't call session close() since that removes the mThread(s) references,
+    // hence calling the render thread destructor(s). If this is called from the
+    // same thread, the join() from the destructor can deadlock. Flush the
+    // single-stream render thread if it's being used.
+    if (mRenderThread != nullptr) {
+      mRenderThread->flush();
+      mRenderThread->stop();
+    }
+    // Flush all multi-stream render threads if they are being used.
+    for (auto& [_, thread] : mRenderThreads) {
+      thread->flush();
+      thread->stop();
+    }
     cameraDeviceCallback = mCameraDeviceCallback;
   }
 
@@ -1002,9 +1026,6 @@ void VirtualCameraSession::onSessionError() {
                  .errorCode = ErrorCode::ERROR_DEVICE});
     cameraDeviceCallback->notify({msg});
   }
-
-  // close all threads and input streams
-  close();
 }
 
 }  // namespace virtualcamera
