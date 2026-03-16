@@ -13,10 +13,13 @@ flag {
 }
 
 flag {
-  name: "ahardware_buffer_fetch_flag"
+  name: "ahardware_buffer_fetch_bugfix"
   namespace: "codec_fwk"
-  description: "Feature flag to enabling ahardwarebuffer graphic buffer fetch"
+  description: "Feature flag to enabling ahardwarebuffer graphic buffer fetch (Bugfix)"
   bug: "456253311"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
