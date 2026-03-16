@@ -22,6 +22,7 @@
 #include <android-base/logging.h>
 #include <android-base/strings.h>
 #include <audio_utils/Time.h>
+#include <audio_utils/property.h>
 #include <cutils/properties.h>
 #include <mediautils/EventLog.h>
 #include <mediautils/FixedString.h>
@@ -39,10 +40,34 @@
 
 namespace android::mediautils {
 
+namespace {
+
+int getDurationMs(std::atomic<int>& cache, const char* propertyName,
+        int defaultMs, int relaxedMs, const char* name) {
+    int durationMs = cache.load(std::memory_order_relaxed);
+    if (durationMs == 0) {
+        const bool isRelaxedTimingDevice = audio_utils::property::isRelaxedTimingDevice();
+        const int baseMs = isRelaxedTimingDevice ? relaxedMs : defaultMs;
+        durationMs = property_get_int32(propertyName, baseMs);
+        if (durationMs < 1) durationMs = baseMs;
+        ALOGD("%s: isRelaxedTimingDevice: %s %s: %d", __func__,
+                (isRelaxedTimingDevice ? "true" : "false"), name, durationMs);
+        cache.store(durationMs, std::memory_order_relaxed);
+    }
+    return durationMs;
+}
+
+} // namespace
+
 // Note: The sum of kDefaultTimeOutDurationMs and kDefaultSecondChanceDurationMs
 // should be no less than 2 seconds, otherwise spurious timeouts
 // may occur with system suspend.
 static constexpr int kDefaultTimeoutDurationMs = 3000;
+
+// The relaxed timeout is used when running on emulator or cuttlefish -
+// non-production devices where the CPU is virtualized and may not be
+// consistently available.
+static constexpr int kRelaxedTimeoutDurationMs = 3'000;
 
 // Due to suspend abort not incrementing the monotonic clock,
 // we allow another second chance timeout after the first timeout expires.
@@ -51,31 +76,22 @@ static constexpr int kDefaultTimeoutDurationMs = 3000;
 // and the result is more stable when the monotonic clock increments during suspend.
 //
 static constexpr int kDefaultSecondChanceDurationMs = 2000;
+static constexpr int kRelaxedSecondChanceDurationMs = 2'000;
 
 /* static */
 TimeCheck::Duration TimeCheck::getDefaultTimeoutDuration() {
     static constinit std::atomic<int> defaultTimeoutDurationMs{};
-    auto defaultMs = defaultTimeoutDurationMs.load(std::memory_order_relaxed);
-    if (defaultMs == 0) {
-        defaultMs = property_get_int32(
-                "audio.timecheck.timeout_duration_ms", kDefaultTimeoutDurationMs);
-        if (defaultMs < 1) defaultMs = kDefaultTimeoutDurationMs;
-        defaultTimeoutDurationMs.store(defaultMs, std::memory_order_relaxed);
-    }
-    return std::chrono::milliseconds(defaultMs);
+    return std::chrono::milliseconds(getDurationMs(defaultTimeoutDurationMs,
+            "audio.timecheck.timeout_duration_ms",
+            kDefaultTimeoutDurationMs, kRelaxedTimeoutDurationMs, "first-chance-ms"));
 }
 
 /* static */
 TimeCheck::Duration TimeCheck::getDefaultSecondChanceDuration() {
     static constinit std::atomic<int> defaultSecondChanceDurationMs{};
-    auto defaultMs = defaultSecondChanceDurationMs.load(std::memory_order_relaxed);
-    if (defaultMs == 0) {
-        defaultMs = property_get_int32(
-                "audio.timecheck.second_chance_duration_ms", kDefaultSecondChanceDurationMs);
-        if (defaultMs < 1) defaultMs = kDefaultSecondChanceDurationMs;
-        defaultSecondChanceDurationMs.store(defaultMs, std::memory_order_relaxed);
-    }
-    return std::chrono::milliseconds(defaultMs);
+    return std::chrono::milliseconds(getDurationMs(defaultSecondChanceDurationMs,
+            "audio.timecheck.second_chance_duration_ms",
+            kDefaultSecondChanceDurationMs, kRelaxedSecondChanceDurationMs, "second-chance-ms"));
 }
 
 // This function appropriately signals a pid to dump a backtrace if we are
