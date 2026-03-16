@@ -126,4 +126,18 @@
         <point>60,-4000</point>
         <point>100,0</point>
     </reference>
+    <reference name="DEFAULT_ASSISTANT_VOLUME_CURVE">
+    <!-- Default Assistant Volume Curve -->
+        <point>1,-4700</point>
+        <point>20,-3200</point>
+        <point>60,-1500</point>
+        <point>100,0</point>
+    </reference>
+    <reference name="DEFAULT_DEVICE_CATEGORY_HEADSET_ASSISTANT_VOLUME_CURVE">
+    <!-- Default Headset Assistant Volume Curve -->
+        <point>1,-5000</point>
+        <point>20,-3500</point>
+        <point>60,-1500</point>
+        <point>100,0</point>
+    </reference>
 </volumes>
