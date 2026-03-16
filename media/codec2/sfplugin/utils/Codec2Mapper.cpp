@@ -614,6 +614,7 @@ ALookup<uint32_t, int32_t> sPixelFormats = {
     { HAL_PIXEL_FORMAT_YCBCR_P010,             COLOR_FormatYUVP010 },
     { HAL_PIXEL_FORMAT_RGBA_1010102,           COLOR_Format32bitABGR2101010 },
     { HAL_PIXEL_FORMAT_RGBA_FP16,              COLOR_Format64bitABGRFloat },
+    { HAL_PIXEL_FORMAT_RGBA_8888,              COLOR_Format32bitABGR8888 },
 };
 
 ALookup<C2Config::picture_type_t, int32_t> sPictureType = {
