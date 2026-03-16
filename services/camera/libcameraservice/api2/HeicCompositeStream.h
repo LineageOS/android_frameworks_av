@@ -72,7 +72,7 @@ public:
 
     status_t deleteInternalStreams() override;
 
-    status_t configureStream() override;
+    status_t configureStream(bool outputConnected = true) override;
 
     status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap, Vector<int32_t>* /*out*/outputStreamIds,
             int32_t* /*out*/currentStreamId) override;

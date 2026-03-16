@@ -752,7 +752,7 @@ status_t JpegRCompositeStream::updateStream(int streamId,
         mOutputSurface = newSurfaces[0].mSurface;
     }
 
-    status_t res = configureStream();
+    status_t res = configureStream(false /*outputConnected*/);
     if (res == NO_ERROR && (mOutputSurface.get() != nullptr)) {
         outputMap->add(mOutputSurface, mP010SurfaceId);
     }
@@ -784,7 +784,7 @@ status_t JpegRCompositeStream::setConsumerSurfaces(int streamId,
     }
 
     mOutputSurface = consumers[0].mSurface;
-    auto ret = configureStream();
+    auto ret = configureStream(false /*outputConnected*/);
     if (ret == OK) {
         surfaceIds->push_back(mP010SurfaceId);
     }
@@ -792,8 +792,8 @@ status_t JpegRCompositeStream::setConsumerSurfaces(int streamId,
     return OK;
 }
 
-status_t JpegRCompositeStream::configureStream() {
-    if (!flags::seamless_transitions()) {
+status_t JpegRCompositeStream::configureStream(bool outputConnected) {
+    if (!flags::seamless_transitions() || outputConnected) {
         if (isRunning()) {
             // Processing thread is already running, nothing more to do.
             return NO_ERROR;
