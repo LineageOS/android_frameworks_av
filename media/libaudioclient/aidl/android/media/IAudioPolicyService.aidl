@@ -257,7 +257,6 @@ interface IAudioPolicyService {
      */
     int listAudioPorts(AudioPortRole role,
                        AudioPortType type,
-                       inout Int count,
                        out AudioPortFw[] ports);
 
     /**
@@ -287,7 +286,7 @@ interface IAudioPolicyService {
      * Passing '0' on input and inspecting the value on output is a common way of determining the
      * number of elements without actually retrieving them.
      */
-    int listAudioPatches(inout Int count, out AudioPatchFw[] patches);
+    int listAudioPatches(out AudioPatchFw[] patches);
 
     /** Set audio port configuration. */
     void setAudioPortConfig(in AudioPortConfigFw config);

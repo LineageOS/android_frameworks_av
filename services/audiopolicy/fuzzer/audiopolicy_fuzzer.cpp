@@ -306,18 +306,10 @@ bool AudioPolicyManagerFuzzer::getInputForAttr(
 bool AudioPolicyManagerFuzzer::findDevicePort(audio_port_role_t role, audio_devices_t deviceType,
                                               const std::string &address,
                                               audio_port_v7 *foundPort) {
-    uint32_t numPorts = 0;
-    uint32_t generation1;
     status_t ret;
-
-    ret = mManager->listAudioPorts(role, AUDIO_PORT_TYPE_DEVICE, &numPorts, nullptr, &generation1);
-    if (ret != NO_ERROR) {
-        return false;
-    }
-
-    uint32_t generation2;
-    struct audio_port_v7 ports[numPorts];
-    ret = mManager->listAudioPorts(role, AUDIO_PORT_TYPE_DEVICE, &numPorts, ports, &generation2);
+    uint32_t generation;
+    std::vector<audio_port_v7> ports;
+    ret = mManager->listAudioPorts(role, AUDIO_PORT_TYPE_DEVICE, ports, &generation);
     if (ret != NO_ERROR) {
         return false;
     }

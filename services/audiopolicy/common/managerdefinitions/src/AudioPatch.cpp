@@ -88,21 +88,10 @@ status_t AudioPatchCollection::removeAudioPatch(audio_patch_handle_t handle)
     return NO_ERROR;
 }
 
-status_t AudioPatchCollection::listAudioPatches(unsigned int *num_patches,
-                                                struct audio_patch *patches) const
+status_t AudioPatchCollection::listAudioPatches(std::vector<audio_patch>& patches) const
 {
-    if (num_patches == NULL || (*num_patches != 0 && patches == NULL)) {
-        return BAD_VALUE;
-    }
-    ALOGV("listAudioPatches() num_patches %d patches %p available patches %zu",
-          *num_patches, patches, size());
-    if (patches == NULL) {
-        *num_patches = 0;
-    }
+    ALOGV("listAudioPatches() available patches %zu", size());
 
-    size_t patchesWritten = 0;
-    size_t patchesMax = *num_patches;
-    *num_patches = 0;
     for (size_t patchIndex = 0; patchIndex < size(); patchIndex++) {
         // do not report patches with AUDIO_DEVICE_IN_STUB as source or
         // AUDIO_DEVICE_OUT_STUB as sink as those devices are used by stub HALs by convention
@@ -123,16 +112,14 @@ status_t AudioPatchCollection::listAudioPatches(unsigned int *num_patches,
         if (skip) {
             continue; // to next audio patch
         }
-        if (patchesWritten < patchesMax) {
-            patches[patchesWritten] = patch->mPatch;
-            patches[patchesWritten++].id = patch->getHandle();
-        }
-        (*num_patches)++;
+        patches.push_back(patch->mPatch);
+        patches.back().id = patch->getHandle();
+
         ALOGV("listAudioPatches() patch %zu num_sources %d num_sinks %d",
               patchIndex, patch->mPatch.num_sources, patch->mPatch.num_sinks);
     }
 
-    ALOGV("listAudioPatches() got %zu patches needed %d", patchesWritten, *num_patches);
+    ALOGV("listAudioPatches() got %zu patches", patches.size());
     return NO_ERROR;
 }
 
