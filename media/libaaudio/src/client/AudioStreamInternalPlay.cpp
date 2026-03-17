@@ -926,8 +926,8 @@ void *AudioStreamInternalPlay::callbackLoop() {
             if (mUseDataAvailableCallback) {
                 // For data available callback, it doesn't transfer any data. Instead,
                 // it signals a notification to client to call write for data transfer.
-                const int32_t fullFrames = mAudioEndpoint->getFullFramesAvailable();
-                if (fullFrames <= 0) {
+                const int32_t emptyFrames = mAudioEndpoint->getEmptyFramesAvailable();
+                if (emptyFrames <= 0) {
                     // No need to fire data callback. The DSP may just start or slowly read.
                     // Wait for a burst to check if there is data available.
                     android::audio_utils::unique_lock ul(mStreamMutex);
@@ -935,8 +935,8 @@ void *AudioStreamInternalPlay::callbackLoop() {
                     continue;
                 }
                 timeoutNanosForDataAvailableCB =
-                        fullFrames * AAUDIO_NANOS_PER_SECOND / getSampleRate();
-                callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), fullFrames);
+                        emptyFrames * AAUDIO_NANOS_PER_SECOND / getSampleRate();
+                callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), emptyFrames);
             } else {
                 callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), mCallbackFrames);
             }
