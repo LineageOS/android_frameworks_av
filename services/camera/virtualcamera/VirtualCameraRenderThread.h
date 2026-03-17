@@ -136,20 +136,7 @@ class VirtualCameraRenderThread {
   // Returns resolution of the input stream
   const Resolution& getInputResolution() const;
 
-  enum class State {
-    IDLE,        // Thread is waiting for work in dequeueTask.
-    PROCESSING,  // Thread is executing a task.
-    FLUSHING,    // Thread is in a flush operation.
-  };
-
-  // Wait for the render thread to reach a specific state.
-  void waitForState(State state) EXCLUDES(mLock);
-
  private:
-  // Internal helper to wait for a state condition while holding the lock.
-  void waitForStateLocked(State state, std::unique_lock<std::mutex>& lock)
-      REQUIRES(mLock);
-
   RenderThreadTask dequeueTask() EXCLUDES(mLock);
 
   // Rendering thread entry point.
@@ -205,15 +192,6 @@ class VirtualCameraRenderThread {
   // Returns true if mImageHandler initialized successfully. False otherwise
   bool initializeImageHandler();
 
-  // Returns true if the current request is interrupted (because of a call to
-  // flush or close). Should be called after a waiting time return early from
-  // the rendering task.
-  bool isRequestInterrupted(const ProcessCaptureRequestTask& request);
-
-  // Update the current state and notify all waiters.
-  void setState(State state) EXCLUDES(mLock);
-  void setStateLocked(State state) REQUIRES(mLock);
-
   // Camera callback
   const std::shared_ptr<
       ::aidl::android::hardware::camera::device::ICameraDeviceCallback>
@@ -236,11 +214,7 @@ class VirtualCameraRenderThread {
   std::condition_variable mTaskReadyCondVar;
   std::condition_variable mThrottlingCondVar;
   volatile bool GUARDED_BY(mLock) mTextureUpdateRequested = false;
-
   volatile bool GUARDED_BY(mLock) mPendingExit = false;
-
-  State mState GUARDED_BY(mLock) = State::IDLE;
-  std::condition_variable mStateCondVar;
 
   // Number of consecutive timeouts.
   std::atomic<int> mWaitInputFrameTimeoutsCount{0};
