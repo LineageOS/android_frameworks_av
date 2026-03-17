@@ -66,7 +66,7 @@ public:
     virtual status_t deleteInternalStreams() = 0;
 
     // Stream configuration completed.
-    virtual status_t configureStream() = 0;
+    virtual status_t configureStream(bool outputConnected = true) = 0;
 
     // Finalize deferred composite stream
     virtual status_t setConsumerSurfaces(int /*streamId*/,

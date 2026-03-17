@@ -16,29 +16,31 @@
 
 #pragma once
 
-#include <android/hardware_buffer.h>
 #include <android-base/unique_fd.h>
-#include <gui/IGraphicBufferProducer.h>
+#include <android/hardware_buffer.h>
+#include <gui/Surface.h>
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <thread>
-#include <optional>
+#include <unordered_map>
 
 #include <C2Buffer.h>
 
 namespace aidl::android::hardware::media::c2::implementation {
 
-using ::android::IGraphicBufferProducer;
-using ::android::GraphicBuffer;
-using ::android::FrameEventHistoryDelta;
 using ::android::Fence;
+using ::android::FrameEventHistoryDelta;
+using ::android::GraphicBuffer;
 using ::android::PixelFormat;
 using ::android::sp;
+using ::android::Surface;
 /**
  * The class allocates AHardwareBuffer(GraphicBuffer)s using BufferQueue.
  *
@@ -77,7 +79,7 @@ public:
      * @param[in] igbp        the new surface to configure
      * @param[in] generation  identifier for each configured surface
      */
-    c2_status_t configureGraphics(const sp<IGraphicBufferProducer>& igbp, uint32_t generation);
+    c2_status_t configureGraphics(const sp<Surface>& igbp, uint32_t generation);
 
     /**
      * Configure max # of outstanding allocations at any given time.
@@ -130,8 +132,8 @@ public:
      *          C2_CORRUPTED
      */
     c2_status_t render(const C2ConstGraphicBlock& block,
-                       const IGraphicBufferProducer::QueueBufferInput& input,
-                       IGraphicBufferProducer::QueueBufferOutput *output);
+                       const ::android::SurfaceQueueBufferInput& input,
+                       ::android::SurfaceQueueBufferOutput* output);
 
     /**
      * Retrieve frame event history from the crurrent surface if any.
@@ -159,6 +161,28 @@ public:
      * @param[in] generation    generation id for specifying Graphics(BQ)
      */
     void onAttached(uint32_t generation);
+
+    /**
+     * Notifies when a Buffer is detached from Graphics(consumer side).
+     * If generation does not match to the current, notifications via the interface
+     * will be ignored. (In the case, the notifications are from one of the old surfaces
+     * which is no longer used.)
+     *
+     * @param[in] generation    generation id for specifying Graphics(BQ)
+     * @param[in] bufferId      id of the buffer to detach
+     */
+    void onBufferDetached(uint32_t generation, uint64_t bufferId);
+
+    /**
+     * Notifies when a Buffer is removed from Graphics(consumer side).
+     * If generation does not match to the current, notifications via the interface
+     * will be ignored. (In the case, the notifications are from one of the old surfaces
+     * which is no longer used.)
+     *
+     * @param[in] generation    generation id for specifying Graphics(BQ)
+     * @param[in] bufferIds     ids of the buffers to remove
+     */
+    void onBuffersRemoved(uint32_t generation, const std::vector<uint64_t>& bufferIds);
 
     /**
      * Get waitable fd for events.(allocate is ready, end of life cycle)
@@ -196,15 +220,12 @@ private:
         bool mInit;
         uint64_t mId;
         uint32_t mGeneration;
-        int mSlot;
         AHardwareBuffer *mBuf;
         uint64_t mUsage; // Gralloc usage format, not AHB
         sp<Fence> mFence;
 
         // Create from a GraphicBuffer
-        BufferItem(uint32_t generation, int slot,
-                   const sp<GraphicBuffer>& buf,
-                   const sp<Fence> &fence);
+        BufferItem(uint32_t generation, const sp<GraphicBuffer>& buf, const sp<Fence>& fence);
 
         // Create from an AHB (no slot information)
         // Should be attached to IGBP for rendering
@@ -226,39 +247,39 @@ private:
         uint64_t mBqId;
         uint64_t mUsage;
         uint32_t mGeneration;
-        ::android::sp<IGraphicBufferProducer> mIgbp;
+        ::android::sp<Surface> mSurface;
 
-        // Maps slotId to buffer
-        // IGBP::dequeueBuffer(), IGBP::queueBuffer() and IGBP::cancelBuffer()
-        // require slotId.
-        std::map<int, std::shared_ptr<BufferItem>> mBuffers;
+        std::mutex mCacheLock;
+        std::condition_variable mCV;
 
-        // block slot use, while deallocating(cancel, render and etc)
-        struct BlockedSlot {
-            std::mutex l;
-            std::condition_variable cv;
-            bool blocked;
-            BlockedSlot() : blocked{false} {}
-            ~BlockedSlot() = default;
-        };
-
-        BlockedSlot mBlockedSlots[kNumSlots];
+        // Maps bufferId to buffer
+        std::map<uint64_t, std::shared_ptr<BufferItem>> mBuffers GUARDED_BY(mCacheLock);
+        std::unordered_set<uint64_t> mBlockedBuffers GUARDED_BY(mCacheLock);
 
         std::atomic<int> mNumAttached;
 
-        BufferCache() : mBqId{0ULL}, mUsage{0ULL},
-                mGeneration{0}, mIgbp{nullptr}, mNumAttached{0} {}
-        BufferCache(uint64_t bqId, uint64_t usage, uint32_t generation,
-                const sp<IGraphicBufferProducer>& igbp) :
-            mBqId{bqId}, mUsage{usage}, mGeneration{generation}, mIgbp{igbp}, mNumAttached{0} {}
+        BufferCache()
+            : mBqId{0ULL}, mUsage{0ULL}, mGeneration{0}, mSurface{nullptr}, mNumAttached{0} {}
+        BufferCache(uint64_t bqId, uint64_t usage, uint32_t generation, const sp<Surface>& igbp)
+            : mBqId{bqId},
+              mUsage{usage},
+              mGeneration{generation},
+              mSurface{igbp},
+              mNumAttached{0} {}
 
         ~BufferCache();
 
-        void waitOnSlot(int slot);
+        void removeBuffer(uint64_t bufferId);
 
-        void blockSlot(int slot);
+        void waitOnBufferId(uint64_t bufferId);
 
-        void unblockSlot(int slot);
+        void blockBufferId(uint64_t bufferId);
+
+        void unblockBufferId(uint64_t bufferId);
+
+      private:
+        void waitOnBufferIdLocked(uint64_t bufferId, std::unique_lock<std::mutex>& lock)
+                REQUIRES(mCacheLock);
     };
 
     std::shared_ptr<BufferCache> mBufferCache;
@@ -330,10 +351,9 @@ private:
             int maxDequeueCommitted);
 
     c2_status_t requestAllocateLocked(std::shared_ptr<BufferCache> *cache);
-    c2_status_t requestDeallocate(uint64_t bid, const sp<Fence> &fence,
-                                  bool *completed, bool *updateDequeue,
-                                  std::shared_ptr<BufferCache> *cache, int *slotId,
-                                  sp<Fence> *rFence);
+    c2_status_t requestDeallocate(uint64_t bid, const sp<Fence>& fence, bool* completed,
+                                  bool* updateDequeue, std::shared_ptr<BufferCache>* cache,
+                                  sp<GraphicBuffer>* graphicBuffer, sp<Fence>* rFence);
     c2_status_t requestRender(uint64_t bid, std::shared_ptr<BufferCache> *cache,
                               std::shared_ptr<BufferItem> *pBuffer,
                               bool *fromCache,
@@ -344,25 +364,20 @@ private:
                                 std::shared_ptr<BufferItem> *pBuffer,
                                 bool *updateDequeue);
 
-    void commitAllocate(c2_status_t res,
-                        const std::shared_ptr<BufferCache> &cache,
-                        bool cached, int slotId, const sp<Fence> &fence,
-                        std::shared_ptr<BufferItem> *buffer,
-                        bool *updateDequeue);
-    void commitDeallocate(std::shared_ptr<BufferCache> &cache,
-                          int slotId, uint64_t bid,
-                          bool *updateDequeue);
+    void commitAllocate(c2_status_t res, const std::shared_ptr<BufferCache>& cache, bool cached,
+                        uint64_t bufferId, const sp<Fence>& fence,
+                        std::shared_ptr<BufferItem>* buffer, bool* updateDequeue);
+    void commitDeallocate(std::shared_ptr<BufferCache>& cache, uint64_t bid, bool* updateDequeue);
     void commitRender(const std::shared_ptr<BufferCache> &cache,
                       const std::shared_ptr<BufferItem> &buffer,
                       const std::shared_ptr<BufferItem> &oldBuffer,
                       bool bufferReplaced,
                       bool *updateDequeue);
 
-    c2_status_t _allocate(
-            const std::shared_ptr<BufferCache> &cache,
-            uint32_t width, uint32_t height, PixelFormat format, uint64_t usage,
-            bool *cached, int *rSlotId, sp<Fence> *rFence,
-            std::shared_ptr<BufferItem> *buffer);
+    c2_status_t _allocate(const std::shared_ptr<BufferCache>& cache, uint32_t width,
+                          uint32_t height, PixelFormat format, uint64_t usage, bool* cached,
+                          uint64_t* rBufferId, sp<Fence>* rFence,
+                          std::shared_ptr<BufferItem>* buffer);
 
     c2_status_t _allocateDirect(
             uint32_t width, uint32_t height, PixelFormat format, uint64_t usage,
