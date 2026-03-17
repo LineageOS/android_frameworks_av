@@ -98,19 +98,18 @@ void TestPatternRenderer::renderThreadLoop(
   const std::chrono::nanoseconds frameDuration(
       static_cast<uint64_t>(1e9 / mFps));
 
-  std::chrono::nanoseconds lastFrameTs(0);
   while (mRunning) {
-    // Wait for appropriate amount of time to meet configured FPS.
-    std::chrono::nanoseconds ts = getCurrentTimestamp();
-    std::chrono::nanoseconds currentDuration = ts - lastFrameTs;
-    if (currentDuration < frameDuration) {
-      std::this_thread::sleep_for(frameDuration - currentDuration);
-    }
+    std::chrono::nanoseconds startTs = getCurrentTimestamp();
 
     // Render the test pattern and update timestamp.
-    testPatternProgram.draw(ts);
+    testPatternProgram.draw(startTs);
     eglDisplayContext.swapBuffers();
-    lastFrameTs = getCurrentTimestamp();
+
+    std::chrono::nanoseconds endTs = getCurrentTimestamp();
+    std::chrono::nanoseconds elapsed = endTs - startTs;
+    if (elapsed < frameDuration) {
+      std::this_thread::sleep_for(frameDuration - elapsed);
+    }
   }
 
   ALOGV("Terminating test client render loop");
