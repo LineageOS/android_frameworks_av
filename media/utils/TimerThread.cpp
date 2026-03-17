@@ -21,8 +21,10 @@
 // go/keep-sorted start
 #include <audio_utils/Time.h>
 #include <audio_utils/mutex.h>
+#include <audio_utils/threads.h>
 #include <mediautils/MediaUtilsDelayed.h>
 #include <mediautils/TidWrapper.h>
+#include <system/thread_defs.h>
 #include <unistd.h>
 #include <utils/Log.h>
 #include <utils/ThreadDefs.h>
@@ -335,6 +337,12 @@ TimerThread::MonitorThread::~MonitorThread() {
 }
 
 void TimerThread::MonitorThread::threadFunc() {
+    constexpr const char* kThreadName = "TimerThread";
+    audio_utils::set_thread_name(kThreadName);
+    constexpr int kPriority = audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_AUDIO);
+    const status_t status = audio_utils::set_thread_priority(kPriority);
+    ALOGW_IF(status != OK, "%s: set priority %d failed with status %d",
+             __func__, kPriority, status);
     std::unique_lock _l(mMutex);
     ::android::base::ScopedLockAssertion lock_assertion(mMutex);
     while (!mShouldExit) {
