@@ -113,8 +113,10 @@ class VirtualCameraSession
 
   std::set<int> getStreamIds() const EXCLUDES(mLock);
 
-  // Fatal session error, notifies framework and closes the session.
+  // Fatal session error, notifies framework and stops the streams
   void onSessionError();
+
+  void notifyDeviceError();
 
  private:
   ndk::ScopedAStatus processCaptureRequest(
