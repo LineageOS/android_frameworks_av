@@ -1204,7 +1204,7 @@ c2_status_t SetMetadataToGralloc4Handle(
         const std::shared_ptr<const C2StreamHdrStaticMetadataInfo::output> &staticInfo,
         const std::shared_ptr<const C2StreamHdrDynamicMetadataInfo::output> &dynamicInfo,
         const C2ConstGraphicBlock &block) {
-    if (android::media::codec::provider_->ahardware_buffer_fetch_flag()) {
+    if (android::media::codec::provider_->ahardware_buffer_fetch_bugfix()) {
         AHardwareBuffer *ahwb = nullptr;
         std::shared_ptr<const _C2BlockPoolData> poolData =
                 _C2BlockFactory::GetGraphicBlockPoolData(block);
