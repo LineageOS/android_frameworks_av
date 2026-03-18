@@ -999,7 +999,6 @@ ndk::ScopedAStatus VirtualCameraSession::processCaptureRequest(
 
 void VirtualCameraSession::onSessionError() {
   ALOGW("Camera session error, notifying framework and stopping all streams.");
-  std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback;
   {
     std::lock_guard<std::mutex> lock(mLock);
     // Don't call session close() since that removes the mThread(s) references,
@@ -1015,6 +1014,15 @@ void VirtualCameraSession::onSessionError() {
       thread->flush();
       thread->stop();
     }
+  }
+
+  notifyDeviceError();
+}
+
+void VirtualCameraSession::notifyDeviceError() {
+  std::shared_ptr<ICameraDeviceCallback> cameraDeviceCallback;
+  {
+    std::lock_guard<std::mutex> lock(mLock);
     cameraDeviceCallback = mCameraDeviceCallback;
   }
 
