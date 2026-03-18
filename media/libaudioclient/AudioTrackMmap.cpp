@@ -419,7 +419,9 @@ nsecs_t AudioTrackMmap::processAudioBuffer() {
         }
     }
     audio_utils::unique_lock ul(mMmapCbMutex);
-    mMmapCbCond.wait(ul);
+    mMmapCbCond.wait(ul, [this]() REQUIRES(mMmapCbMutex) {
+        return !mCbEvents.empty() || mStoppingCallback;
+    });
     while (!mCbEvents.empty()) {
         const auto& event = mCbEvents.front();
         switch (event.mEvent) {
@@ -464,6 +466,10 @@ void AudioTrackMmap::stopAndJoinCallbacks() {
     }
     if (mAudioTrackThread != nullptr) {
         mAudioTrackThread->requestExit();
+        {
+            std::lock_guard _l(mMmapCbMutex);
+            mStoppingCallback = true;
+        }
         mMmapCbCond.notify_one();
         mAudioTrackThread->requestExitAndWait();
         mAudioTrackThread.clear();
