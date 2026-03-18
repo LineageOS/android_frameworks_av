@@ -16,6 +16,7 @@
 */
 
 
+#include "system/audio.h"
 #define LOG_TAG "AudioFlinger"
 // #define LOG_NDEBUG 0
 #define ATRACE_TAG ATRACE_TAG_AUDIO
@@ -4990,6 +4991,13 @@ status_t PlaybackThread::createAudioPatch_l(const struct audio_patch *patch,
         status = mOutput->stream->legacyCreateAudioPatch(patch->sinks[0], std::nullopt, type);
         *handle = AUDIO_PATCH_HANDLE_NONE;
     }
+
+    // TODO(b/493682418) - Workaround for BT software HALs
+    if (isSuspended()) {
+        ALOGD("%s: restoring output with newly active patch", __func__);
+        restore();
+    }
+
     const std::string patchSinksAsString = patchSinksToString(patch);
 
     mThreadMetrics.logEndInterval();
@@ -5029,6 +5037,12 @@ status_t PlaybackThread::releaseAudioPatch_l(const audio_patch_handle_t handle)
     status_t status = NO_ERROR;
 
     mPatch = audio_patch{};
+    const bool isAnyBt =
+            std::any_of(mOutDeviceTypeAddrs.begin(), mOutDeviceTypeAddrs.end(), [](const auto& x) {
+                return audio_is_a2dp_out_device(x.mType) || audio_is_ble_out_device(x.mType) ||
+                       audio_is_bluetooth_out_sco_device(x.mType);
+            });
+
     mOutDeviceTypeAddrs.clear();
 
     if (mOutput->audioHwDev->supportsAudioPatches()) {
@@ -5037,6 +5051,15 @@ status_t PlaybackThread::releaseAudioPatch_l(const audio_patch_handle_t handle)
     } else {
         status = mOutput->stream->legacyReleaseAudioPatch();
     }
+    // TODO(b/493682418) - Workaround for BT software HALs
+    if (!afThreadCallback()->isPrimary(mOutput->audioHwDev)
+            && hasMixer()
+            && isAnyBt
+            && !isSuspended()) {
+        ALOGD("%s: suspending output on released patch %d", __func__, handle);
+        suspend();
+    }
+
     // Force meteadata update after a route change
     mActiveTracks.setHasChanged();
 
