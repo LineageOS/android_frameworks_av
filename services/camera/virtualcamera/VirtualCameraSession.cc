@@ -741,7 +741,6 @@ ndk::ScopedAStatus VirtualCameraSession::constructDefaultRequestSettings(
 }
 
 ndk::ScopedAStatus VirtualCameraSession::flush() {
-  ALOGV("[%s]", __func__);
   if (isInFatalError()) {
     return cameraStatus(Status::INTERNAL_ERROR);
   }
