@@ -67,7 +67,7 @@ static constexpr int kDefaultTimeoutDurationMs = 3000;
 // The relaxed timeout is used when running on emulator or cuttlefish -
 // non-production devices where the CPU is virtualized and may not be
 // consistently available.
-static constexpr int kRelaxedTimeoutDurationMs = 3'000;
+static constexpr int kRelaxedTimeoutDurationMs = 6'000;
 
 // Due to suspend abort not incrementing the monotonic clock,
 // we allow another second chance timeout after the first timeout expires.
@@ -76,7 +76,7 @@ static constexpr int kRelaxedTimeoutDurationMs = 3'000;
 // and the result is more stable when the monotonic clock increments during suspend.
 //
 static constexpr int kDefaultSecondChanceDurationMs = 2000;
-static constexpr int kRelaxedSecondChanceDurationMs = 2'000;
+static constexpr int kRelaxedSecondChanceDurationMs = 4'000;
 
 /* static */
 TimeCheck::Duration TimeCheck::getDefaultTimeoutDuration() {
