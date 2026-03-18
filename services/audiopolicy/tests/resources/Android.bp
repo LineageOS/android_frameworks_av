@@ -21,6 +21,7 @@ filegroup {
         "test_car_ap_atmos_offload_configuration.xml",
         "test_invalid_audio_policy_configuration.xml",
         "test_phone_apm_configuration.xml",
+        "test_phone_legacy_usb_apm_conf.xml",
         "test_settop_box_surround_configuration.xml",
         "test_tv_apm_configuration.xml",
     ],
