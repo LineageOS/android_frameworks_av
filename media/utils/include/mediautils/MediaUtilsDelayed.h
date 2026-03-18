@@ -26,6 +26,6 @@ namespace android::mediautils {
 /**
  * Returns a string callstack from the thread id tid.
  */
-std::string getCallStackStringForTid(pid_t tid);
+std::string getCallStackStringForTid(pid_t tid = -1);
 
 } // android::mediautils

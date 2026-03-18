@@ -179,6 +179,7 @@ class AudioPolicyManagerTest : public testing::Test {
     constexpr static uint32_t k384000SamplingRate = 384000;
     constexpr static uint32_t k48000SamplingRate = 48000;
     constexpr static uint32_t k96000SamplingRate = 96000;
+    constexpr static uint32_t k8000SamplingRate = 8000;
 
   protected:
     void SetUp() override;
@@ -1084,6 +1085,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, HandleDeviceConfigChange) {
 TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferredMixerAttributes) {
     mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                                                            "", "", AUDIO_FORMAT_DEFAULT));
@@ -1157,6 +1159,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferredMixerAttributes) {
 TEST_F(AudioPolicyManagerTestWithConfigurationFile, RoutingChangedWithPreferredMixerAttributes) {
     mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                                                            "", "", AUDIO_FORMAT_DEFAULT));
@@ -1233,6 +1236,7 @@ bool hasDuplicates(const T& container) {
 TEST_F(AudioPolicyManagerTestWithConfigurationFile, UniqueSelectedDeviceIds) {
     mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                                                            "", "", AUDIO_FORMAT_DEFAULT));
@@ -1326,6 +1330,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, CheckInputsForDeviceClosesSt
     mClient->addSupportedFormat(AUDIO_FORMAT_PCM_24_BIT_PACKED);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_MONO);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     // Since 'checkInputsForDevice' is called as part of the 'setDeviceConnectionState',
     // call it directly here, as we need to ensure that it does not keep all intermediate
     // streams opened, as it may cause a rejection from the HAL based on the cap.
@@ -1343,6 +1348,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, SetDeviceConnectionStateClos
     mClient->addSupportedFormat(AUDIO_FORMAT_PCM_24_BIT_PACKED);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_MONO);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     const size_t streamCountBefore = mClient->getOpenedInputsCount();
     EXPECT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_IN_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
@@ -1603,6 +1609,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferConfigForInputDevice) 
     mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_MONO);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     const std::set<audio_channel_mask_t> kChannelMasks =
             {AUDIO_CHANNEL_IN_STEREO, AUDIO_CHANNEL_IN_MONO};
     const std::string usbAddress = "card=1;device=0";
@@ -1661,6 +1668,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, PreferConfigForInputDevice) 
 TEST_F(AudioPolicyManagerTestWithConfigurationFile, SystemEnforcement) {
     mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                                                            "", "", AUDIO_FORMAT_DEFAULT));
@@ -1756,6 +1764,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, GetFlushFromFrameSupport) {
 
     mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                                                            "", "", AUDIO_FORMAT_DEFAULT));
@@ -1787,6 +1796,7 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, DeviceRoleForStrategy) {
     // Connect a peripheral device.
     mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     const std::string usbAddress = "card=1;device=0";
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
             AUDIO_DEVICE_OUT_USB_DEVICE, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
@@ -2202,6 +2212,7 @@ void AudioPolicyManagerTestForHdmi::SetUp() {
     mClient->addSupportedFormat(AUDIO_FORMAT_AC3);
     mClient->addSupportedFormat(AUDIO_FORMAT_E_AC3);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     mManager->setDeviceConnectionState(
             AUDIO_DEVICE_OUT_HDMI, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
             "" /*address*/, "" /*name*/, AUDIO_FORMAT_DEFAULT);
@@ -4176,6 +4187,130 @@ TEST_F(AudioPolicyManagerPhoneTest, VibrationUsagesMapToTtsStrategy) {
     }
 }
 
+class AudioPolicyManagerPhoneLegacyUsbTest : public AudioPolicyManagerTestWithConfigurationFile {
+protected:
+    std::string getConfigFile() override { return sPhoneLegacyUsbConfig; }
+    static const std::string sPhoneLegacyUsbConfig;
+};
+
+const std::string AudioPolicyManagerPhoneLegacyUsbTest::sPhoneLegacyUsbConfig =
+        AudioPolicyManagerPhoneLegacyUsbTest::sExecutableDir + "test_phone_legacy_usb_apm_conf.xml";
+
+TEST_F(AudioPolicyManagerPhoneLegacyUsbTest, InitSuccess) {
+    // SetUp must finish with no assertions.
+}
+
+TEST_F(AudioPolicyManagerPhoneLegacyUsbTest, Dump) {
+    dumpToLog();
+}
+
+TEST_F(AudioPolicyManagerPhoneLegacyUsbTest, RecordAtLowSamplingRatePrimary) {
+    audio_port_v7 micDevicePort;
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SOURCE, AUDIO_DEVICE_IN_BUILTIN_MIC,
+                               "bottom", &micDevicePort));
+
+    audio_port_handle_t otherInputPortId = AUDIO_PORT_HANDLE_NONE;
+    // Create first recording thread at 48k
+    {
+        audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+        attr.source = AUDIO_SOURCE_MIC;
+        audio_port_handle_t selectedDeviceId = micDevicePort.id;
+        audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+        ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &input, OTHER_SESSION_ID, 2, &selectedDeviceId,
+                        AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_MONO,
+                        k48000SamplingRate, AUDIO_INPUT_FLAG_NONE, &otherInputPortId));
+        ASSERT_NE(otherInputPortId, AUDIO_PORT_HANDLE_NONE);
+        ASSERT_EQ(micDevicePort.id, selectedDeviceId);
+    }
+    ASSERT_EQ(NO_ERROR, mManager->startInput(otherInputPortId));
+
+    {
+        auto patch = mClient->getLastAddedPatch();
+        ASSERT_NE(nullptr, patch);
+        ASSERT_EQ(1, patch->num_sources);
+        ASSERT_EQ(micDevicePort.id, patch->sources[0].id);
+        EXPECT_EQ(k48000SamplingRate, patch->sources[0].sample_rate);
+    }
+
+    audio_port_handle_t inputPortId = AUDIO_PORT_HANDLE_NONE;
+    // Create second recording thread at 8k
+    {
+        audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+        attr.source = AUDIO_SOURCE_MIC;
+        audio_port_handle_t selectedDeviceId = micDevicePort.id;
+        audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+        ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &input, TEST_SESSION_ID, 1, &selectedDeviceId,
+                        AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_MONO,
+                        k8000SamplingRate, AUDIO_INPUT_FLAG_NONE, &inputPortId));
+        ASSERT_NE(inputPortId, AUDIO_PORT_HANDLE_NONE);
+        ASSERT_EQ(micDevicePort.id, selectedDeviceId);
+    }
+    ASSERT_EQ(NO_ERROR, mManager->startInput(inputPortId));
+
+    // Since the device port lists no profiles, its default SR must be used.
+    {
+        auto patch = mClient->getLastAddedPatch();
+        ASSERT_NE(nullptr, patch);
+        ASSERT_EQ(1, patch->num_sources);
+        ASSERT_EQ(micDevicePort.id, patch->sources[0].id);
+        EXPECT_EQ(k48000SamplingRate, patch->sources[0].sample_rate);
+    }
+
+    ASSERT_EQ(NO_ERROR, mManager->stopInput(inputPortId));
+    mManager->releaseInput(inputPortId);
+    ASSERT_EQ(NO_ERROR, mManager->stopInput(otherInputPortId));
+    mManager->releaseInput(otherInputPortId);
+}
+
+TEST_F(AudioPolicyManagerPhoneLegacyUsbTest, RecordAtLowSamplingRateUsb) {
+    const std::string address = "card=1;device=0";
+
+    mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
+    mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_MONO);
+    mClient->addSupportedSamplingRate(k8000SamplingRate);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_HEADSET,
+                    AUDIO_POLICY_DEVICE_STATE_AVAILABLE, address.c_str(), "",
+                    AUDIO_FORMAT_DEFAULT));
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_IN_USB_HEADSET,
+                    AUDIO_POLICY_DEVICE_STATE_AVAILABLE, address.c_str(), "",
+                    AUDIO_FORMAT_DEFAULT));
+    audio_port_v7 usbDevicePort;
+    ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SOURCE, AUDIO_DEVICE_IN_USB_HEADSET,
+                               address, &usbDevicePort));
+
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    attr.source = AUDIO_SOURCE_MIC;
+    audio_port_handle_t selectedDeviceId = usbDevicePort.id;
+    audio_io_handle_t input = AUDIO_PORT_HANDLE_NONE;
+    audio_port_handle_t inputPortId = AUDIO_PORT_HANDLE_NONE;
+    ASSERT_NO_FATAL_FAILURE(getInputForAttr(attr, &input, TEST_SESSION_ID, 1, &selectedDeviceId,
+                    AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_IN_MONO,
+                    k8000SamplingRate, AUDIO_INPUT_FLAG_NONE, &inputPortId));
+    ASSERT_NE(inputPortId, AUDIO_PORT_HANDLE_NONE);
+    ASSERT_EQ(usbDevicePort.id, selectedDeviceId);
+
+    ASSERT_EQ(NO_ERROR, mManager->startInput(inputPortId));
+
+    auto patch = mClient->getLastAddedPatch();
+    ASSERT_NE(nullptr, patch);
+    ASSERT_EQ(1, patch->num_sources);
+    ASSERT_EQ(usbDevicePort.id, patch->sources[0].id);
+    EXPECT_EQ(k8000SamplingRate, patch->sources[0].sample_rate);
+
+    ASSERT_EQ(NO_ERROR, mManager->stopInput(inputPortId));
+    mManager->releaseInput(inputPortId);
+
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_IN_USB_HEADSET,
+                    AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE, address.c_str(), "",
+                    AUDIO_FORMAT_DEFAULT));
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_HEADSET,
+                    AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE, address.c_str(), "",
+                    AUDIO_FORMAT_DEFAULT));
+}
+
 enum {
     MIX_PORT_ATTR_EXPECTED_NAME_PARAMETER,
     MIX_PORT_ATTR_EXPECTED_NAME_WITH_DBFM_PARAMETER,
@@ -5252,6 +5387,7 @@ void AudioPolicyManagerTestBitPerfectBase::SetUp() {
 
     mClient->addSupportedFormat(mBitPerfectFormat);
     mClient->addSupportedChannelMask(mBitPerfectChannelMask);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(AUDIO_DEVICE_OUT_USB_DEVICE,
                                                            AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
                                                            "", "", AUDIO_FORMAT_DEFAULT));
@@ -5718,6 +5854,7 @@ TEST_F_WITH_FLAGS(
     mClient->addSupportedFormat(AUDIO_FORMAT_PCM_16_BIT);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_OUT_STEREO);
     mClient->addSupportedChannelMask(AUDIO_CHANNEL_IN_STEREO);
+    mClient->addSupportedSamplingRate(k48000SamplingRate);
 
     // This test is based on XML config parsing and does not have HAL IDs.
     // We assign some unique numbers to test this AIDL feature.

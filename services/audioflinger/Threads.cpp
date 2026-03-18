@@ -2077,16 +2077,18 @@ audio_utils::CommandThread& ThreadBase::getAsyncCommandThread()
     return commandThread;
 }
 
-void ThreadBase::asyncBroadcast()
+void ThreadBase::asyncBroadcast(std::chrono::nanoseconds delay)
 {
     // Wake from a separate thread to avoid deadlock from the ThreadBase mutex.
+    // TODO: b/493288935 - Consider coalescing delayed asyncBroadcasts to the same Thread
+    // to the later time if they are close enough.
     getAsyncCommandThread().add(std::string("asyncBroadcast-").append(mThreadName),
         [wpThis = wp<ThreadBase>::fromExisting(this)]() {
             if (const auto thread = wpThis.promote()) {
                 audio_utils::lock_guard lg(thread->mutex());
                 thread->broadcast_l();
             }
-        });
+        }, delay);
 }
 
 // Call only from threadLoop() or when it is idle.

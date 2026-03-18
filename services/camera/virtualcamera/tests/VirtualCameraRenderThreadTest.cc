@@ -148,45 +148,46 @@ TEST_F(VirtualCameraRenderThreadTest, FlushReturnsErrorForInFlightRequests) {
           CaptureRequestBuffer(firstStreamId, firstStreamBufferId),
           CaptureRequestBuffer(secondStreamId, secondStreamBufferId)}));
 
-  mRenderThread->flush();
+  mRenderThread->flush(frameNumber);
 }
 
-TEST_F(VirtualCameraRenderThreadTest, StateTransitions) {
-  using State = VirtualCameraRenderThread::State;
-
-  // Initially thread is not started, should be in IDLE state.
-  // Wait for state should return immediately if it's already in that state.
-  mRenderThread->waitForState(State::IDLE);
-
-  ASSERT_TRUE(mRenderThread->start());
-  // After start, it should still be IDLE (waiting in dequeueTask).
-  mRenderThread->waitForState(State::IDLE);
-
-  const int frameNumber = 42;
+// Verifies that a task with a frame number higher than the last flushed frame
+// number is correctly enqueued and not dropped.
+TEST_F(VirtualCameraRenderThreadTest, EnqueueTask_EnqueuesFreshTask) {
+  const int flushedFrameNumber = 100;
+  const int taskFrameNumber = 101;
   const int streamId = 1;
-  const int bufferId = 1234;
+  const int bufferId = 2;
 
-  EXPECT_CALL(*mMockCameraDeviceCallback, notify(testing::_))
-      .WillRepeatedly(testing::Invoke([](const std::vector<NotifyMsg>&) {
-        return ndk::ScopedAStatus::ok();
-      }));
+  mRenderThread->flush(flushedFrameNumber);
+
+  // Enqueueing a task with a frame number higher than the last flushed frame
+  // number should not trigger any immediate calls, as the task is queued.
+  EXPECT_CALL(*mMockCameraDeviceCallback, notify(testing::_)).Times(0);
   EXPECT_CALL(*mMockCameraDeviceCallback, processCaptureResult(testing::_))
-      .WillRepeatedly(testing::Invoke([](const std::vector<CaptureResult>&) {
-        return ndk::ScopedAStatus::ok();
-      }));
+      .Times(0);
 
   mRenderThread->enqueueTask(std::make_unique<ProcessCaptureRequestTask>(
-      frameNumber, std::vector<CaptureRequestBuffer>{
-                       CaptureRequestBuffer(streamId, bufferId)}));
+      taskFrameNumber, std::vector<CaptureRequestBuffer>{
+                           CaptureRequestBuffer(streamId, bufferId)}));
 
-  // It should reach PROCESSING state eventually.
-  mRenderThread->waitForState(State::PROCESSING);
+  // To verify the task was actually enqueued, we can flush again and check
+  // that the error callbacks are now invoked.
+  testing::Mock::VerifyAndClearExpectations(mMockCameraDeviceCallback.get());
 
-  // After processing, it should go back to IDLE.
-  mRenderThread->waitForState(State::IDLE);
+  EXPECT_CALL(*mMockCameraDeviceCallback,
+              notify(ElementsAre(IsRequestErrorNotifyMsg(taskFrameNumber))))
+      .WillOnce(Return(ndk::ScopedAStatus::ok()));
+  EXPECT_CALL(
+      *mMockCameraDeviceCallback,
+      processCaptureResult(ElementsAre(AllOf(
+          Field(&CaptureResult::frameNumber, taskFrameNumber),
+          Field(&CaptureResult::outputBuffers,
+                ElementsAre(IsStreamBufferWithStatus(
+                    streamId, bufferId, BufferStatus::ERROR)))))))
+      .WillOnce(Return(ndk::ScopedAStatus::ok()));
 
-  // Test stop.
-  mRenderThread->stop();
+  mRenderThread->flush(taskFrameNumber);
 }
 
 }  // namespace
