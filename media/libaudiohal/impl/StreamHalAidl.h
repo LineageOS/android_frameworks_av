@@ -306,6 +306,8 @@ class StreamHalAidl : public virtual StreamHalInterface, public ConversionHelper
     status_t parseAndSetVendorParameters(const AudioParameter& parameters);
 
     int32_t getAidlInterfaceVersion() const { return mAidlInterfaceVersion; }
+    ::aidl::android::media::audio::IHalAdapterVendorExtension::ParameterScope getParameterScope()
+            const;
 
     const bool mIsInput;
     const audio_config_base_t mConfig;
