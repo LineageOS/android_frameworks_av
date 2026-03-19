@@ -3597,7 +3597,7 @@ status_t AudioPolicyManager::startInput(audio_port_handle_t portId)
     } else {
         ALOGW("%s no new input device can be found for descriptor %d",
                 __FUNCTION__, inputDesc->getId());
-        status = BAD_VALUE;
+        status = DEAD_OBJECT;
     }
 
     if (status == NO_ERROR && inputDesc->activeCount() == 1) {
