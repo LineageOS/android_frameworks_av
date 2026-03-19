@@ -20,33 +20,26 @@ import android.media.MediaCodec;
 import android.media.MediaCodec.CodecException;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
-import android.view.Surface;
 import android.util.Log;
+import android.view.Surface;
 
 import androidx.annotation.NonNull;
+
+import com.android.media.benchmark.library.BlockModelDecoder.LinearBlockWrapper;
 
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-
 import java.util.ArrayDeque;
 import java.util.Iterator;
-
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.LinkedBlockingQueue;
-
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
-
-import com.android.media.benchmark.library.IBufferXfer;
-import com.android.media.benchmark.library.Muxer;
-import com.android.media.benchmark.library.BlockModelDecoder.LinearBlockWrapper;
-import com.android.media.benchmark.library.FrameProducer;
 
 public class Encoder implements IBufferXfer.IConsumer {
     // Change in AUDIO_ENCODE_DEFAULT_MAX_INPUT_SIZE should also be taken to
@@ -804,7 +797,8 @@ public class Encoder implements IBufferXfer.IConsumer {
             int frameRate,
             FileInputStream inputStream,
             int numFramesToLoad,
-            double loopTime)
+            double loopTime,
+            boolean isPvricFrameFormat)
             throws IOException, InterruptedException {
         mInputBufferSize = inputStream.getChannel().size();
         mFrameRate = frameRate;
@@ -831,7 +825,14 @@ public class Encoder implements IBufferXfer.IConsumer {
         int inputFormat = encodeFormat.getInteger(MediaFormat.KEY_COLOR_FORMAT);
 
         FrameProducer producer =
-                new FrameProducer(mCodec, mInputIndexQueue, width, height, mFrameRate, inputFormat);
+                new FrameProducer(
+                        mCodec,
+                        mInputIndexQueue,
+                        width,
+                        height,
+                        mFrameRate,
+                        inputFormat,
+                        isPvricFrameFormat);
 
         try {
             producer.loadFrames(inputStream, numFramesToLoad);
