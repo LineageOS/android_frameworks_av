@@ -80,7 +80,7 @@ class HalAdapterVendorExtensionWrapper :
         return status;
     }
 
-    ndk::ScopedAStatus parseVendorParameterIds(ParameterScope in_scope,
+    ndk::ScopedAStatus parseVendorParameterIds(const ParameterScope& in_scope,
                                                const std::string& in_rawKeys,
                                                std::vector<std::string>* _aidl_return) override {
         return callWithRetryOnCrash([&](auto service) {
@@ -89,7 +89,7 @@ class HalAdapterVendorExtensionWrapper :
     }
 
     ndk::ScopedAStatus parseVendorParameters(
-            ParameterScope in_scope, const std::string& in_rawKeysAndValues,
+            const ParameterScope& in_scope, const std::string& in_rawKeysAndValues,
             std::vector<VendorParameter>* out_syncParameters,
             std::vector<VendorParameter>* out_asyncParameters) override {
         return callWithRetryOnCrash([&](auto service) {
@@ -112,7 +112,7 @@ class HalAdapterVendorExtensionWrapper :
         });
     }
 
-    ndk::ScopedAStatus processVendorParameters(ParameterScope in_scope,
+    ndk::ScopedAStatus processVendorParameters(const ParameterScope& in_scope,
                                                const std::vector<VendorParameter>& in_parameters,
                                                std::string* _aidl_return) override {
         return callWithRetryOnCrash([&](auto service) {

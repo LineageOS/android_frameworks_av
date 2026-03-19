@@ -102,7 +102,7 @@ error::Result<bool> filterOutAndProcessParameter(
     return false;
 }
 
-// Must use the same order of elements as IHalAdapterVendorExtension::ParameterScope.
+// Must use the same order of elements as IHalAdapterVendorExtension::ScopeType.
 using VendorParametersRecipient = std::variant<
         std::shared_ptr<::aidl::android::hardware::audio::core::IModule>,
         std::shared_ptr<::aidl::android::hardware::audio::core::IStreamCommon>>;

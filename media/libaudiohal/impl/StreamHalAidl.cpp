@@ -893,11 +893,16 @@ status_t StreamHalAidl::legacyReleaseAudioPatch() {
     return INVALID_OPERATION;
 }
 
+IHalAdapterVendorExtension::ParameterScope StreamHalAidl::getParameterScope() const {
+    return IHalAdapterVendorExtension::ParameterScope(
+            IHalAdapterVendorExtension::ScopeType::STREAM, getInstanceName());
+}
+
 status_t StreamHalAidl::parseAndGetVendorParameters(const AudioParameter& parameterKeys,
                                                     String8* values) {
     std::vector<std::string> vendorParameterIds;
     RETURN_STATUS_IF_ERROR(
-            fillVendorParameterIds(mVendorExt, IHalAdapterVendorExtension::ParameterScope::STREAM,
+            fillVendorParameterIds(mVendorExt, getParameterScope(),
                                    parameterKeys, vendorParameterIds));
     if (vendorParameterIds.empty()) {
         return OK;
@@ -907,7 +912,7 @@ status_t StreamHalAidl::parseAndGetVendorParameters(const AudioParameter& parame
             mStream, &Stream::getVendorParameters, vendorParameterIds, &vendorParameters)));
 
     RETURN_STATUS_IF_ERROR(fillKeyValuePairsFromVendorParameters(
-            mVendorExt, IHalAdapterVendorExtension::ParameterScope::STREAM, vendorParameters,
+            mVendorExt, getParameterScope(), vendorParameters,
             values));
     return OK;
 }
@@ -915,7 +920,7 @@ status_t StreamHalAidl::parseAndGetVendorParameters(const AudioParameter& parame
 status_t StreamHalAidl::parseAndSetVendorParameters(const AudioParameter& parameters) {
     std::vector<VendorParameter> syncParameters, asyncParameters;
     RETURN_STATUS_IF_ERROR(fillVendorParameters(mVendorExt,
-                                                IHalAdapterVendorExtension::ParameterScope::STREAM,
+                                                getParameterScope(),
                                                 parameters, syncParameters, asyncParameters));
     if (!syncParameters.empty())
         RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(serializeCall(

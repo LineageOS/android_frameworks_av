@@ -1062,5 +1062,11 @@ void AudioStreamInternalPlay::onWakeUp_l(android::audio_utils::TimerQueue::handl
         mPendingStop = false;
     }
     processCommands();
+    if (isClockModelInControl()) {
+        // If the stream is active, ensure the read counter is refreshed
+        // for data available callback.
+        mAudioEndpoint->setDataReadCounter(
+                mClockModel.convertTimeToPosition(AudioClock::getNanoseconds()));
+    }
     wakeupCallbackThread_l();
 }
