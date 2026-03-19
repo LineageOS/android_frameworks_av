@@ -438,6 +438,10 @@ private:
         return mCapturingClients.contains(uid);
     }
 
+    bool isPrimary(const AudioHwDevice* device) const final {
+        return mPrimaryHardwareDev.load() == device;
+    }
+
     // ---- end of IAfThreadCallback interface
 
     void setHasAlreadyCaptured_l(uid_t uid) REQUIRES(mutex());
