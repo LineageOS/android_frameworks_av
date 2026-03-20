@@ -28,6 +28,7 @@
 #include <android-base/stringprintf.h>
 #include <audio_utils/clock.h>
 #include <audio_utils/primitives.h>
+#include <audiomanager/IAudioManager.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <media/AudioTrack.h>
@@ -1815,6 +1816,13 @@ status_t AudioTrack::createTrack_l()
                   convertTransferToText(mTransfer));
             mFlags = (audio_output_flags_t) (mFlags & ~AUDIO_OUTPUT_FLAG_FAST);
         }
+    }
+
+    if (auto binder = defaultServiceManager()->checkService(String16("audio")); binder != nullptr) {
+        // Barrier to ensure package/permission updates propagate to audioserver
+        // Must be client-side
+        interface_cast<IAudioManager>(binder)->getNativeInterface()->permissionUpdateBarrier(
+                /*forRecord=*/false);
     }
 
     IAudioFlinger::CreateTrackInput input;
