@@ -1178,10 +1178,6 @@ void AAudioServiceStreamBase::wakeUp_l(
     if (mPendingStop) {
         stop_l();
         mPendingStop = false;
-        // The client stops a while back, it should be safe for us to standby the stream for
-        // power saving.
-        ALOGD("%s, standby the stream as the client has stopped for a while", __func__);
-        standby_l();
     }
     if (mClientCallback == nullptr) {
         ALOGD("%s, no client callback is set", __func__);
