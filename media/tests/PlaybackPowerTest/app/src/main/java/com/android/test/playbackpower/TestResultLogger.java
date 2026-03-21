@@ -76,6 +76,18 @@ import org.json.JSONObject;
         }
     }
 
+    public void logBatteryHealth(long timeMs, int health) {
+        logEvent(timeMs, "battery_health", health);
+    }
+
+    public void logBatteryTemperature(long timeMs, int temperature) {
+        logEvent(timeMs, "battery_temperature", temperature);
+    }
+
+    public void logBatteryCycleCount(long timeMs, int cycleCount) {
+        logEvent(timeMs, "battery_cycle_count", cycleCount);
+    }
+
     public void logSuccess(String message) {
         Log.i(mLogTag, "Succeeded " + message);
         if (mInitialChargeCounter != UNSET) {

@@ -64,6 +64,7 @@ class IAfTrack;
 class IAfTrackBase;
 class Client;
 class MelReporter;
+class AudioHwDevice;
 
 // Note this is exposed through IAfThreadBase::afThreadCallback()
 // and hence may be used by the Effect / Track framework.
@@ -129,6 +130,8 @@ public:
     virtual media::IAudioPolicyService::HardeningOverride getHardeningOverride() const = 0;
 
     virtual bool hasAlreadyCaptured(uid_t uid) const = 0;
+
+    virtual bool isPrimary(const AudioHwDevice* device) const = 0;
 };
 
 class IAfThreadBase : public virtual RefBase {

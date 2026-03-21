@@ -16,6 +16,8 @@
 
 package com.android.media.benchmark.library;
 
+import android.hardware.HardwareBuffer;
+
 public class Native {
     static { System.loadLibrary("mediabenchmark_jni"); }
 
@@ -30,4 +32,6 @@ public class Native {
     public native int Encode(String inputFilePath, String inputFileName, String statsFile,
             String codecName, String mime, int bitRate, int colorFormat, int frameInterval,
             int width, int height, int profile, int level, int sampleRate, int numChannel);
+
+    public native int NativeMemCopy(HardwareBuffer buffer, java.nio.ByteBuffer data, long size);
 }

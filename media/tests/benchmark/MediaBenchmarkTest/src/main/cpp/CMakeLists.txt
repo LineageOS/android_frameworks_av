@@ -25,6 +25,7 @@ add_library(
   NativeMuxer.cpp
   NativeDecoder.cpp
   NativeEncoder.cpp
+  NativeMemCopy.cpp
   ${native_source_path}/common/BenchmarkCommon.cpp
   ${native_source_path}/common/Stats.cpp
   ${native_source_path}/common/utils/Timers.cpp

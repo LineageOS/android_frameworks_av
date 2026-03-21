@@ -1227,21 +1227,9 @@ public:
     sp<StreamHalInterface> stream() const final;
 
     // suspend(), restore(), and isSuspended() are implemented atomically.
-    void suspend() final { ++mSuspended; }
-    void restore() final {
-        // if restore() is done without suspend(), get back into
-        // range so that the next suspend() will operate correctly
-        while (true) {
-            int32_t suspended = mSuspended;
-            if (suspended <= 0) {
-                ALOGW("%s: invalid mSuspended %d <= 0", __func__, suspended);
-                return;
-            }
-            const int32_t desired = suspended - 1;
-            if (mSuspended.compare_exchange_weak(suspended, desired)) return;
-        }
-    }
-    bool isSuspended() const final { return mSuspended > 0; }
+    void suspend() final { mSuspended.store(true); }
+    void restore() final { mSuspended.store(false); }
+    bool isSuspended() const final { return mSuspended.load(); }
 
     String8 getParameters(const String8& keys) EXCLUDES_ThreadBase_Mutex;
 
@@ -1475,12 +1463,11 @@ protected:
     // Size of mPostSpatializerBuffer in bytes
     size_t mPostSpatializerBufferSize GUARDED_BY(mutex());
 
-    // suspend count, > 0 means suspended.  While suspended, the thread continues to pull from
-    // tracks and mix, but doesn't write to HAL.  A2DP and SCO HAL implementations can't handle
-    // concurrent use of both of them, so Audio Policy Service suspends one of the threads to
-    // workaround that restriction.
-    // 'volatile' means accessed via atomic operations and no lock.
-    std::atomic<int32_t> mSuspended;
+    // While suspended, the thread continues to pull from
+    // tracks and mix, but doesn't write to HAL (the output is standby).
+    // We suspend when outputs patches are cleared in the case the HAL doesn't handle the cleared
+    // patch similar to standby on an existing patch.
+    std::atomic<bool> mSuspended;
 
     int64_t                         mBytesWritten;
     std::atomic<int64_t> mFramesWritten;  // not reset on standby

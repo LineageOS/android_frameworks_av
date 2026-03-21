@@ -3749,6 +3749,9 @@ getHardeningDecision(audio_usage_t usage, IAfThreadCallback& cb, uid_t uid) {
     }
 
     if (hardening_strict()) {
+        if (pp.getHighestTargetSdkForUid(uid).value_or(1000) < 37) {
+            return {EnforcementLevel::PARTIAL, TARGET_SDK};
+        }
         if (hardening_usage()) {
             if (usage == AUDIO_USAGE_ALARM) {
                 if (pp.checkPermission(PermissionEnum::SCHEDULE_EXACT_ALARM, uid).value_or(false) ||

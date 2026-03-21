@@ -51,36 +51,33 @@ public class FrameProducer {
     private final int mHeight;
     private final int mFps;
 
-    // TODO(b/298699053): Support 10bit, RGB, and compressed formats
     private static class PixelFormat {
         final int mFormat;
 
         PixelFormat(int codecFormat) {
-            switch (codecFormat) {
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible:
-                    mFormat = ImageFormat.YUV_420_888;
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format32bitABGR8888:
-                    mFormat = android.graphics.PixelFormat.RGBA_8888;
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUVP010:
-                    mFormat = ImageFormat.YCBCR_P010;
-                    break;
-                case MediaCodecInfo.CodecCapabilities.COLOR_Format32bitABGR2101010:
-                    mFormat = android.graphics.PixelFormat.RGBA_1010102;
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unsupported format: " + codecFormat);
-            }
+            mFormat = switch (codecFormat) {
+                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible ->
+                        ImageFormat.YUV_420_888;
+                case MediaCodecInfo.CodecCapabilities.COLOR_Format32bitABGR8888 ->
+                        android.graphics.PixelFormat.RGBA_8888;
+                case MediaCodecInfo.CodecCapabilities.COLOR_FormatYUVP010 ->
+                        ImageFormat.YCBCR_P010;
+                case MediaCodecInfo.CodecCapabilities.COLOR_Format32bitABGR2101010 ->
+                        android.graphics.PixelFormat.RGBA_1010102;
+                default -> throw new IllegalArgumentException(
+                        "Unsupported format: 0x" + Integer.toHexString(codecFormat));
+            };
         }
     }
 
     private final PixelFormat mPixelFormat;
+    private final boolean mIsPvricFrameFormat;
 
     private ImageReader mReader;
     private ImageWriter mWriter;
 
     private final List<Image> mFrameList = new ArrayList<>();
+    private final Native mNative = new Native();
 
     public FrameProducer(
             MediaCodec codec,
@@ -88,22 +85,35 @@ public class FrameProducer {
             int width,
             int height,
             int fps,
-            int codecFormat) {
+            int codecFormat,
+            boolean isPvricFrameFormat) {
         mCodec = codec;
         mInputIndexQueue = inputIndexQueue;
         mWidth = width;
         mHeight = height;
         mFps = fps;
         mPixelFormat = new PixelFormat(codecFormat);
+        mIsPvricFrameFormat = isPvricFrameFormat;
         initializeAllocators();
     }
 
     private void initializeAllocators() {
-        long usageFlags = HardwareBuffer.USAGE_VIDEO_ENCODE | HardwareBuffer.USAGE_CPU_WRITE_OFTEN;
+        long usageFlags = HardwareBuffer.USAGE_VIDEO_ENCODE;
+
+        // Add CPU flags if PVRIC is disabled since the CPU flags are disabling PVRIC in gralloc
+        // layer.
+        if (!mIsPvricFrameFormat) {
+            usageFlags |=
+                    HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN;
+        }
         mReader =
                 ImageReader.newInstance(
                         mWidth, mHeight, mPixelFormat.mFormat, MAX_NUM_FRAMES_TO_LOAD, usageFlags);
-        mWriter = ImageWriter.newInstance(mReader.getSurface(), MAX_NUM_FRAMES_TO_LOAD);
+        mWriter =
+                new ImageWriter.Builder(mReader.getSurface())
+                        .setMaxImages(MAX_NUM_FRAMES_TO_LOAD)
+                        .setUsage(usageFlags)
+                        .build();
     }
 
     public void loadFrames(FileInputStream fileStream, int numFramesToLoad) throws IOException {
@@ -202,10 +212,36 @@ public class FrameProducer {
     }
 
     private boolean fillImageFromFile(Image image, FileChannel channel) throws IOException {
+        if (mIsPvricFrameFormat) {
+            int frameSize =
+                    (int)getCompressedSize(
+                                    getPvricFormat(),
+                                    PvricTile.Tile_8x8,
+                                    mWidth,
+                                    mHeight,
+                                    /* lossy= */ false);
+            ByteBuffer data = ByteBuffer.allocateDirect(frameSize);
+            while (data.hasRemaining()) {
+                if (channel.read(data) == -1) {
+                    Log.e(TAG, "Reached end of stream before filling frame buffer.");
+                    return false;
+                }
+            }
+            data.rewind();
+
+            // Image.getPlanes() is disabled when PVRIC is enabled (by disabling CPU usage flags).
+            // Therefore, using a native method to copy the data into the buffer instead of using
+            // getPlanes().
+            int status = mNative.NativeMemCopy(image.getHardwareBuffer(), data, frameSize);
+            if (status < 0) {
+                Log.e(TAG, "NativeMemCopy failed with status: " + status);
+                return false;
+            }
+            return true;
+        }
         Image.Plane[] planes = image.getPlanes();
         int width = image.getWidth();
         int height = image.getHeight();
-
         if (mPixelFormat.mFormat == ImageFormat.YUV_420_888) {
             ByteBuffer yBuf = planes[0].getBuffer();
             int yStride = planes[0].getRowStride();
@@ -330,5 +366,174 @@ public class FrameProducer {
         if (mReader != null) {
             mReader.close();
         }
+    }
+
+    // PVRIC Translation Helpers
+    private enum PvricFormat {
+        RGBA,
+        NV12,
+        P010,
+        RGB16,
+        RGB565
+    }
+
+    private enum PvricTile {
+        Tile_8x8,
+        Tile_16x4,
+        Tile_32x2
+    }
+
+    private static class PvricPlaneDetail {
+        final int width_subsampling;
+        final int height_subsampling;
+        final int compressed_body_bytes_per_sample;
+
+        PvricPlaneDetail(int w, int h, int b, int c) {
+            this.width_subsampling = w;
+            this.height_subsampling = h;
+            this.compressed_body_bytes_per_sample = c;
+        }
+    }
+
+    private static class PvricCompressedPlaneDetail {
+        final int width_alignment;
+        final int height_alignment;
+
+        PvricCompressedPlaneDetail(int w, int h) {
+            this.width_alignment = w;
+            this.height_alignment = h;
+        }
+    }
+
+    private static class PvricCompressedDetail {
+        long body_size;
+        long unaligned_header_size;
+        long header_size;
+    }
+
+    private PvricFormat getPvricFormat() {
+        if (mPixelFormat.mFormat == ImageFormat.YUV_420_888) return PvricFormat.NV12;
+        if (mPixelFormat.mFormat == android.graphics.PixelFormat.RGBA_8888) return PvricFormat.RGBA;
+        if (mPixelFormat.mFormat == ImageFormat.YCBCR_P010) return PvricFormat.P010;
+        throw new IllegalArgumentException(
+                "Unsupported format for PVRIC: 0x" + Integer.toHexString(mPixelFormat.mFormat));
+    }
+
+    private static int align(int x, int y) {
+        return x + (y - x % y) % y;
+    }
+
+    private static List<PvricPlaneDetail> getPlaneDetails(PvricFormat f) {
+        List<PvricPlaneDetail> list = new ArrayList<>();
+        switch (f) {
+            case RGBA -> list.add(new PvricPlaneDetail(1, 1, 4, 4));
+            case NV12 -> {
+                list.add(new PvricPlaneDetail(1, 1, 1, 1));
+                list.add(new PvricPlaneDetail(2, 2, 2, 2));
+            }
+            case P010 -> {
+                list.add(new PvricPlaneDetail(1, 1, 2, 2));
+                list.add(new PvricPlaneDetail(2, 2, 4, 4));
+            }
+            case RGB16 -> list.add(new PvricPlaneDetail(1, 1, 6, 8));
+            case RGB565 -> list.add(new PvricPlaneDetail(1, 1, 2, 2));
+        }
+        return list;
+    }
+
+    private static List<PvricCompressedPlaneDetail> getCompressedPlaneDetails(
+            PvricFormat f, PvricTile t) {
+        List<PvricCompressedPlaneDetail> list = new ArrayList<>();
+        switch (f) {
+            case RGBA -> {
+                if (t == PvricTile.Tile_8x8) list.add(new PvricCompressedPlaneDetail(8, 8));
+                else if (t == PvricTile.Tile_16x4) list.add(new PvricCompressedPlaneDetail(16, 4));
+            }
+            case NV12 -> {
+                if (t == PvricTile.Tile_8x8) {
+                    list.add(new PvricCompressedPlaneDetail(32, 8));
+                    list.add(new PvricCompressedPlaneDetail(16, 8));
+                } else if (t == PvricTile.Tile_16x4) {
+                    list.add(new PvricCompressedPlaneDetail(64, 4));
+                    list.add(new PvricCompressedPlaneDetail(32, 4));
+                }
+            }
+            case P010 -> {
+                if (t == PvricTile.Tile_8x8) {
+                    list.add(new PvricCompressedPlaneDetail(16, 8));
+                    list.add(new PvricCompressedPlaneDetail(8, 8));
+                } else if (t == PvricTile.Tile_16x4) {
+                    list.add(new PvricCompressedPlaneDetail(32, 4));
+                    list.add(new PvricCompressedPlaneDetail(16, 4));
+                }
+            }
+            case RGB16 -> {
+                if (t == PvricTile.Tile_32x2) list.add(new PvricCompressedPlaneDetail(32, 2));
+            }
+            case RGB565 -> {
+                if (t == PvricTile.Tile_16x4) list.add(new PvricCompressedPlaneDetail(32, 4));
+            }
+        }
+        return list;
+    }
+
+    private static List<PvricCompressedDetail> getCompressedDetails(
+            PvricFormat format, PvricTile tile, int width, int height, boolean lossy) {
+        final int kBytesInAHeader = 1;
+        final int kBodyBytesPerHeader = 256;
+        final int kHeaderAlignment = 256;
+        final int kLosslessBodyBytesPerTile = kBodyBytesPerHeader;
+        final int kLossyBodyBytesPerTile = 128;
+        final int kLossyBodyBytesPerTileYuv10Pack16 = 96;
+
+        int bodyBytesPerTile;
+        if (!lossy) {
+            bodyBytesPerTile = kLosslessBodyBytesPerTile;
+        } else if (format == PvricFormat.P010) {
+            bodyBytesPerTile = kLossyBodyBytesPerTileYuv10Pack16;
+        } else {
+            bodyBytesPerTile = kLossyBodyBytesPerTile;
+        }
+
+        List<PvricPlaneDetail> planeDetails = getPlaneDetails(format);
+        List<PvricCompressedPlaneDetail> compressedPlaneDetails =
+                getCompressedPlaneDetails(format, tile);
+
+        if (planeDetails.size() != compressedPlaneDetails.size()) {
+            throw new IllegalArgumentException(
+                    "Plane details count does not match compressed plane details count for format "
+                            + format
+                            + " and tile "
+                            + tile);
+        }
+
+        List<PvricCompressedDetail> out = new ArrayList<>();
+        for (int idx = 0; idx < planeDetails.size(); idx++) {
+            PvricPlaneDetail pd = planeDetails.get(idx);
+            PvricCompressedPlaneDetail cpd = compressedPlaneDetails.get(idx);
+
+            int thisWidth = align(width / pd.width_subsampling, cpd.width_alignment);
+            int thisHeight = align(height / pd.height_subsampling, cpd.height_alignment);
+
+            int tiles =
+                    (thisWidth * thisHeight * pd.compressed_body_bytes_per_sample)
+                            / kBodyBytesPerHeader;
+
+            PvricCompressedDetail cd = new PvricCompressedDetail();
+            cd.unaligned_header_size = (long) tiles * kBytesInAHeader;
+            cd.header_size = align((int) cd.unaligned_header_size, kHeaderAlignment);
+            cd.body_size = (long) tiles * bodyBytesPerTile;
+            out.add(cd);
+        }
+        return out;
+    }
+
+    private static long getCompressedSize(
+            PvricFormat format, PvricTile tile, int width, int height, boolean lossy) {
+        long size = 0;
+        for (PvricCompressedDetail cd : getCompressedDetails(format, tile, width, height, lossy)) {
+            size += cd.header_size + cd.body_size;
+        }
+        return size;
     }
 }

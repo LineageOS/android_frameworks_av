@@ -78,6 +78,7 @@ public final class PlaybackPowerActivity extends Activity {
     private BroadcastReceiver mPowerReceiver;
     private Runnable mSampleBatteryRunnable;
     private TestResultLogger mTestResultLogger;
+    private boolean mLoggedBatteryCycleCount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,6 +93,7 @@ public final class PlaybackPowerActivity extends Activity {
         }
         mTestResultLogger = new TestResultLogger(
                 /* logTag= */ TAG, new File(getExternalFilesDir(/* type= */ null), fileName));
+        mLoggedBatteryCycleCount = false;
         mBatteryManager = getSystemService(BatteryManager.class);
         mPowerManager = getSystemService(PowerManager.class);
         mBatteryChangedIntentFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
@@ -225,6 +227,38 @@ public final class PlaybackPowerActivity extends Activity {
         handleFailure("Power connected");
     }
 
+    // The charge counter, handled elsewhere, is our critical piece of info.
+    // However, there are "EXTRA" fields of battery information which help
+    // provide context to the charge counter, so we record some of those as well.
+    private void logBatteryExtraInfo(long timeMs) {
+        @Nullable Intent batteryStatusIntent = getBatteryStatusIntent();
+        if (batteryStatusIntent == null) {
+            return;
+        }
+        int level = batteryStatusIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = batteryStatusIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+        if (level >= 0 && scale > 0) {
+            mTestResultLogger.logBatteryLevel(timeMs, level, scale);
+        }
+        int temperature = batteryStatusIntent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1);
+        if (temperature > 0) {
+            mTestResultLogger.logBatteryTemperature(timeMs, temperature);
+        }
+        int health = batteryStatusIntent.getIntExtra(BatteryManager.EXTRA_HEALTH, -1);
+        if (health > 0) {
+            mTestResultLogger.logBatteryHealth(timeMs, health);
+        }
+        // This doesn't change during a test run, so only log it once.
+        if (!mLoggedBatteryCycleCount) {
+            int cycleCount = batteryStatusIntent.getIntExtra(BatteryManager.EXTRA_CYCLE_COUNT, -1);
+            // Even if we get -1 here, we'll log it, since we're only logging
+            // once per test run, and it's useful to know that the device
+            // doesn't report this information.
+            mTestResultLogger.logBatteryCycleCount(timeMs, cycleCount);
+            mLoggedBatteryCycleCount = true;
+        }
+    }
+
     private void startTestPlayback() {
         mIsTestPlaybackRunning = true;
 
@@ -237,14 +271,7 @@ public final class PlaybackPowerActivity extends Activity {
             long chargeCounter =
                     mBatteryManager.getLongProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
             mTestResultLogger.logChargeCounter(timeMs, chargeCounter);
-            @Nullable Intent batteryStatusIntent = getBatteryStatusIntent();
-            if (batteryStatusIntent != null) {
-                int level = batteryStatusIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-                int scale = batteryStatusIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-                if (level >= 0 && scale > 0) {
-                    mTestResultLogger.logBatteryLevel(timeMs, level, scale);
-                }
-            }
+            logBatteryExtraInfo(timeMs);
             mHandler.postDelayed(mSampleBatteryRunnable, BATTERY_SAMPLE_INTERVAL_SEC * 1000L);
         };
         mHandler.post(mSampleBatteryRunnable);

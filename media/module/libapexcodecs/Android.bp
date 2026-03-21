@@ -61,57 +61,6 @@ cc_library_headers {
 }
 
 cc_library {
-    name: "libcom.android.media.swcodec.apexcodecs-testing",
-    defaults: ["libcom.android.media.swcodec.apexcodecs-defaults"],
-
-    srcs: [
-        "ApexCodecsStoreImpl.cpp",
-    ] + select(release_flag("RELEASE_APEX_CODECS"), {
-        true: [
-            "C2ApexOpusDec.cpp",
-            "C2ApexAacDec.cpp",
-            "DrcPresModeWrapRustAac.cpp",
-        ],
-        default: [],
-    }),
-
-    shared_libs: select(release_flag("RELEASE_APEX_CODECS"), {
-        true: [
-            "libaconfig_storage_read_api_cc",
-            "libcodec2_soft_common",
-            "libcodec2_vndk",
-            "liblog", // for ALOG
-            "libopus",
-            "libstagefright_foundation", // for ColorUtils and MIME
-            "libcutils", // for <cutils/properties.h>
-        ],
-        default: [],
-    }),
-
-    cflags: select(release_flag("RELEASE_APEX_CODECS"), {
-        true: [
-            "-DENABLE_APEX_CODECS",
-            "-Wno-unused-function",
-        ],
-        default: [],
-    }),
-
-    static_libs: [
-        "android.media.codec-aconfig-cc",
-    ] + select(release_flag("RELEASE_APEX_CODECS"), {
-        true: [
-            "libaac",
-            "libaac_ffi",
-        ],
-        default: [],
-    }),
-
-    visibility: [
-        ":__subpackages__",
-    ],
-}
-
-cc_library {
     name: "libcom.android.media.swcodec.apexcodecs",
     defaults: [
         "libcom.android.media.swcodec.apexcodecs-defaults",
@@ -123,6 +72,7 @@ cc_library {
     visibility: [
         "//frameworks/av/apex:__subpackages__",
         "//frameworks/av/media/codec2/hal/client",
+        ":__subpackages__",
     ],
 
     srcs: [
@@ -167,9 +117,11 @@ cc_library {
 
     arch: {
         arm64: {
+            lfi_supported: true,
             static_libs: select(release_flag("RELEASE_APEX_CODECS"), {
                 true: [
-                    "libopus",
+                    "liblfi",
+                    "libopus_lfi",
                 ],
                 default: [],
             }),
