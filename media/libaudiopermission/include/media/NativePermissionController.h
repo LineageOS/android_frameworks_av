@@ -53,6 +53,9 @@ class NativePermissionController : public BnNativePermissionController, public I
     // map of app_ids to the set of packages names which could run in them (should be 1)
     std::unordered_map<uid_t, std::vector<UidPackageState::PackageState>> package_map_
             GUARDED_BY(m_);
+    // map of app-ids to pcc-ids (apps w/ associated PCC components have all of these components run
+    // in a specific allocated uid).
+    std::vector<std::pair<int, int>> primary_to_pcc_map_ GUARDED_BY(m_);
     bool is_package_populated_ GUARDED_BY(m_);
     // (logical) map of PermissionEnum to list of uids (not appid) which hold the perm
     std::array<std::vector<uid_t>, static_cast<size_t>(PermissionEnum::ENUM_SIZE)> permission_map_
