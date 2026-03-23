@@ -3833,7 +3833,7 @@ typedef enum acamera_metadata_tag {
      *   {@link AIMAGE_FORMAT_RAW12 RAW14}</li>
      * <li>Processed (but not-stalling): any non-RAW format without a stall duration.  Typically
      *   {@link AIMAGE_FORMAT_YUV_420_888 YUV_420_888},
-     *   <a href="https://developer.android.com/reference/android/graphics/ImageFormat.html#NV21">NV21</a>, <a href="https://developer.android.com/reference/android/graphics/ImageFormat.html#YV12">YV12</a>, or {@link AIMAGE_FORMAT_Y8 Y8} .</li>
+     *   or {@link AIMAGE_FORMAT_Y8 Y8} .</li>
      * </ul>
      *
      * @see ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS
