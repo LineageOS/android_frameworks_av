@@ -109,7 +109,7 @@ PlanesLockGuard::~PlanesLockGuard() {
   AHardwareBuffer_unlock(mHwBuffer.get(), /*fence=*/nullptr);
 }
 
-int PlanesLockGuard::getStatus() const {
+status_t PlanesLockGuard::getStatus() const {
   return mLockStatus;
 }
 
