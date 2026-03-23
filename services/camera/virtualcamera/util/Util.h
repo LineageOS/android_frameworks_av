@@ -94,7 +94,7 @@ class PlanesLockGuard {
 
   // Disable copy.
   PlanesLockGuard(const PlanesLockGuard&) = delete;
-  PlanesLockGuard& operator=(const YCbCrLockGuard&) = delete;
+  PlanesLockGuard& operator=(const PlanesLockGuard&) = delete;
 
  private:
   std::shared_ptr<AHardwareBuffer> mHwBuffer;
