@@ -220,7 +220,7 @@ for time in "${time_array[@]}"; do
 
   # ensure similar stats collection state
   echo "restarting audioserver and waiting 5 seconds"
-  adb shell pkill audio
+  adb shell pkill audioserver
   sleep 5
 
   # echo "$OUT"
