@@ -259,6 +259,19 @@ static void checkAttributesTags(aaudio_performance_mode_t perfMode) {
     }
 }
 
+static void checkAttributesTagsInput(aaudio_performance_mode_t perfMode) {
+    checkAttributes(perfMode, DONT_SET, DONT_SET, nullptr /*tags*/, DONT_SET, DONT_SET,
+                    DONT_SET, AAUDIO_DIRECTION_INPUT);
+    for (int i = 0; i < TOTAL_TAGS; ++i) {
+        std::vector<const char*> tags = {sTags[i]};
+        if (i > 0) {
+            tags.push_back(sTags[i-1]);
+        }
+        checkAttributes(perfMode, DONT_SET, DONT_SET, &tags, DONT_SET, DONT_SET,
+                        DONT_SET, AAUDIO_DIRECTION_INPUT);
+    }
+}
+
 static void checkAttributesInputPreset(aaudio_performance_mode_t perfMode) {
     for (aaudio_input_preset_t inputPreset : sInputPresets) {
         checkAttributes(perfMode,
@@ -309,6 +322,10 @@ TEST(test_attributes, aaudio_tags_perfnone) {
     checkAttributesTags(AAUDIO_PERFORMANCE_MODE_NONE);
 }
 
+TEST(test_attributes, aaudio_tags_input_perfnone) {
+    checkAttributesTagsInput(AAUDIO_PERFORMANCE_MODE_NONE);
+}
+
 TEST(test_attributes, aaudio_input_preset_perfnone) {
     checkAttributesInputPreset(AAUDIO_PERFORMANCE_MODE_NONE);
 }
@@ -327,6 +344,10 @@ TEST(test_attributes, aaudio_content_type_lowlat) {
 
 TEST(test_attributes, aaudio_tags_lowlat) {
     checkAttributesTags(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+}
+
+TEST(test_attributes, aaudio_tags_input_lowlat) {
+    checkAttributesTagsInput(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 }
 
 TEST(test_attributes, aaudio_input_preset_lowlat) {

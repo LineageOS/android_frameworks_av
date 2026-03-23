@@ -100,6 +100,7 @@ PlanesLockGuard::PlanesLockGuard(std::shared_ptr<AHardwareBuffer> hwBuffer,
   if (rawFence >= 0) {
     close(rawFence);
   }
+  mHwBuffer = hwBuffer;
 }
 
 PlanesLockGuard::~PlanesLockGuard() {
@@ -109,7 +110,7 @@ PlanesLockGuard::~PlanesLockGuard() {
   AHardwareBuffer_unlock(mHwBuffer.get(), /*fence=*/nullptr);
 }
 
-int PlanesLockGuard::getStatus() const {
+status_t PlanesLockGuard::getStatus() const {
   return mLockStatus;
 }
 
