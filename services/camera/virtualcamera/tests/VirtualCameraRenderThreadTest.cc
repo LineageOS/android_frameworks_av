@@ -18,6 +18,7 @@
 
 #include <memory>
 
+#include "VirtualCameraImagePassthroughHandler.h"
 #include "VirtualCameraRenderThread.h"
 #include "VirtualCameraSessionContext.h"
 #include "aidl/android/companion/virtualcamera/Format.h"
@@ -188,6 +189,37 @@ TEST_F(VirtualCameraRenderThreadTest, EnqueueTask_EnqueuesFreshTask) {
       .WillOnce(Return(ndk::ScopedAStatus::ok()));
 
   mRenderThread->flush(taskFrameNumber);
+}
+
+TEST_F(VirtualCameraRenderThreadTest,
+       ImagePassthroughHandlerBasicFunctionality) {
+  int frameReadyCallbackCount = 0;
+  // Create an image passthrough handler directly.
+  auto handler = VirtualCameraImagePassthroughHandler::create(
+      *mSessionContext, kImageFormat,
+      /*frameReadyCallback=*/[&]() { frameReadyCallbackCount++; });
+
+  ASSERT_NE(handler, nullptr);
+
+  // Check basic properties are initialized correctly
+  EXPECT_NE(handler->getInputSurface(), nullptr);
+  EXPECT_FALSE(handler->isFirstFrameDrawn());
+  EXPECT_EQ(handler->getTimestamp(), std::chrono::nanoseconds(0));
+
+  // Test a very short timeout should safely return false.
+  EXPECT_FALSE(handler->waitForInputFrame(std::chrono::milliseconds(10)));
+  EXPECT_EQ(frameReadyCallbackCount, 0);
+
+  // Test interruptWait safely unblocks the wait-for-frame payload with false
+  handler->interruptWait();
+  EXPECT_FALSE(handler->waitForInputFrame(std::chrono::milliseconds(10)));
+  EXPECT_EQ(frameReadyCallbackCount, 0);
+
+  // Test that manually signaling onFrameAvailable triggers the callback and
+  // fulfills the promise with true, which propagates to waitForInputFrame
+  handler->onFrameAvailable();
+  EXPECT_EQ(frameReadyCallbackCount, 1);
+  EXPECT_TRUE(handler->waitForInputFrame(std::chrono::milliseconds(10)));
 }
 
 }  // namespace
