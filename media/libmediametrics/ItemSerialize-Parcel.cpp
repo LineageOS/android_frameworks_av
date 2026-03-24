@@ -30,8 +30,6 @@
 #include <utils/SortedVector.h>
 #include <utils/threads.h>
 
-#include <android/media/BnMediaMetricsService.h> // for direct Binder access
-#include <android/media/IMediaMetricsService.h>
 #include <binder/IServiceManager.h>
 #include <media/MediaMetricsItem.h>
 #include <private/android_filesystem_config.h>

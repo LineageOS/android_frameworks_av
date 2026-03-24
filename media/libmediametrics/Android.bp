@@ -24,11 +24,15 @@ cc_library {
     name: "libmediametrics",
 
     srcs: [
+        // go/keep-sorted start
         "ItemSerialize-ByteString.cpp",
         "ItemSerialize-Parcel.cpp",
+        "ItemSerialize-Structured.cpp",
         "MediaMetrics.cpp",
         "MediaMetricsItem.cpp",
         "Submit.cpp",
+        "getService.cpp",
+        // go/keep-sorted end
     ],
 
     shared_libs: [
@@ -36,7 +40,7 @@ cc_library {
         "libcutils",
         "liblog",
         "libutils",
-        "mediametricsservice-aidl-cpp",
+        "mediametricsservice-aidl-V1-cpp",
     ],
 
     export_include_dirs: ["include"],
@@ -86,10 +90,8 @@ cc_library {
     name: "libmediametrics_module",
 
     srcs: [
+        // minimize the content here until we port/start using it
         "ItemSerialize-ByteString.cpp",
-        "MediaMetrics.cpp",
-        "MediaMetricsItem.cpp",
-        "Submit-module.cpp",
     ],
 
     shared_libs: [
@@ -97,7 +99,7 @@ cc_library {
         "libbinder_ndk",
         "libcutils",
         "liblog",
-        "mediametricsservice-aidl-ndk",
+        "mediametricsservice-aidl-V1-ndk",
     ],
     static_libs: [
         "libutils",
@@ -111,6 +113,7 @@ cc_library {
         "-Wextra",
         "-Wthread-safety",
         "-Wunreachable-code",
+        "-DMETRICS_IN_MODULE",
     ],
 
     sanitize: {
@@ -140,11 +143,10 @@ cc_library {
 
 aidl_interface {
     name: "mediametricsservice-aidl",
-    unstable: true,
     local_include_dir: "aidl",
     vendor_available: true,
     srcs: [
-        "aidl/android/media/IMediaMetricsService.aidl",
+        "aidl/**/*.aidl",
     ],
     double_loadable: true,
     backend: {
@@ -164,4 +166,8 @@ aidl_interface {
             min_sdk_version: "29",
         },
     },
+
+    // stable so we can use across framework/module boundaries
+    unstable: false,
+    frozen: false,
 }

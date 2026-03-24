@@ -53,7 +53,7 @@ cc_fuzz {
         "libmedia_helper",
         "libprocessgroup",
         "libprocessgroup_util",
-        "mediametricsservice-aidl-cpp",
+        "mediametricsservice-aidl-V1-cpp",
         "shared-file-region-aidl-cpp",
     ],
     fuzz_config: {
