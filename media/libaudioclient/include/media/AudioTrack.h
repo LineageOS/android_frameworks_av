@@ -17,17 +17,20 @@
 #ifndef ANDROID_AUDIOTRACK_H
 #define ANDROID_AUDIOTRACK_H
 
+// go/keep-sorted start
+#include <android/content/AttributionSourceState.h>
+#include <android/media/audio/common/FlushFromFrameAccuracy.h>
 #include <audiomanager/IAudioManager.h>
 #include <binder/IMemory.h>
 #include <cutils/sched_policy.h>
+#include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
-#include <media/AudioResamplerPublic.h>
 #include <media/MediaMetricsItem.h>
 #include <media/Modulo.h>
 #include <media/VolumeShaper.h>
 #include <utils/threads.h>
-#include <android/content/AttributionSourceState.h>
+// go/keep-sorted end
 
 #include <chrono>
 #include <string>
@@ -610,6 +613,11 @@ public:
      * This function is a no-op if the track is not stopped or paused, or uses a static buffer.
      */
             virtual void        flush();
+
+            virtual status_t flushFromFrame(
+                    android::media::audio::common::FlushFromFrameAccuracy accuracy,
+                    int64_t requestedPosition,
+                    int64_t* actualFlushedPosition);
 
     /* Pause a track. After pause, the callback will cease being called and
      * obtainBuffer returns WOULD_BLOCK. Note that obtainBuffer() still works

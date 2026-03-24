@@ -249,6 +249,16 @@ void AudioTrackMmap::flush() {
     mState = STATE_FLUSHED;
 }
 
+status_t AudioTrackMmap::flushFromFrame(
+        android::media::audio::common::FlushFromFrameAccuracy accuracy,
+        int64_t requestedPosition,
+        int64_t *actualFlushedPosition) {
+    AutoMutex lock(mLock);
+    *actualFlushedPosition = requestedPosition;
+    return AAudioConvert_aaudioToAndroidStatus(mStream->flushFromFrame(
+            AAudioConvert_androidToAAudioFlushFromAccuracy(accuracy), actualFlushedPosition));
+}
+
 ssize_t AudioTrackMmap::getBufferSizeInFrames() {
     AutoMutex lock(mLock);
     return mStream->getBufferSize();
