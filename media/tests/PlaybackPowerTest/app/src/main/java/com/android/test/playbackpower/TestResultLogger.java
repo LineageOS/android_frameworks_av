@@ -15,6 +15,8 @@
  */
 package com.android.test.playbackpower;
 
+import android.content.res.Resources;
+import android.content.res.XmlResourceParser;
 import android.os.SystemClock;
 import android.util.Log;
 import java.io.File;
@@ -24,6 +26,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserException;
 
 /**
  * Logs and saves test results for power tests.
@@ -54,6 +58,49 @@ import org.json.JSONObject;
 
     public void logStarted() {
         logEvent("started");
+        // This is something we'll just do once.  The timestamp doesn't matter.
+        logEvent("battery_nominal_capacity", getNominalBatteryCapacity());
+    }
+
+    private int getNominalBatteryCapacity() {
+        int capacity = -1;
+
+        int resId = Resources.getSystem().getIdentifier("power_profile", "xml", "android");
+        if (resId == 0) {
+            Log.e(mLogTag, "Could not find power_profile.xml resource.");
+            return capacity;
+        }
+
+        XmlResourceParser parser = Resources.getSystem().getXml(resId);
+        String currentName = null;
+
+        try {
+            for (int eventType = parser.getEventType();
+                 eventType != XmlPullParser.END_DOCUMENT;
+                 eventType = parser.next()) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    if ("item".equals(parser.getName())) {
+                        currentName = parser.getAttributeValue(null, "name");
+                    }
+                } else if (eventType == XmlPullParser.TEXT) {
+                    if ("battery.capacity".equals(currentName)) {
+                        try {
+                            capacity = Integer.parseInt(parser.getText());
+                        } catch (NumberFormatException e) {
+                            Log.e(mLogTag, "Could not parse battery.capacity value: "
+                                  + e.toString());
+                        }
+                        break;
+                    }
+                }
+            }
+        } catch (XmlPullParserException | IOException e) {
+            Log.e(mLogTag, "Failed to parse power_profile.xml", e);
+        } finally {
+            parser.close();
+        }
+
+        return capacity;
     }
 
     public void logChargeCounter(long timeMs, long chargeCounter) {
