@@ -320,6 +320,11 @@ status_t StagefrightRecorder::setOutputFormat(output_format of) {
         return BAD_VALUE;
     }
 
+    if (mWriter != NULL) {
+        ALOGE("output format cannot be changed after prepare");
+        return INVALID_OPERATION;
+    }
+
     if (of == OUTPUT_FORMAT_DEFAULT) {
         mOutputFormat = OUTPUT_FORMAT_THREE_GPP;
     } else {

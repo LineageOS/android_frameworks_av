@@ -256,7 +256,7 @@ class Camera3OutputStream :
     virtual int getMirrorMode() const override { return  mMirrorMode; };
 
     virtual status_t getUniqueSurfaceIds(const std::vector<size_t>&,
-            /*out*/std::vector<size_t>*) { return INVALID_OPERATION; };
+            /*out*/std::vector<size_t>*);
 
     /**
      * Update the stream output surfaces.

@@ -307,6 +307,19 @@ TEST_F(StagefrightRecorderTest, MultiStartPauseTest) {
     }
 }
 
+TEST_F(StagefrightRecorderTest, SetOutputFormatAfterPrepareTest) {
+    ASSERT_NO_FATAL_FAILURE(setAudioRecorderFormat(OUTPUT_FORMAT_DEFAULT, AUDIO_ENCODER_DEFAULT));
+
+    status_t status = mStfRecorder->init();
+    ASSERT_EQ(status, OK) << "Failed to initialize stagefright recorder";
+
+    status = mStfRecorder->prepare();
+    ASSERT_EQ(status, OK) << "Failed to prepare the recorder";
+
+    status = mStfRecorder->setOutputFormat(OUTPUT_FORMAT_RTP_AVP);
+    ASSERT_EQ(status, INVALID_OPERATION) << "setOutputFormat should fail after prepare";
+}
+
 INSTANTIATE_TEST_SUITE_P(
         StagefrightRecorderTestAll, StagefrightRecorderTest,
         ::testing::Values(std::make_pair(OUTPUT_FORMAT_AMR_NB, AUDIO_ENCODER_AMR_NB),

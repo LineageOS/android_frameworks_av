@@ -532,6 +532,10 @@ private:
 
         bool isFrozen() const { return mFrozen; }
 
+        std::pair<bool, int64_t> getFrozenStatus() const {
+            return { mFrozen.load(), mFreezeTime.load() };
+        }
+
     private:
         DISALLOW_COPY_AND_ASSIGN(NotificationClient);
 
@@ -541,6 +545,7 @@ private:
         const sp<media::IAudioFlingerClient> mAudioFlingerClient;
         const std::unique_ptr<media::psh_utils::Token> mClientToken;
         std::atomic<bool> mFrozen = false;
+        std::atomic<int64_t> mFreezeTime = 0;
     };
 
     // Find io handle by session id.
