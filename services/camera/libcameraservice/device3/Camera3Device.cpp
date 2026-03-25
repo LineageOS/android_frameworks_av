@@ -3852,12 +3852,9 @@ void Camera3Device::RequestThread::updateNextRequest(NextRequest& nextRequest) {
     cleanupPhysicalSettings(nextRequest.captureRequest, &halRequest);
 }
 
-bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata& settings,
-        bool *updatesDetected/*out*/) {
+bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata& settings) {
     ATRACE_CALL();
-    if (updatesDetected == nullptr) {
-        return false;
-    }
+    bool updatesDetected = false;
 
     CameraMetadata updatedParams(mLatestSessionParams);
     for (auto tag : mSessionParamKeys) {
@@ -3890,7 +3887,7 @@ bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata&
                 mForceNewRequest = true;
                 ALOGV("%s: Session parameter tag id %d changed", __FUNCTION__, tag);
                 if (!skipHFRTargetFPSUpdate(tag, entry, lastEntry)) {
-                    *updatesDetected = true;
+                    updatesDetected = true;
                 }
                 updatedParams.update(entry);
             }
@@ -3898,12 +3895,12 @@ bool Camera3Device::RequestThread::updateSessionParameters(const CameraMetadata&
             // Value has been removed
             ALOGV("%s: Session parameter tag id %d removed", __FUNCTION__, tag);
             updatedParams.erase(tag);
-            *updatesDetected = true;
+            updatesDetected = true;
         }
     }
 
     bool reconfigureRequired;
-    if (*updatesDetected) {
+    if (updatesDetected) {
         reconfigureRequired = mInterface->isReconfigurationRequired(mLatestSessionParams,
                 updatedParams);
         mLatestSessionParams = updatedParams;
@@ -3963,8 +3960,7 @@ bool Camera3Device::RequestThread::threadLoop() {
     //  should contain the latest camera settings that we need to check for any session
     //  parameter updates.
     mForceNewRequest = false;
-    if (updateSessionParameters(mNextRequests[0].captureRequest->mSettingsList.begin()->metadata,
-                &mForceNewRequest)) {
+    if (updateSessionParameters(mNextRequests[0].captureRequest->mSettingsList.begin()->metadata)) {
         res = OK;
 
         //Input stream buffers are already acquired at this point so an input stream
@@ -3987,6 +3983,7 @@ bool Camera3Device::RequestThread::threadLoop() {
                     cleanUpFailedRequests(/*sendRequestError*/ false);
                     return false;
                 }
+                mForceNewRequest = true;
                 mReconfigured = reconfigured;
             }
 
