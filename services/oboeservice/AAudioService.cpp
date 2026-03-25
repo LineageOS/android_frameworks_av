@@ -24,10 +24,12 @@
 
 #include <android/content/AttributionSourceState.h>
 #include <aaudio/AAudio.h>
+#include <audio_utils/clock.h>
 #include <audio_utils/TimerQueue.h>
 #include <media/AidlConversion.h>
 #include <mediautils/ServiceUtilities.h>
 #include <utils/String16.h>
+#include <utils/Timers.h>
 
 #include "binding/AAudioServiceMessage.h"
 #include "AAudioClientTracker.h"
@@ -100,6 +102,26 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
                           int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
+    // Because the FROZEN notification may come early and the UNFROZEN notification
+    // may (rarely) come in late, we wait 500 ms before opening new streams for
+    // a frozen app.
+    const pid_t callingPid = IPCThreadState::self()->getCallingPid();
+    constexpr int kTimeoutMs = 500;
+
+    auto checkFrozen = [&](const char* where) {
+        const auto [frozen, freezeTime] =
+                AAudioClientTracker::getInstance().getFrozenStatus(callingPid);
+        const bool skip = freezeTime > 0 && (systemTime(SYSTEM_TIME_MONOTONIC) - freezeTime)
+                 < kTimeoutMs * NANOS_PER_MILLISECOND;
+        if (skip) {
+            ALOGW("openStream denied for pid %d at %s - frozen within %d ms",
+                    callingPid, where, kTimeoutMs);
+        }
+        return skip;
+    };
+
+    if (checkFrozen("begin")) AIDL_RETURN(AAUDIO_ERROR_INTERNAL);
+
     // Create wrapper objects for simple usage of the parcelables.
     const AAudioStreamRequest request(_request);
     AAudioStreamConfiguration paramsOut;
@@ -113,7 +135,7 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
     // 4) Thread A can then get the lock and also open a shared stream.
     // Without the lock. Thread A might sneak in and reallocate an exclusive stream
     // before B can open the shared stream.
-    const std::unique_lock<std::recursive_mutex> lock(mOpenLock);
+    std::unique_lock ul(mOpenLock);
 
     aaudio_result_t result = AAUDIO_OK;
     sp<AAudioServiceStreamBase> serviceStream;
@@ -189,6 +211,14 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
         const aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());
         serviceStream->setHandle(handle);
         AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);
+
+        // Double checked atomic.  This must be done after registerClientStream.
+        if (checkFrozen("end")) {
+            ul.unlock();
+            closeStream(serviceStream, true /* force */);
+            AIDL_RETURN(AAUDIO_ERROR_INTERNAL);
+        }
+
         // Currently, port handle and io handle are not exposed when opening.
         // TODO: b/479291234 - Need to expose the port handle and io handle when successfully open
         paramsOut.copyFrom(*serviceStream);

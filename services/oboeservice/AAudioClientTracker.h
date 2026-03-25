@@ -68,6 +68,8 @@ public:
 
     bool isExclusiveEnabled(pid_t pid);
 
+    std::pair<bool, int64_t> getFrozenStatus(pid_t pid) const;
+
     android::AAudioService *getAAudioService() const {
         return mAAudioService;
     }
@@ -85,7 +87,7 @@ private:
                                public IBinder::FrozenStateChangeCallback  {
     public:
         NotificationClient(pid_t pid, const android::sp<IBinder>& binder);
-        ~NotificationClient() override = default;
+        ~NotificationClient() override;
 
         int32_t getStreamCount();
 
@@ -113,18 +115,30 @@ private:
             mBinder = binder;
         }
 
+        std::pair<bool, int64_t> getFrozenStatus() const {
+            return { mFrozen.load(), mFreezeTime.load() };
+        }
+
         // IBinder::DeathRecipient
         void binderDied(const android::wp<IBinder>& who) override;
         // IBinder::FrozenStateChangeCallback
         void onStateChanged(const android::wp<IBinder>& who, State state) override;
 
     private:
+        /**
+         * Close any open streams for the client.
+         * @param fromFreeze true if the streams are being closed because the process is frozen.
+         */
+        void closeStream(bool fromFreeze);
+
         mutable std::mutex                              mLock;
         const pid_t                                     mProcessId;
         std::set<android::sp<AAudioServiceStreamBase>>  mStreams GUARDED_BY(mLock);
         // hold onto binder to receive death notifications
         android::sp<IBinder>                            mBinder;
         bool                                            mExclusiveEnabled = true;
+        std::atomic<bool> mFrozen = false;
+        std::atomic<int64_t> mFreezeTime = 0;
     };
 
     // This must be called under mLock
