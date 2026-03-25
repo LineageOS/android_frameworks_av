@@ -1058,6 +1058,11 @@ protected:
     // Threads, so do not do compute heavy operations on it.
     static audio_utils::CommandThread& getAsyncCommandThread();
 
+    // AsyncCallbackThread is a singleton thread used for handling client
+    // callbacks.  As a single thread, it avoids messages being sent
+    // out of order.
+    static audio_utils::CommandThread& getAsyncCallbackThread();
+
     private:
     void dumpBase_l(int fd, const Vector<String16>& args) REQUIRES(mutex());
     void dumpEffectChains_l(int fd, const Vector<String16>& args) REQUIRES(mutex());

@@ -27,13 +27,15 @@
 #include "IAfTrack.h"
 #include "MelReporter.h"
 #include "PatchCommandThread.h"
-#include "audio_utils/clock.h"
 
 // External classes
-#include <audio_utils/mutex.h>
+// go/keep-sorted start
+#include <audio_utils/CommandThread.h>
 #include <audio_utils/FdToString.h>
 #include <audio_utils/SimpleLog.h>
 #include <audio_utils/TimerQueue.h>
+#include <audio_utils/clock.h>
+#include <audio_utils/mutex.h>
 #include <com/android/media/permission/PermissionEnum.h>
 #include <media/IAudioFlinger.h>
 #include <media/IAudioPolicyServiceLocal.h>
@@ -41,6 +43,7 @@
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <mediautils/Synchronization.h>
 #include <psh_utils/AudioPowerManager.h>
+// go/keep-sorted end
 
 // not needed with the includes above, added to prevent transitive include dependency.
 #include <utils/KeyedVector.h>
@@ -65,6 +68,11 @@ class AudioFlinger
     friend class sp<AudioFlinger>;
 public:
     static void instantiate() ANDROID_API;
+
+    // AsyncCallbackThread is a singleton thread used for handling client
+    // callbacks through AudioSystem.  As a single thread, it avoids messages
+    // being sent out of order.
+    static audio_utils::CommandThread& getAsyncCallbackThread();
 
     status_t resetReferencesForTest();
 
