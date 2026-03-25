@@ -1036,6 +1036,15 @@ void AudioTrack::pause()
     }
 }
 
+status_t AudioTrack::flushFromFrame(
+        android::media::audio::common::FlushFromFrameAccuracy /*accuracy*/,
+        int64_t requestedPosition,
+        int64_t* actualFlushedPosition) {
+    // Dummy implementation. Need to call to the HAL.
+    *actualFlushedPosition = requestedPosition;
+    return NO_ERROR;
+}
+
 status_t AudioTrack::setVolume(float left, float right)
 {
     // This duplicates a test by AudioTrack JNI, but that is not the only caller

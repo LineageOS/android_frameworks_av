@@ -21,6 +21,7 @@
 #include <aaudio/AAudio.h>
 #include <aaudio/AAudioTesting.h>
 #include <android/media/audio/common/AudioMMapPolicyInfo.h>
+#include <android/media/audio/common/FlushFromFrameAccuracy.h>
 #include <media/AudioResamplerPublic.h>
 #include <system/audio.h>
 #include <utils/Errors.h>
@@ -385,6 +386,9 @@ audio_devices_t AAudioConvert_aaudioToAndroidDeviceType(
 
 aaudio_policy_t AAudioConvert_androidToAAudioMMapPolicy(
         android::media::audio::common::AudioMMapPolicy policy);
+
+AAudio_FlushFromAccuracy AAudioConvert_androidToAAudioFlushFromAccuracy(
+        android::media::audio::common::FlushFromFrameAccuracy accuracy);
 
 aaudio_result_t AAudioConvert_aaudioToAndroidPlaybackParameters(
         const AAudioPlaybackParameters& parameters, android::AudioPlaybackRate* rate);
