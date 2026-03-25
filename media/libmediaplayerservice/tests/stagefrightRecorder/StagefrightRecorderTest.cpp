@@ -313,11 +313,14 @@ TEST_F(StagefrightRecorderTest, SetOutputFormatAfterPrepareTest) {
     status_t status = mStfRecorder->init();
     ASSERT_EQ(status, OK) << "Failed to initialize stagefright recorder";
 
+    status = mStfRecorder->setVideoSource(VIDEO_SOURCE_SURFACE);
+    ASSERT_EQ(status, OK) << "Failed to set video source to surface";
+
     status = mStfRecorder->prepare();
     ASSERT_EQ(status, OK) << "Failed to prepare the recorder";
 
     status = mStfRecorder->setOutputFormat(OUTPUT_FORMAT_RTP_AVP);
-    ASSERT_EQ(status, INVALID_OPERATION) << "setOutputFormat should fail after prepare";
+    ASSERT_EQ(status, INVALID_OPERATION) << "setOutputFormat should fail after writer is set";
 }
 
 INSTANTIATE_TEST_SUITE_P(
