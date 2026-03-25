@@ -2291,6 +2291,7 @@ void AudioFlinger::NotificationClient::onStateChanged(
     if (state == IBinder::FrozenStateChangeCallback::State::FROZEN) {
         frozen = true;
         fstring = "frozen";
+        mFreezeTime = systemTime(SYSTEM_TIME_MONOTONIC);
     } else if (state == IBinder::FrozenStateChangeCallback::State::UNFROZEN) {
         frozen = false;
         fstring = "unfrozen";
@@ -2351,6 +2352,26 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     // TODO pass wrapped object around
     adjAttributionSource = std::move(validatedAttrSource).unwrapInto();
 
+    // Because the FROZEN notification may come early and the UNFROZEN notification
+    // may (rarely) come in late, we wait 500 ms before accepting any new AudioRecords for
+    // a frozen app.
+    sp<NotificationClient> notificationClient; // acquire notificationClient outside of AF lock.
+    constexpr int kTimeoutMs = 500;
+    auto checkFrozen = [&](const char* where, sp<NotificationClient> nc) {
+        if (!nc) return false;
+
+        const auto [frozen, freezeTime] = nc->getFrozenStatus();
+        // we don't care whether we are frozen or not, it is just freezeTime.
+        const bool skip = freezeTime > 0 && (systemTime(SYSTEM_TIME_MONOTONIC) - freezeTime)
+                  < kTimeoutMs * NANOS_PER_MILLISECOND;
+        if (skip) {
+            ALOGW("createRecord: record request denied for pid %d at %s - frozen within %d ms",
+                    adjAttributionSource.pid, where, kTimeoutMs);
+            lStatus = PERMISSION_DENIED;
+        }
+        return skip;
+    };
+
     // further format checks are performed by createRecordTrack_l()
     if (!audio_is_valid_format(input.config.format)) {
         ALOGE("createRecord() invalid format %#x", input.config.format);
@@ -2377,6 +2398,16 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     output.flags = input.flags;
 
     client = registerClient(adjAttributionSource.pid, adjAttributionSource.uid);
+    {
+        audio_utils::lock_guard _cl(clientMutex());
+        if (const auto it = mNotificationClients.find(callingPid);
+             it != mNotificationClients.end()) {
+             notificationClient = it->second;
+        }
+    }
+
+    // Check to see if we are frozen.
+    if (checkFrozen("begin", notificationClient)) goto Exit; // lStatus reads PERMISSION_DENIED.
 
     // Not a conventional loop, but a retry loop for at most two iterations total.
     // Try first maybe with FAST flag then try again without FAST flag if that fails.
@@ -2429,6 +2460,10 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
                                                   input.clientInfo.clientTid,
                                                   &lStatus, portId, input.maxSharedAudioHistoryMs);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (recordTrack == 0));
+
+        // Double checked atomic rollback.
+        if (checkFrozen("end", notificationClient)) goto Exit; // lStatus reads PERMISSION_DENIED.
+
 
         // lStatus == BAD_TYPE means FAST flag was rejected: request a new input from
         // audio policy manager without FAST constraint
