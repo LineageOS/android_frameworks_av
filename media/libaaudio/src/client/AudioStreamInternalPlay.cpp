@@ -340,10 +340,7 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
 
     // If a DMA channel or DSP is reading the other end then we have to update the readCounter.
     if (mAudioEndpoint->isFreeRunning()) {
-        // Update data queue based on the timing model.
-        int64_t estimatedReadCounter = mClockModel.convertTimeToPosition(currentNanoTime);
-        // ALOGD("AudioStreamInternal::processDataNow() - estimatedReadCounter = %d", (int)estimatedReadCounter);
-        mAudioEndpoint->setDataReadCounter(estimatedReadCounter);
+        updateReadCounter(currentNanoTime);
     }
 
     if (mNeedCatchUp.isRequested()) {
@@ -746,6 +743,7 @@ aaudio_result_t AudioStreamInternalPlay::flushFromFrame_l(
         // Rewind successfully, update the written position as the rewound position.
         mLastFramesWritten = actualPosition;
         mAudioEndpoint->setDataWriteCounter(actualPosition - mFramesOffsetFromService);
+        updateReadCounter(AudioClock::getNanoseconds());
     }
     wakeupCallbackThread_l();
     return result;
@@ -879,6 +877,13 @@ aaudio_result_t AudioStreamInternalPlay::getPlaybackParameters_l(
     mClockModel.setPlaybackSpeed(mPlaybackParameters.speed);
     *parameters = tempParam;
     return AAUDIO_OK;
+}
+
+void AudioStreamInternalPlay::updateReadCounter(int64_t currentNanoTime) {
+    // Update data queue based on the timing model.
+    int64_t estimatedReadCounter = mClockModel.convertTimeToPosition(currentNanoTime);
+    // ALOGD("%s - estimatedReadCounter = %jd", __func__, estimatedReadCounter);
+    mAudioEndpoint->setDataReadCounter(estimatedReadCounter);
 }
 
 // Render audio in the application callback and then write the data to the stream.
