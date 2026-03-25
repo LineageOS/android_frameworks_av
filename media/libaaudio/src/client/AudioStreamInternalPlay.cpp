@@ -283,7 +283,19 @@ aaudio_result_t AudioStreamInternalPlay::write(const void *buffer, int32_t numFr
             mDraining = false;
         }
     }
-    aaudio_result_t result = processData((void *)buffer, numFrames, timeoutNanoseconds);
+    aaudio_result_t result = AAUDIO_OK;
+    if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+        // For offload mode, the counters can also be updated when calling flushFromFrame.
+        // We document apps must not provide data when calling flushFromFrame. But to avoid
+        // app's misbehavior, adding a lock here to protect the counters. Without any competitor,
+        // locking should not be too expensive.
+        std::lock_guard _l(mEndpointMutex);
+        result = processData((void *) buffer, numFrames, timeoutNanoseconds);
+    } else {
+        // For non-offload mode, the counters will only be updated from one thread.
+        // It should be fine to access it without locking.
+        result = processData((void *) buffer, numFrames, timeoutNanoseconds);
+    }
     if (isDataCallbackSet() && result != numFrames) {
         // For callback case, it must always be able to write all data
         if (result >= 0) {
