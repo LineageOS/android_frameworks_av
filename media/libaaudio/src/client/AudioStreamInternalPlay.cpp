@@ -916,31 +916,29 @@ void *AudioStreamInternalPlay::callbackLoop() {
             }
         }
         int64_t timeoutNanosForDataAvailableCB = 0;
+        int32_t callbackFrames = 0;
         if (mUseDataAvailableCallback) {
-            std::lock_guard _l(mStreamMutex);
+            android::audio_utils::unique_lock ul(mStreamMutex);
             mDrainingNanosValid = false;
-        }
-        {
-            std::lock_guard _endpointLock(mEndpointMutex);
-            // Call application using the AAudio callback interface.
-            if (mUseDataAvailableCallback) {
-                // For data available callback, it doesn't transfer any data. Instead,
-                // it signals a notification to client to call write for data transfer.
-                const int32_t emptyFrames = mAudioEndpoint->getEmptyFramesAvailable();
-                if (emptyFrames <= 0) {
-                    // No need to fire data callback. The DSP may just start or slowly read.
-                    // Wait for a burst to check if there is data available.
-                    android::audio_utils::unique_lock ul(mStreamMutex);
-                    mCallbackCV.wait_for(ul, std::chrono::nanoseconds(mNanosPerBurst));
-                    continue;
-                }
-                timeoutNanosForDataAvailableCB =
-                        emptyFrames * AAUDIO_NANOS_PER_SECOND / getSampleRate();
-                callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), emptyFrames);
-            } else {
-                callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), mCallbackFrames);
+            // For data available callback, it doesn't transfer any data. Instead,
+            // it signals a notification to client to call write for data transfer.
+            {
+                std::lock_guard _endpointLock(mEndpointMutex);
+                callbackFrames = mAudioEndpoint->getEmptyFramesAvailable();
             }
+            if (callbackFrames <= 0) {
+                // No need to fire data callback. The DSP may just start or slowly read.
+                // Wait for a burst to check if there is data available.
+                mCallbackCV.wait_for(ul, std::chrono::nanoseconds(mNanosPerBurst));
+                continue;
+            }
+            timeoutNanosForDataAvailableCB =
+                    callbackFrames * AAUDIO_NANOS_PER_SECOND / getSampleRate();
+        } else {
+            callbackFrames = mCallbackFrames;
         }
+        // Call application using the AAudio callback interface.
+        callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), callbackFrames);
 
         if (callbackResult < 0) {
             if (!shouldStopStream()) {
