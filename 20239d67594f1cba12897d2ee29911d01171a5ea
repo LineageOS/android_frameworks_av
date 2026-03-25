@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a7bd4fb4_510bada6",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 25691
+      },
+      "writtenOn": "2026-03-25T08:43:40Z",
+      "side": 1,
+      "message": "Topic builds for and runs on Moto G5 Cedric. THANK YOU.\nI performed a \"repo sync\", had to \"cd .repo/manifests\" and \"git reset --hard\" for that to succeed. Is there going to be an update to the safety patch date (still on 2021-06-05), or are those two patches still missing and preventing that?",
+      "revId": "20239d67594f1cba12897d2ee29911d01171a5ea",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
