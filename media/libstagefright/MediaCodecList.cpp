@@ -47,6 +47,9 @@
 #include <utils/threads.h>
 
 #include <cutils/properties.h>
+#include <unistd.h>
+#include <private/android_filesystem_config.h>
+#include <android/media/IMediaCodecListGenerator.h>
 
 #include <algorithm>
 #include <regex>
@@ -134,20 +137,37 @@ public:
             }
         }
         if (mLocalInstance == nullptr) {
-            MediaCodecList *codecList = new MediaCodecList(GetBuilders());
-            if (codecList->initCheck() == OK) {
-                mLocalInstance = codecList;
-
-                if (isProfilingNeeded()) {
-                    ALOGV("Codec profiling needed, will be run in separated thread.");
-                    pthread_t profiler;
-                    if (pthread_create(&profiler, nullptr, profilerThreadWrapper, nullptr) != 0) {
-                        ALOGW("Failed to create thread for codec profiling.");
+            if (getuid() == AID_MEDIA) {
+                ALOGI("In mediaserver, fetching MediaCodecList from generator service.");
+                sp<IServiceManager> sm = defaultServiceManager();
+                sp<IBinder> binder = sm->waitForService(String16("media.codeclist.generator"));
+                if (binder != nullptr) {
+                    sp<media::IMediaCodecListGenerator> generator =
+                            interface_cast<media::IMediaCodecListGenerator>(binder);
+                    std::vector<uint8_t> data;
+                    binder::Status status = generator->generateCodecList(&data);
+                    if (status.isOk()) {
+                        Parcel p;
+                        p.setData(data.data(), data.size());
+                        mLocalInstance = MediaCodecList::FromParcel(p);
+                    } else {
+                        ALOGE("Failed to generate MediaCodecList from generator: %s",
+                                status.toString8().c_str());
                     }
+                } else {
+                    ALOGE("Failed to get media.codeclist.generator service.");
                 }
-            } else {
-                // failure to initialize may be temporary. retry on next call.
-                delete codecList;
+            }
+            if (mLocalInstance == nullptr) {
+                mLocalInstance = MediaCodecList::Build();
+            }
+            if (mLocalInstance != nullptr && isProfilingNeeded()) {
+                ALOGV("Codec profiling needed, will be run in separated thread.");
+                pthread_t profiler;
+                if (pthread_create(
+                        &profiler, nullptr, profilerThreadWrapper, nullptr) != 0) {
+                    ALOGW("Failed to create thread for codec profiling.");
+                }
             }
         }
 
@@ -243,6 +263,15 @@ void MediaCodecList::BinderDeathObserver::binderDied(const wp<IBinder> &who __un
 // static
 sp<IMediaCodecList> MediaCodecList::getInstance() {
     return InstanceCache::Get().getRemoteInstance();
+}
+
+// static
+sp<MediaCodecList> MediaCodecList::Build() {
+    sp<MediaCodecList> codecList = new MediaCodecList(GetBuilders());
+    if (codecList->initCheck() != OK) {
+        return nullptr;
+    }
+    return codecList;
 }
 
 MediaCodecList::MediaCodecList(std::vector<MediaCodecListBuilderBase*> builders) {
@@ -587,6 +616,38 @@ bool MediaCodecList::codecHandlesFormat(
 
     // haven't found a reason to discard this one
     return true;
+}
+
+// static
+sp<MediaCodecList> MediaCodecList::FromParcel(const Parcel &parcel) {
+    sp<MediaCodecList> list = new MediaCodecList();
+    list->mInitCheck = static_cast<status_t>(parcel.readInt32());
+    if (list->mInitCheck != OK) {
+        return nullptr;
+    }
+    list->mGlobalSettings = AMessage::FromParcel(parcel);
+    int32_t size = parcel.readInt32();
+    for (int32_t i = 0; i < size; i++) {
+        sp<MediaCodecInfo> info = MediaCodecInfo::FromParcel(parcel);
+        if (info == nullptr) {
+            return nullptr;
+        }
+        list->mCodecInfos.push_back(info);
+    }
+    return list;
+}
+
+status_t MediaCodecList::writeToParcel(Parcel *parcel) const {
+    parcel->writeInt32(mInitCheck);
+    if (mInitCheck != OK) {
+        return OK;
+    }
+    mGlobalSettings->writeToParcel(parcel);
+    parcel->writeInt32(mCodecInfos.size());
+    for (const auto &info : mCodecInfos) {
+        info->writeToParcel(parcel);
+    }
+    return OK;
 }
 
 }  // namespace android

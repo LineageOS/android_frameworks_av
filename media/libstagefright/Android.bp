@@ -226,6 +226,12 @@ cc_library_shared {
     },
 }
 
+filegroup {
+    name: "libstagefright_mediacodeclistgenerator_aidl",
+    srcs: ["aidl/android/media/IMediaCodecListGenerator.aidl"],
+    path: "aidl",
+}
+
 cc_library {
     name: "libstagefright",
 
@@ -234,6 +240,7 @@ cc_library {
     ],
 
     srcs: [
+        ":libstagefright_mediacodeclistgenerator_aidl",
         "AACWriter.cpp",
         "ACodec.cpp",
         "ACodecBufferChannel.cpp",
@@ -283,6 +290,11 @@ cc_library {
         "VideoRenderQualityTracker.cpp",
         "VvcUtils.cpp",
     ],
+
+    aidl: {
+        export_aidl_headers: true,
+        local_include_dirs: ["aidl"],
+    },
 
     shared_libs: [
         "aconfig_mediacodec_flags_c_lib",

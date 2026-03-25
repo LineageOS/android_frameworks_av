@@ -61,6 +61,12 @@ struct MediaCodecList : public BnMediaCodecList {
     // to be used by MediaPlayerService alone
     static sp<IMediaCodecList> getLocalInstance();
 
+    /**
+     * Serialization over Binder
+     */
+    static sp<MediaCodecList> FromParcel(const Parcel &parcel);
+    status_t writeToParcel(Parcel *parcel) const;
+
     // only to be used by getLocalInstance
     static void *profilerThreadWrapper(void * /*arg*/);
 
@@ -97,6 +103,8 @@ private:
     sp<AMessage> mGlobalSettings;
     std::vector<sp<MediaCodecInfo> > mCodecInfos;
 
+    MediaCodecList() = default;
+
     /**
      * This constructor will call `buildMediaCodecList()` from the given
      * `MediaCodecListBuilderBase` objects.
@@ -114,6 +122,10 @@ private:
             const char *mime,
             const sp<MediaCodecInfo> &info,
             const sp<AMessage> &format);
+
+    static sp<MediaCodecList> Build();
+
+    friend class MediaCodecListGenerator;
 };
 
 }  // namespace android
