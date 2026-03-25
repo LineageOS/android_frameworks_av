@@ -5981,8 +5981,11 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
                     if (chunk_type == FOURCC("moof")) {
                         mNextMoofOffset = *offset;
                         break;
-                    } else if (chunk_type == FOURCC("mdat")) {
-                        parseChunk(offset);
+                    } else if (chunk_type == FOURCC("mdat") && chunk_size > 0) {
+                        status_t err = parseChunk(offset);
+                        if (err != OK) {
+                            return err;
+                        }
                         continue;
                     } else if (chunk_size == 0) {
                         break;

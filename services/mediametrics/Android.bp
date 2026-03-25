@@ -121,12 +121,12 @@ cc_binary {
             "libandroid#31", // for APermissionManager, sdk>=31
             "libbinder_ndk",
             // don't have in-module version of LimitProcessMemory
-            "mediametricsservice-aidl-ndk",
+            "mediametricsservice-aidl-V1-ndk",
         ],
         default: [
             "libbinder",
             "libmediautils", // LimitProcessMemory
-            "mediametricsservice-aidl-cpp",
+            "mediametricsservice-aidl-V1-cpp",
         ],
     }),
 
@@ -215,15 +215,14 @@ cc_library {
         true: [
             "libbinder_ndk",
             "libmediametrics_module",
-            "mediametricsservice-aidl-ndk",
+            "mediametricsservice-aidl-V1-ndk",
         ],
         default: [
-            "libaudioutils",
             "libbinder",
             "libmediametrics",
             "libmediautils",
             "libmemunreachable",
-            "mediametricsservice-aidl-cpp",
+            "mediametricsservice-aidl-V1-cpp",
         ],
     }),
 
@@ -244,16 +243,9 @@ cc_library {
     ],
 
     static_libs: [
+        "libaudioutils_stringutils",
         "libmediametrics_allowlist",
         "mediametrics-protos-lite",
-    ] + select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
-        true: [
-            "libaudioutils_stringutils",
-            "libutils",
-        ],
-        default: [],
-    }),
-    whole_static_libs: [
     ],
 
     header_libs: [

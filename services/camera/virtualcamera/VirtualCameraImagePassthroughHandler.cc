@@ -214,7 +214,6 @@ bool VirtualCameraImagePassthroughHandler::waitForInputFrame(
   if (mFrameAvailableFuture->wait_for(timeoutNs) != std::future_status::ready) {
     ALOGE("%s: timed out after %llu ns waiting for frame arrival", __func__,
           timeoutNs.count());
-    resetFrameAvailableSignalingMechanism();
     return false;
   }
 
@@ -338,6 +337,12 @@ void VirtualCameraImagePassthroughHandler::onFrameAvailable() {
 
 void VirtualCameraImagePassthroughHandler::resetFrameAvailableSignalingMechanism() {
   std::lock_guard<std::mutex> criticalSection{mFrameAvailableCallbackMutex};
+
+  // If the promise has not already been signalled, set its value to false
+  // so it can be safely destroyed.
+  if (!mFrameAvailablePromiseSignalled && mFrameAvailablePromise != nullptr) {
+    mFrameAvailablePromise->set_value(false);
+  }
 
   mFrameAvailablePromiseSignalled = false;
   mFrameAvailablePromise = std::make_unique<std::promise<bool>>();

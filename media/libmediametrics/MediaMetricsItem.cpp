@@ -34,6 +34,7 @@
 #include <utils/threads.h>
 
 #include <binder/IServiceManager.h>
+#include <media/MediaMetricsInternal.h>
 #include <media/MediaMetricsItem.h>
 #include <private/android_filesystem_config.h>
 
@@ -223,26 +224,6 @@ std::string mediametrics::Item::toString() const {
     }
     result.append(")}");
     return result;
-}
-
-// for the lazy, we offer methods that finds the service and
-// calls the appropriate daemon
-bool mediametrics::Item::selfrecord() {
-    ALOGD_IF(DEBUG_API, "%s: delivering %s", __func__, this->toString().c_str());
-
-    char *str;
-    size_t size;
-    status_t status = writeToByteString(&str, &size);
-    if (status == NO_ERROR) {
-        status = submitBuffer(str, size);
-        free(str);
-    }
-    if (status != NO_ERROR) {
-        ALOGW("%s: failed to record: (%d) %s", __func__,
-              status,  this->toString().c_str());
-        return false;
-    }
-    return true;
 }
 
 //static

@@ -37,7 +37,7 @@ cc_defaults {
         "libaudiopolicyservice",
         "libdl",
         "libvndksupport",
-        "mediametricsservice-aidl-cpp",
+        "mediametricsservice-aidl-V1-cpp",
     ],
     header_libs: [
         "libaudiopolicymanager_interface_headers",

@@ -43,6 +43,7 @@ typedef ::aidl::android::media::IMediaMetricsService metricsservice_t;
 
 #include <binder/IServiceManager.h>
 #include <media/MediaMetricsItem.h>
+#include <media/MediaMetricsInternal.h>
 #include <private/android_filesystem_config.h>
 
 // Max per-property string size before truncation in toString().
@@ -55,72 +56,6 @@ namespace android::mediametrics {
 #define DEBUG_API               0
 #define DEBUG_ALLOCATIONS       0
 
-// monitor health of our connection to the metrics service
-
-AIBinder_DeathRecipient *sRecipient = nullptr;
-
-static void onBinderDied(void *cookie) {
-        // do the cleanup
-    if (cookie == nullptr) {
-        AIBinder_DeathRecipient_delete(sRecipient);
-        sRecipient = nullptr;
-                // clear sediaMetricsService
-                // should we mutex in here too
-        ALOGD("mediametrics service disappeared");
-    }
-}
-
-static std::mutex sServiceMutex;
-static std::shared_ptr<metricsservice_t> sMediaMetricsService GUARDED_BY(sServiceMutex);
-
-static
-std::shared_ptr<metricsservice_t> getService() {
-    static const char *servicename = "media.metrics";
-    static const bool enabled = BaseItem::isEnabled(); // singleton initialized
-
-    if (enabled == false) {
-        ALOGD_IF(DEBUG_SERVICEACCESS, "%s: disabled", __func__);
-        return nullptr;
-    }
-    std::lock_guard _l(sServiceMutex);
-    // think of remainingBindAttempts as telling us whether service == nullptr because
-    // (1) we haven't tried to initialize it yet
-    // (2) we've tried to initialize it, but failed.
-    if (sMediaMetricsService == nullptr) {
-        const char *badness = "";
-
-        // checkService works as a replacement for getService()
-        // checkService() is non-blocking, opening us for some busy-waiting
-        // if the caller keeps retrying.
-        ::ndk::SpAIBinder binder(AServiceManager_checkService(servicename));
-
-        if (binder == nullptr)  {
-            badness = "did not find service";
-        } else {
-            sMediaMetricsService = metricsservice_t::fromBinder(binder);
-            sRecipient = AIBinder_DeathRecipient_new(onBinderDied);
-            binder_status_t status = AIBinder_linkToDeath(binder.get(), sRecipient, nullptr);
-            if (status != NO_ERROR) {
-                ALOGD("Unable to establish linkToDeath");
-            AIBinder_DeathRecipient_delete(sRecipient);
-            sRecipient = nullptr;
-            }
-        }
-
-        if (sMediaMetricsService == nullptr) {
-            ALOGW_IF(DEBUG_SERVICEACCESS, "%s: unable to bind to service %s: %s",
-                    __func__, servicename, badness);
-        }
-    }
-    return sMediaMetricsService;
-}
-
-// static
-void BaseItem::dropInstance() {
-    std::lock_guard  _l(sServiceMutex);
-    sMediaMetricsService = nullptr;
-}
-
 // static
 status_t BaseItem::submitBuffer(const char *buffer, size_t size) {
     ALOGD_IF(DEBUG_API, "%s: delivering %zu bytes", __func__, size);
@@ -129,7 +64,7 @@ status_t BaseItem::submitBuffer(const char *buffer, size_t size) {
     if (size > std::numeric_limits<int32_t>::max()) return BAD_VALUE;
 
     // Do we have the service available?
-    std::shared_ptr<metricsservice_t> svc = getService();
+    sp<metricsservice_t> svc = getService();
     if (svc == nullptr)  return NO_INIT;
 
     ::android::status_t status = NO_ERROR;

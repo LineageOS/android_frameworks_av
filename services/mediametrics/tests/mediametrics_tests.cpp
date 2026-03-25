@@ -208,23 +208,23 @@ TEST(mediametrics_tests, instantiate) {
   status_t status;
 
   // random keys ignored when empty
-  std::unique_ptr<mediametrics::Item> random_key(mediametrics::Item::create("random_key"));
-  status = mediaMetrics->submit(random_key.get());
+  std::shared_ptr<mediametrics::Item> random_key(mediametrics::Item::create("random_key"));
+  status = mediaMetrics->submitInternal(random_key);
   ASSERT_EQ(PERMISSION_DENIED, status);
 
   // random keys ignored with data
   random_key->setInt32("foo", 10);
-  status = mediaMetrics->submit(random_key.get());
+  status = mediaMetrics->submitInternal(random_key);
   ASSERT_EQ(PERMISSION_DENIED, status);
 
   // known keys ignored if empty
-  std::unique_ptr<mediametrics::Item> audiotrack_key(mediametrics::Item::create("audiotrack"));
-  status = mediaMetrics->submit(audiotrack_key.get());
+  std::shared_ptr<mediametrics::Item> audiotrack_key(mediametrics::Item::create("audiotrack"));
+  status = mediaMetrics->submitInternal(audiotrack_key);
   ASSERT_EQ(BAD_VALUE, status);
 
   // known keys not ignored if not empty
   audiotrack_key->addInt32("foo", 10);
-  status = mediaMetrics->submit(audiotrack_key.get());
+  status = mediaMetrics->submitInternal(audiotrack_key);
   ASSERT_EQ(NO_ERROR, status);
 
 
@@ -323,7 +323,8 @@ TEST(mediametrics_tests, item_manipulation) {
   fflush(stdout);
 
   sp mediaMetrics = new MediaMetricsService();
-  status_t status = mediaMetrics->submit(&item);
+  std::shared_ptr<mediametrics::Item> sitem(item.dup());
+  status_t status = mediaMetrics->submitInternal(sitem);
   ASSERT_EQ(NO_ERROR, status);
   mediaMetrics->dump(fileno(stdout), {} /* args */);
 }
@@ -418,6 +419,25 @@ TEST(mediametrics_tests, item_binderization) {
   ASSERT_EQ(item, item2);
 }
 
+TEST(mediametrics_tests, item_structuredconversion) {
+  mediametrics::Item item;
+  item.setInt32("i32", 1)
+      .setInt64("i64", 2)
+      .setDouble("double", 3.1)
+      .setCString("string", "abc")
+      .setRate("rate", 11, 12);
+
+  // convert to StructuredItem
+  std::shared_ptr<StructuredItem> structured = writeItemToStructured(item);
+
+  // convert back to Item
+  std::shared_ptr<mediametrics::Item> wrapped =
+                  android::mediametrics::readFromStructuredItem(structured.get());
+
+  // and compare
+  ASSERT_EQ(item, *wrapped);
+}
+
 TEST(mediametrics_tests, item_byteserialization) {
   mediametrics::Item item;
   item.setInt32("i32", 1)
@@ -437,6 +457,121 @@ TEST(mediametrics_tests, item_byteserialization) {
   printf("item: %s\n", item.toString().c_str());
   printf("item2: %s\n", item2.toString().c_str());
   ASSERT_EQ(item, item2);
+
+  free(data);
+}
+
+TEST(mediametrics_tests, item_byteserialization_check_encoding) {
+  mediametrics::Item item("key");
+  item.setPid(1)
+      .setUid(2)
+      .setTimestamp(3)
+      .setInt32("i32", 123)
+      .setInt64("i64", 456)
+      .setDouble("double", 0.5)
+      .setCString("string", "abc")
+      .setRate("rate", 10, 20);
+
+  char *data;
+  size_t length;
+  ASSERT_EQ(0, item.writeToByteString(&data, &length));
+  ASSERT_GT(length, (size_t)0);
+
+  // Expected bytes (Little Endian)
+  // std::map sorts properties by key: "double", "i32", "i64", "rate", "string"
+  // Header (32 bytes):
+  // 00: 76 00 00 00 (Total size: 118 bytes)
+  // 04: 20 00 00 00 (Header size: 32 bytes)
+  // 08: 00 00       (Version: 0)
+  // 0a: 04 00       (Key size: 4)
+  // 0c: 6b 65 79 00 ("key\0")
+  // 10: 01 00 00 00 (PID: 1)
+  // 14: 02 00 00 00 (UID: 2)
+  // 18: 03 00 00 00 00 00 00 00 (Timestamp: 3)
+
+  // Body:
+  // 20: 05 00 00 00 (# Props: 5)
+
+  // Prop: "double" (double) 0.5
+  // Size: 2 + 1 + 7 + 8 = 18
+  // 24: 12 00       (Prop size: 18)
+  // 26: 03          (Type: kTypeDouble)
+  // 27: 64 6f 75 62 6c 65 00 ("double\0")
+  // 2e: 00 00 00 00 00 00 e0 3f (0.5)
+
+  // Prop: "i32" (int32) 123
+  // Size: 2 + 1 + 4 + 4 = 11
+  // 36: 0b 00       (Prop size: 11)
+  // 38: 01          (Type: kTypeInt32)
+  // 39: 69 33 32 00 ("i32\0")
+  // 3d: 7b 00 00 00 (123)
+
+  // Prop: "i64" (int64) 456
+  // Size: 2 + 1 + 4 + 8 = 15
+  // 41: 0f 00       (Prop size: 15)
+  // 43: 02          (Type: kTypeInt64)
+  // 44: 69 36 34 00 ("i64\0")
+  // 48: c8 01 00 00 00 00 00 00 (456)
+
+  // Prop: "rate" (rate) 10, 20
+  // Size: 2 + 1 + 5 + 8 + 8 = 24
+  // 50: 18 00       (Prop size: 24)
+  // 52: 05          (Type: kTypeRate)
+  // 53: 72 61 74 65 00 ("rate\0")
+  // 58: 0a 00 00 00 00 00 00 00 (10)
+  // 60: 14 00 00 00 00 00 00 00 (20)
+
+  // Prop: "string" (string) "abc"
+  // Size: 2 + 1 + 7 + 4 = 14
+  // 68: 0e 00       (Prop size: 14)
+  // 6a: 04          (Type: kTypeCString)
+  // 6b: 73 74 72 69 6e 67 00 ("string\0")
+  // 72: 61 62 63 00 ("abc\0")
+
+  // Total size: 32 (header) + 4 (prop count) + 18 + 11 + 15 + 24 + 14 = 118
+
+  ASSERT_EQ((size_t)118, length);
+  uint8_t expected[] = {
+    0x76, 0x00, 0x00, 0x00, // Total size: 118 (0x76)
+    0x20, 0x00, 0x00, 0x00, // Header size: 32 (0x20)
+    0x00, 0x00,             // Version: 0
+    0x04, 0x00,             // Key size: 4
+    'k', 'e', 'y', 0x00,    // Key
+    0x01, 0x00, 0x00, 0x00, // PID: 1
+    0x02, 0x00, 0x00, 0x00, // UID: 2
+    0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Timestamp: 3
+    0x05, 0x00, 0x00, 0x00, // Prop count: 5
+    // Prop: double
+    0x12, 0x00,             // Size: 18
+    0x03,                   // Type: kTypeDouble
+    'd', 'o', 'u', 'b', 'l', 'e', 0x00, // Name
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x3f, // Value: 0.5
+    // Prop: i32
+    0x0b, 0x00,             // Size: 11
+    0x01,                   // Type: kTypeInt32
+    'i', '3', '2', 0x00,    // Name
+    0x7b, 0x00, 0x00, 0x00, // Value: 123
+    // Prop: i64
+    0x0f, 0x00,             // Size: 15
+    0x02,                   // Type: kTypeInt64
+    'i', '6', '4', 0x00,    // Name
+    0xc8, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Value: 456
+    // Prop: rate
+    0x18, 0x00,             // Size: 24
+    0x05,                   // Type: kTypeRate
+    'r', 'a', 't', 'e', 0x00, // Name
+    0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // count: 10
+    0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // duration: 20
+    // Prop: string
+    0x0e, 0x00,             // Size: 14
+    0x04,                   // Type: kTypeCString
+    's', 't', 'r', 'i', 'n', 'g', 0x00, // Name
+    'a', 'b', 'c', 0x00,    // Value
+  };
+
+  for (size_t i = 0; i < length; ++i) {
+    ASSERT_EQ(expected[i], (uint8_t)data[i]) << "at index " << i;
+  }
 
   free(data);
 }
