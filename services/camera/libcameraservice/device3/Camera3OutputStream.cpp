@@ -1811,6 +1811,20 @@ bool Camera3OutputStream::shouldLogError(status_t res) {
     return shouldLogError(res, mState);
 }
 
+status_t Camera3OutputStream::getUniqueSurfaceIds(
+        const std::vector<size_t>& surfaceIds,
+        /*out*/std::vector<size_t>* outUniqueIds) {
+    Mutex::Autolock l(mLock);
+    if (outUniqueIds == nullptr || surfaceIds.size() > 1) {
+        return BAD_VALUE;
+    }
+
+    outUniqueIds->clear();
+    outUniqueIds->push_back(mCurrentSurfaceId);
+
+    return OK;
+}
+
 }; // namespace camera3
 
 }; // namespace android
