@@ -615,6 +615,8 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
     int init_read_len = std::min(
             static_cast<uint64_t>(packet_size - sizeof(mtp_data_header)), file_length);
 
+    bool io_order_improvement = android::hardware::usb::flags::mtp_download_io_order_improvement();
+
     advise(mfr.fd);
 
     struct aiocb aio;
@@ -659,13 +661,27 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
         }
 
         if (has_write) {
-            // Wait for usb write. Cancel unwritten portion if there's an error.
-            int num_events = 0;
-            if (waitEvents(&mIobuf[(i-1)%NUM_IO_BUFS], mIobuf[(i-1)%NUM_IO_BUFS].actual, ioevs,
-                        &num_events) != ret) {
-                error = true;
-                cancelEvents(mIobuf[(i-1)%NUM_IO_BUFS].iocb.data(), ioevs, num_events,
-                        mIobuf[(i-1)%NUM_IO_BUFS].actual, false);
+            // Avoid returning in this block because a background thread is processing aio. We need
+            // to wait until aio_suspend finishes before we can safely return.
+
+            unsigned prev_idx = (i + NUM_IO_BUFS - 1) % NUM_IO_BUFS;
+
+            if (io_order_improvement) {
+                // Queue up a write to usb.
+                if (iobufSubmit(&mIobuf[prev_idx], mBulkIn, ret, false) == -1) {
+                    error = true;
+                }
+            }
+
+            if (!error) {
+                // Wait for usb write. Cancel unwritten portion if there's an error.
+                int num_events = 0;
+                if (waitEvents(&mIobuf[prev_idx], mIobuf[prev_idx].actual, ioevs, &num_events)
+                        != ret) {
+                    error = true;
+                    cancelEvents(mIobuf[prev_idx].iocb.data(), ioevs, num_events,
+                            mIobuf[prev_idx].actual, false);
+                }
             }
             has_write = false;
         }
@@ -688,12 +704,18 @@ int MtpFfsHandle::sendFile(mtp_file_range mfr) {
                 return -1;
             }
 
-            // Queue up a write to usb.
-            if (iobufSubmit(&mIobuf[i], mBulkIn, num_read, false) == -1) {
-                return -1;
+            if (!io_order_improvement) {
+                // Queue up a write to usb.
+                if (iobufSubmit(&mIobuf[i], mBulkIn, num_read, false) == -1) {
+                    return -1;
+                }
             }
+
             has_write = true;
             ret = num_read;
+        } else if (io_order_improvement && error) {
+            // To avoid reporting success if iobufSubmit failed in the last iteration.
+            return -1;
         }
 
         i = (i + 1) % NUM_IO_BUFS;
