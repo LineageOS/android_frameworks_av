@@ -1329,10 +1329,8 @@ void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
     }
     config->queryConfiguration(comp);
 
-    if (android::media::codec::codec_availability_support()) {
-        std::string storeName = mClient->getServiceName();
-        mCodecResources = std::make_unique<CCodecResources>(storeName);
-    }
+    std::string storeName = mClient->getServiceName();
+    mCodecResources = std::make_unique<CCodecResources>(storeName);
 
     mCallback->onComponentAllocated(componentName.c_str());
 }
@@ -3208,7 +3206,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                         updates.push_back(C2Param::Copy(*param));
                     }
                     // Check for change in resources required.
-                    if (!updates.empty() && android::media::codec::codec_availability_support()) {
+                    if (!updates.empty()) {
                         for (const std::unique_ptr<C2Param>& param : updates) {
                             if (param->index() == C2ResourcesNeededTuning::PARAM_TYPE) {
                                 // Update the required resources.
@@ -3845,11 +3843,7 @@ std::shared_ptr<C2GraphicBlock> CCodec::FetchGraphicBlock(
 
 //static
 std::vector<GlobalResourceInfo> CCodec::GetGloballyAvailableResources() {
-    if (android::media::codec::codec_availability_support()) {
-        return CCodecResources::GetGloballyAvailableResources();
-    }
-
-    return std::vector<GlobalResourceInfo>{};
+    return CCodecResources::GetGloballyAvailableResources();
 }
 
 }  // namespace android

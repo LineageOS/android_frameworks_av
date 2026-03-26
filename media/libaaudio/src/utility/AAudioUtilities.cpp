@@ -42,6 +42,7 @@ using namespace android;
 
 using android::media::audio::common::AudioMMapPolicy;
 using android::media::audio::common::AudioMMapPolicyInfo;
+using android::media::audio::common::FlushFromFrameAccuracy;
 
 status_t AAudioConvert_aaudioToAndroidStatus(
         aaudio_result_t result,
@@ -891,6 +892,20 @@ aaudio_policy_t AAudioConvert_androidToAAudioMMapPolicy(AudioMMapPolicy policy) 
         case AudioMMapPolicy::UNSPECIFIED:
         default:
             return AAUDIO_POLICY_NEVER;
+    }
+}
+
+AAudio_FlushFromAccuracy AAudioConvert_androidToAAudioFlushFromAccuracy(
+        FlushFromFrameAccuracy accuracy) {
+    switch (accuracy) {
+        case FlushFromFrameAccuracy::BEST_EFFORT:
+            return AAUDIO_FLUSH_FROM_ACCURACY_UNDEFINED;
+        case FlushFromFrameAccuracy::EXACT:
+            return AAUDIO_FLUSH_FROM_FRAME_ACCURATE;
+        default:
+            ALOGW("%s unrecognized accuracy: %d, convert it to undefined",
+                  __func__, static_cast<int>(accuracy));
+            return AAUDIO_FLUSH_FROM_ACCURACY_UNDEFINED;
     }
 }
 

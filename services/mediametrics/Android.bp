@@ -140,12 +140,7 @@ cc_binary {
         "include/mediametricsservice",
     ],
 
-    init_rc: select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
-        true: [
-            // through mediametrics-apex.37rc in frameworks/av/apex/Android.bp
-        ],
-        default: ["mediametrics.rc"],
-    }),
+    init_rc: ["mediametrics.rc"],
 
     apex_available: [
         "//apex_available:platform",
@@ -156,9 +151,9 @@ cc_binary {
 }
 
 prebuilt_etc {
-    name: "com.android.media-mediametrics-apex.37rc",
-    src: "mediametrics-apex.37rc",
-    filename: "mediametrics-apex.37rc",
+    name: "com.android.media-mediametrics.37rc",
+    src: "mediametrics.37rc",
+    filename: "mediametrics.37rc",
     installable: false,
 }
 

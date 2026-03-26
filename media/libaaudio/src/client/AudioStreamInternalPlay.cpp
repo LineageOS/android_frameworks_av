@@ -283,7 +283,19 @@ aaudio_result_t AudioStreamInternalPlay::write(const void *buffer, int32_t numFr
             mDraining = false;
         }
     }
-    aaudio_result_t result = processData((void *)buffer, numFrames, timeoutNanoseconds);
+    aaudio_result_t result = AAUDIO_OK;
+    if (getPerformanceMode() == AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED) {
+        // For offload mode, the counters can also be updated when calling flushFromFrame.
+        // We document apps must not provide data when calling flushFromFrame. But to avoid
+        // app's misbehavior, adding a lock here to protect the counters. Without any competitor,
+        // locking should not be too expensive.
+        std::lock_guard _l(mEndpointMutex);
+        result = processData((void *) buffer, numFrames, timeoutNanoseconds);
+    } else {
+        // For non-offload mode, the counters will only be updated from one thread.
+        // It should be fine to access it without locking.
+        result = processData((void *) buffer, numFrames, timeoutNanoseconds);
+    }
     if (isDataCallbackSet() && result != numFrames) {
         // For callback case, it must always be able to write all data
         if (result >= 0) {
@@ -340,10 +352,7 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
 
     // If a DMA channel or DSP is reading the other end then we have to update the readCounter.
     if (mAudioEndpoint->isFreeRunning()) {
-        // Update data queue based on the timing model.
-        int64_t estimatedReadCounter = mClockModel.convertTimeToPosition(currentNanoTime);
-        // ALOGD("AudioStreamInternal::processDataNow() - estimatedReadCounter = %d", (int)estimatedReadCounter);
-        mAudioEndpoint->setDataReadCounter(estimatedReadCounter);
+        updateReadCounter(currentNanoTime);
     }
 
     if (mNeedCatchUp.isRequested()) {
@@ -746,6 +755,7 @@ aaudio_result_t AudioStreamInternalPlay::flushFromFrame_l(
         // Rewind successfully, update the written position as the rewound position.
         mLastFramesWritten = actualPosition;
         mAudioEndpoint->setDataWriteCounter(actualPosition - mFramesOffsetFromService);
+        updateReadCounter(AudioClock::getNanoseconds());
     }
     wakeupCallbackThread_l();
     return result;
@@ -881,6 +891,13 @@ aaudio_result_t AudioStreamInternalPlay::getPlaybackParameters_l(
     return AAUDIO_OK;
 }
 
+void AudioStreamInternalPlay::updateReadCounter(int64_t currentNanoTime) {
+    // Update data queue based on the timing model.
+    int64_t estimatedReadCounter = mClockModel.convertTimeToPosition(currentNanoTime);
+    // ALOGD("%s - estimatedReadCounter = %jd", __func__, estimatedReadCounter);
+    mAudioEndpoint->setDataReadCounter(estimatedReadCounter);
+}
+
 // Render audio in the application callback and then write the data to the stream.
 void *AudioStreamInternalPlay::callbackLoop() {
     ALOGD("%s() entering >>>>>>>>>>>>>>>", __func__);
@@ -916,31 +933,29 @@ void *AudioStreamInternalPlay::callbackLoop() {
             }
         }
         int64_t timeoutNanosForDataAvailableCB = 0;
+        int32_t callbackFrames = 0;
         if (mUseDataAvailableCallback) {
-            std::lock_guard _l(mStreamMutex);
+            android::audio_utils::unique_lock ul(mStreamMutex);
             mDrainingNanosValid = false;
-        }
-        {
-            std::lock_guard _endpointLock(mEndpointMutex);
-            // Call application using the AAudio callback interface.
-            if (mUseDataAvailableCallback) {
-                // For data available callback, it doesn't transfer any data. Instead,
-                // it signals a notification to client to call write for data transfer.
-                const int32_t emptyFrames = mAudioEndpoint->getEmptyFramesAvailable();
-                if (emptyFrames <= 0) {
-                    // No need to fire data callback. The DSP may just start or slowly read.
-                    // Wait for a burst to check if there is data available.
-                    android::audio_utils::unique_lock ul(mStreamMutex);
-                    mCallbackCV.wait_for(ul, std::chrono::nanoseconds(mNanosPerBurst));
-                    continue;
-                }
-                timeoutNanosForDataAvailableCB =
-                        emptyFrames * AAUDIO_NANOS_PER_SECOND / getSampleRate();
-                callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), emptyFrames);
-            } else {
-                callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), mCallbackFrames);
+            // For data available callback, it doesn't transfer any data. Instead,
+            // it signals a notification to client to call write for data transfer.
+            {
+                std::lock_guard _endpointLock(mEndpointMutex);
+                callbackFrames = mAudioEndpoint->getEmptyFramesAvailable();
             }
+            if (callbackFrames <= 0) {
+                // No need to fire data callback. The DSP may just start or slowly read.
+                // Wait for a burst to check if there is data available.
+                mCallbackCV.wait_for(ul, std::chrono::nanoseconds(mNanosPerBurst));
+                continue;
+            }
+            timeoutNanosForDataAvailableCB =
+                    callbackFrames * AAUDIO_NANOS_PER_SECOND / getSampleRate();
+        } else {
+            callbackFrames = mCallbackFrames;
         }
+        // Call application using the AAudio callback interface.
+        callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), callbackFrames);
 
         if (callbackResult < 0) {
             if (!shouldStopStream()) {

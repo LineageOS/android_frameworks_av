@@ -32,6 +32,7 @@
 #include <afutils/Vibrator.h>
 #include <android/media/BnMmapStream.h>
 #include <android/binder_to_string.h>
+#include <audio_utils/CommandThread.h>
 #include <audio_utils/MelProcessor.h>
 #include <audio_utils/Metadata.h>
 #include <audio_utils/Time.h>
@@ -2093,6 +2094,15 @@ audio_utils::CommandThread& ThreadBase::getAsyncCommandThread()
     return commandThread;
 }
 
+// static
+audio_utils::CommandThread& ThreadBase::getAsyncCallbackThread()
+{
+    [[clang::no_destroy]] static audio_utils::CommandThread commandThread(
+            "TB_AsyncCallback",
+            audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_AUDIO));
+    return commandThread;
+}
+
 void ThreadBase::asyncBroadcast(std::chrono::nanoseconds delay)
 {
     // Wake from a separate thread to avoid deadlock from the ThreadBase mutex.
@@ -3209,7 +3219,7 @@ void PlaybackThread::onCodecFormatChanged(
         const std::vector<uint8_t>& metadataBs)
 {
     const auto weakPointerThis = wp<PlaybackThread>::fromExisting(this);
-    std::thread([this, metadataBs, weakPointerThis]() {
+    getAsyncCallbackThread().add("onCodecFormatChanged", [this, metadataBs, weakPointerThis]() {
             const sp<PlaybackThread> playbackThread = weakPointerThis.promote();
             if (playbackThread == nullptr) {
                 ALOGW("PlaybackThread was destroyed, skip codec format change event");
@@ -3232,7 +3242,7 @@ void PlaybackThread::onCodecFormatChanged(
             for (const auto& callbackPair : mAudioTrackCallbacks) {
                 callbackPair.second->onCodecFormatChanged(metadataVec);
             }
-    }).detach();
+    });
 }
 
 void PlaybackThread::resetWriteBlocked(uint32_t sequence)

@@ -162,7 +162,6 @@ struct MediaCodec : public AHandler {
      *
      * It will return INVALID_OPERATION if:
      *  - HAL does not implement codec availability API
-     *  - codec_availability feature flag isn't defined.
      */
     static status_t getGloballyAvailableResources(std::vector<GlobalResourceInfo>& resources);
 
@@ -188,7 +187,6 @@ struct MediaCodec : public AHandler {
      * returning INVALID_OPERATION error code.
      * It will also return INVALID_OPERATION if:
      *  - HAL does not implement codec availability API
-     *  - codec_availability feature flag isn't defined.
      */
     status_t getRequiredResources(std::vector<InstanceResourceInfo>& resources);
 

@@ -32,6 +32,7 @@
 #include <android-base/errors.h>
 #include <android-base/stringprintf.h>
 #include <android/media/IAudioPolicyService.h>
+#include <audio_utils/CommandThread.h>
 #include <audiomanager/IAudioManager.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -282,14 +283,22 @@ class DevicesFactoryHalCallbackImpl : public DevicesFactoryHalCallback {
         // Start a detached thread to execute notification in parallel.
         // This is done to prevent mutual blocking of audio_flinger and
         // audio_policy services during system initialization.
-        std::thread notifier([]() {
+        AudioFlinger::getAsyncCallbackThread().add("onNewAudioModulesAvailable", []() {
             AudioSystem::onNewAudioModulesAvailable();
         });
-        notifier.detach();
     }
 };
 
 // ----------------------------------------------------------------------------
+
+// static
+audio_utils::CommandThread& AudioFlinger::getAsyncCallbackThread()
+{
+    [[clang::no_destroy]] static audio_utils::CommandThread commandThread(
+            "AF_AsyncCallback",
+            audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_AUDIO));
+    return commandThread;
+}
 
 void AudioFlinger::instantiate() {
     sp<IServiceManager> sm(defaultServiceManager());

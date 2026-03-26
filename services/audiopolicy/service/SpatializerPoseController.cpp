@@ -22,13 +22,18 @@
 
 #define LOG_TAG "SpatializerPoseController"
 //#define LOG_NDEBUG 0
+
+// go/keep-sorted start
 #include <audio_utils/mutex.h>
+#include <audio_utils/threads.h>
 #include <cutils/properties.h>
-#include <sensor/Sensor.h>
 #include <media/MediaMetricsItem.h>
 #include <media/QuaternionUtil.h>
+#include <sensor/Sensor.h>
 #include <utils/Log.h>
 #include <utils/SystemClock.h>
+#include <utils/ThreadDefs.h>
+// go/keep-sorted end
 
 namespace android {
 
@@ -128,6 +133,15 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
                                         // everything else because it runs a member
                                         // function that may use any member
                                         // of this class.
+          if (const status_t status = audio_utils::set_thread_name("SpatializerPoseController");
+                  status != OK) {
+              ALOGW("%s: set_thread_name failed with status %d", __func__, status);
+          }
+          if (const status_t status = audio_utils::set_thread_priority(
+                  audio_utils::nice_to_unified_priority(ANDROID_PRIORITY_URGENT_AUDIO));
+                  status != OK) {
+              ALOGW("%s: set_thread_priority failed with status %d", __func__, status);
+          }
           while (true) {
               Pose3f headToStage;
               std::optional<HeadTrackingMode> modeIfChanged;
