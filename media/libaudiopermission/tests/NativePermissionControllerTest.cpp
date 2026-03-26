@@ -42,11 +42,13 @@ class NativePermissionControllerTest : public ::testing::Test {
     NativePermissionController& controller_ = *holder_;
 };
 static UidPackageState::PackageState createPackageState(std::string packageName, int targetSdk = 34,
-                                                        bool isPlaybackCaptureAllowed = false) {
+                                                        bool isPlaybackCaptureAllowed = false,
+                                                        int pccId = -1) {
     UidPackageState::PackageState out{};
     out.packageName = std::move(packageName);
     out.targetSdk = targetSdk;
     out.isPlaybackCaptureAllowed = isPlaybackCaptureAllowed;
+    out.pccId = pccId;
     return out;
 }
 
@@ -190,6 +192,50 @@ TEST_F(NativePermissionControllerTest, validateUidPackagePair_UnknownUid) {
 
     EXPECT_THAT(controller_.validateUidPackagePair(12000, "any.package"),
                 IsErrorAnd(BinderStatusMatcher::hasException(EX_ILLEGAL_ARGUMENT)));
+}
+
+TEST_F(NativePermissionControllerTest, validateUidPackagePair_ValidPccUid) {
+    const std::vector<UidPackageState> input{
+            createState(10000,
+                        {createPackageState("com.example.app1", 34, false, /*pccId=*/30000)}),
+            createState(10001,
+                        {createPackageState("com.example.app2", 34, false, /*pccId=*/30001)}),
+    };
+
+    EXPECT_THAT(controller_.populatePackagesForUids(input), BinderStatusMatcher::isOk());
+
+    // Valid primary
+    EXPECT_THAT(controller_.validateUidPackagePair(10000, "com.example.app1"), IsOkAnd(IsTrue()));
+    // Valid pccUid with package name of owning app-id
+    EXPECT_THAT(controller_.validateUidPackagePair(30000, "com.example.app1"), IsOkAnd(IsTrue()));
+    // Invalid pccUid package
+    EXPECT_THAT(controller_.validateUidPackagePair(30000, "com.example.other"), IsOkAnd(IsFalse()));
+    // pccUid with package name not corresponding to owning app-id
+    EXPECT_THAT(controller_.validateUidPackagePair(30001, "com.example.app1"), IsOkAnd(IsFalse()));
+}
+
+TEST_F(NativePermissionControllerTest, validateUidPackagePair_UpdatePccUid) {
+    const std::vector<UidPackageState> input{
+            createState(10000,
+                        {createPackageState("com.example.app1", 34, false, /*pccId=*/30000)}),
+    };
+
+    EXPECT_THAT(controller_.populatePackagesForUids(input), BinderStatusMatcher::isOk());
+
+    // Valid pccUid matching primary package
+    EXPECT_THAT(controller_.validateUidPackagePair(30000, "com.example.app1"), IsOkAnd(IsTrue()));
+
+    // Update to change pccUid
+    UidPackageState newState = createState(
+            10000, {createPackageState("com.example.app1", 34, false, /*pccId=*/30001)});
+    EXPECT_THAT(controller_.updatePackagesForUid(newState), BinderStatusMatcher::isOk());
+
+    // Old pccUid is no longer valid
+    EXPECT_THAT(controller_.validateUidPackagePair(30000, "com.example.app1"),
+                IsErrorAnd(BinderStatusMatcher::hasException(EX_ILLEGAL_ARGUMENT)));
+
+    // New pccUid is valid
+    EXPECT_THAT(controller_.validateUidPackagePair(30001, "com.example.app1"), IsOkAnd(IsTrue()));
 }
 
 TEST_F(NativePermissionControllerTest, populatePermissionState_InvalidPermission) {
