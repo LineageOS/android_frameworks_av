@@ -48,24 +48,10 @@ flag {
 }
 
 flag {
-  name: "codec_availability"
-  namespace: "codec_fwk"
-  description: "Feature flag for codec availability HAL API support"
-  bug: "363282971"
-}
-
-flag {
   name: "codec_availability_metrics"
   namespace: "codec_fwk"
   description: "Feature flag for codec availability metrics collection"
   bug: "402463766"
-}
-
-flag {
-  name: "codec_availability_support"
-  namespace: "codec_fwk"
-  description: "Feature flag for codec availability HAL API implementation"
-  bug: "363282971"
 }
 
 flag {
