@@ -1827,7 +1827,8 @@ status_t AudioTrack::createTrack_l()
         }
     }
 
-    if (auto binder = defaultServiceManager()->checkService(String16("audio")); binder != nullptr) {
+    if (auto binder = defaultServiceManager()->checkService(String16("audio"));
+            binder != nullptr && mAttributes.usage == AUDIO_USAGE_ALARM) {
         // Barrier to ensure package/permission updates propagate to audioserver
         // Must be client-side
         interface_cast<IAudioManager>(binder)->getNativeInterface()->permissionUpdateBarrier(
