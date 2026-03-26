@@ -35,6 +35,13 @@ flag {
 }
 
 flag {
+    name: "ble_hearing_aid_device_impl"
+    namespace: "media_audio"
+    description: "Use new BLE_HEARING_AID device type"
+    bug: "370812132"
+}
+
+flag {
     name: "camera_shutter_sound"
     namespace: "media_audio"
     description: "Manage camera sound depending on locale and sim"
