@@ -160,6 +160,8 @@ private:
     // Full conversion method, may be slower than optimized variants above.
     aaudio_result_t writeNowWithConversionFull(const void* buffer, int32_t numFrames);
 
+    void updateReadCounter(int64_t currentNanoTime);
+
     bool shouldStopStream() EXCLUDES(mStreamMutex);
     void maybeCallPresentationEndCallback_l() REQUIRES(mStreamMutex);
 
