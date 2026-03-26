@@ -28,6 +28,8 @@
 #include "aidl/android/hardware/camera/device/BufferRequest.h"
 #include "aidl/android/hardware/camera/device/BufferRequestStatus.h"
 #include "aidl/android/hardware/camera/device/BufferStatus.h"
+#include "aidl/android/hardware/camera/device/CameraBlob.h"
+#include "aidl/android/hardware/camera/device/CameraBlobId.h"
 #include "aidl/android/hardware/camera/device/CaptureResult.h"
 #include "aidl/android/hardware/camera/device/NotifyMsg.h"
 #include "aidl/android/hardware/camera/device/StreamBuffer.h"
@@ -40,7 +42,6 @@
 namespace android {
 namespace companion {
 namespace virtualcamera {
-namespace {
 
 using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::hardware::camera::common::CameraDeviceStatus;
@@ -49,6 +50,8 @@ using ::aidl::android::hardware::camera::device::BnCameraDeviceCallback;
 using ::aidl::android::hardware::camera::device::BufferRequest;
 using ::aidl::android::hardware::camera::device::BufferRequestStatus;
 using ::aidl::android::hardware::camera::device::BufferStatus;
+using ::aidl::android::hardware::camera::device::CameraBlob;
+using ::aidl::android::hardware::camera::device::CameraBlobId;
 using ::aidl::android::hardware::camera::device::CaptureResult;
 using ::aidl::android::hardware::camera::device::ErrorCode;
 using ::aidl::android::hardware::camera::device::ErrorMsg;
@@ -112,11 +115,22 @@ class VirtualCameraRenderThreadTest : public ::testing::Test {
         /*reportedSensorSize*/ kInputResolution, mMockCameraDeviceCallback);
   }
 
+  int32_t findActualPayloadSize(const uint8_t* buffer, int32_t size,
+                                const Format format) {
+    VirtualCameraImagePassthroughHandler handler(*mSessionContext, format,
+                                                 nullptr, nullptr, nullptr);
+    return handler.findActualPayloadSize(buffer, size, format);
+  }
+
  protected:
   std::unique_ptr<VirtualCameraSessionContext> mSessionContext;
   std::unique_ptr<VirtualCameraRenderThread> mRenderThread;
   std::shared_ptr<MockCameraDeviceCallback> mMockCameraDeviceCallback;
 };
+
+namespace {
+
+using ::aidl::android::companion::virtualcamera::Format;
 
 TEST_F(VirtualCameraRenderThreadTest, FlushReturnsErrorForInFlightRequests) {
   const int frameNumber = 42;
@@ -220,6 +234,31 @@ TEST_F(VirtualCameraRenderThreadTest,
   handler->onFrameAvailable();
   EXPECT_EQ(frameReadyCallbackCount, 1);
   EXPECT_TRUE(handler->waitForInputFrame(std::chrono::milliseconds(10)));
+}
+
+TEST_F(VirtualCameraRenderThreadTest, findActualPayloadSizeWithHeicFooter) {
+  const int32_t totalSize = 1024;
+  const int32_t expectedPayloadSize = 750;
+  std::vector<uint8_t> buffer(totalSize, 0);
+
+  // Valid HEIC CameraBlob footer (0x00FE).
+  CameraBlob blob{.blobId = static_cast<CameraBlobId>(0x00FE),
+                  .blobSizeBytes = expectedPayloadSize};
+  memcpy(buffer.data() + totalSize - sizeof(CameraBlob), &blob,
+         sizeof(CameraBlob));
+
+  EXPECT_EQ(findActualPayloadSize(buffer.data(), totalSize, Format::HEIC),
+            expectedPayloadSize);
+}
+
+TEST_F(VirtualCameraRenderThreadTest,
+       findActualPayloadSizeMissingFooterReturnsFullSize) {
+  const int32_t totalSize = 1024;
+  std::vector<uint8_t> buffer(totalSize, 0xCC);
+
+  // No footer present.
+  EXPECT_EQ(findActualPayloadSize(buffer.data(), totalSize, Format::HEIC),
+            totalSize);
 }
 
 }  // namespace
