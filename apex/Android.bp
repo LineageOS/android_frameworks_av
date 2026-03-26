@@ -69,7 +69,7 @@ apex_defaults {
         "media-linker-config",
     ] + select(release_flag("RELEASE_MEDIAMETRICS_MODULE"), {
         true: [
-            "com.android.media-mediametrics-apex.37rc",
+            "com.android.media-mediametrics.37rc",
         ],
         default: [],
     }),
