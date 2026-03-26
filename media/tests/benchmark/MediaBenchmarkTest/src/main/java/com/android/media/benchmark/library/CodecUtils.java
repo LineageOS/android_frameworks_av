@@ -4,6 +4,7 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.os.Build;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -78,6 +79,32 @@ public class CodecUtils {
         }
         return null;
     }
+
+    /**
+     * Returns a codec that matches the given mime and software/hardware type, without checking
+     * specific capabilities or format support.
+     *
+     * @param mime Mime type of the codec.
+     * @param isSoftware Specifies if this is a software / hardware decoder/encoder.
+     * @param isEncoder Specifies if the request is for encoders or not.
+     * @return name of the codec.
+     */
+    public static String getMediaCodec(String mime, boolean isSoftware, boolean isEncoder) {
+        MediaCodecList mcl = new MediaCodecList(MediaCodecList.ALL_CODECS);
+        MediaCodecInfo[] codecInfos = mcl.getCodecInfos();
+        for (MediaCodecInfo codecInfo : codecInfos) {
+            if (codecInfo.isEncoder() != isEncoder) continue;
+            if (isSoftware != codecInfo.isSoftwareOnly()) continue;
+            String[] types = codecInfo.getSupportedTypes();
+            for (String type : types) {
+                if (type.equalsIgnoreCase(mime)) {
+                    return codecInfo.getName();
+                }
+            }
+        }
+        return null;
+    }
+
     /**
      * Returns compression ratio for a given mediaType.
      * @param mediaType mime type for which compression ratio is to be returned.
