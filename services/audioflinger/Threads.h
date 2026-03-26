@@ -559,10 +559,8 @@ public:
     void onEffectEnable(const sp<IAfEffectModule>& effect) final EXCLUDES_ThreadBase_Mutex;
     void onEffectDisable(const sp<IAfEffectModule>& effect) final EXCLUDES_ThreadBase_Mutex;
 
-    void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override
-            REQUIRES(audio_utils::AudioFlinger_Mutex);
-    void stopMelComputation_l() override
-            REQUIRES(audio_utils::AudioFlinger_Mutex);
+    void asyncStartMelComputation(const sp<audio_utils::MelProcessor>& processor) final;
+    void asyncStopMelComputation() final;
 
     audio_utils::DeferredExecutor& getThreadloopExecutor() override {
         return mThreadloopExecutor;
@@ -653,6 +651,12 @@ protected:
             REQUIRES(mutex(), ThreadBase_ThreadLoop) {
                                 return INVALID_OPERATION;
                             }
+
+    // Safe to call without locks as it only interacts with atomic or internally locked members.
+    virtual void startMelComputation(const sp<audio_utils::MelProcessor>& processor)
+            EXCLUDES_ThreadBase_Mutex;
+    virtual void stopMelComputation() EXCLUDES_ThreadBase_Mutex;
+
 public:
 // TODO(b/291317898) organize with publics
    product_strategy_t getStrategyForStream(audio_stream_type_t stream, uid_t uid) const;
@@ -1332,11 +1336,6 @@ public:
                     return INVALID_OPERATION;
                 }
 
-    void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) override
-            REQUIRES(audio_utils::AudioFlinger_Mutex);
-    void stopMelComputation_l() override
-            REQUIRES(audio_utils::AudioFlinger_Mutex);
-
     void setStandby() final EXCLUDES_ThreadBase_Mutex {
         audio_utils::lock_guard _l(mutex());
                     setStandby_l();
@@ -1378,6 +1377,10 @@ public:
     }
 
 protected:
+    void startMelComputation(const sp<audio_utils::MelProcessor>& processor) override
+            EXCLUDES_ThreadBase_Mutex;
+    void stopMelComputation() override EXCLUDES_ThreadBase_Mutex;
+
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
 
@@ -2504,11 +2507,6 @@ public:
     status_t getPlaybackParameters(media::audio::common::AudioPlaybackRate* rate)
             final EXCLUDES_ThreadBase_Mutex;
 
-    void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor) final
-            REQUIRES(audio_utils::AudioFlinger_Mutex);
-    void stopMelComputation_l() final
-            REQUIRES(audio_utils::AudioFlinger_Mutex);
-
     sp<VolumeInterface> asVolumeInterface() final {
        return static_cast<VolumeInterface*>(this);
     }
@@ -2516,6 +2514,10 @@ public:
     void onWakeUp();
 
 protected:
+    void startMelComputation(const sp<audio_utils::MelProcessor>& processor) override
+            EXCLUDES_ThreadBase_Mutex;
+    void stopMelComputation() override EXCLUDES_ThreadBase_Mutex;
+
     void dumpInternals_l(int fd, const Vector<String16>& args) final REQUIRES(mutex());
 
     audio_stream_type_t mStreamType GUARDED_BY(mutex());

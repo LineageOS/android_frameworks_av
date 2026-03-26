@@ -2191,16 +2191,34 @@ product_strategy_t ThreadBase::getStrategyForStream(audio_stream_type_t stream, 
     return AudioSystem::getStrategyForStream(stream, uid);
 }
 
-// startMelComputation_l() must be called with AudioFlinger::mutex() held
-void ThreadBase::startMelComputation_l(
+void ThreadBase::asyncStartMelComputation(const sp<audio_utils::MelProcessor>& processor)
+{
+    getAsyncCommandThread().add(std::string("asyncStartMelComputation-").append(mThreadName),
+            [processor, wpThis = wp<ThreadBase>::fromExisting(this)] {
+        if (auto thread = wpThis.promote()) {
+            thread->startMelComputation(processor);
+        }
+    });
+}
+
+void ThreadBase::asyncStopMelComputation()
+{
+    getAsyncCommandThread().add(std::string("asyncStopMelComputation-").append(mThreadName),
+            [wpThis = wp<ThreadBase>::fromExisting(this)] {
+        if (auto thread = wpThis.promote()) {
+            thread->stopMelComputation();
+        }
+    });
+}
+
+void ThreadBase::startMelComputation(
         const sp<audio_utils::MelProcessor>& /*processor*/)
 {
     // Do nothing
     ALOGW("%s: ThreadBase does not support CSD", __func__);
 }
 
-// stopMelComputation_l() must be called with AudioFlinger::mutex() held
-void ThreadBase::stopMelComputation_l()
+void ThreadBase::stopMelComputation()
 {
     // Do nothing
     ALOGW("%s: ThreadBase does not support CSD", __func__);
@@ -3709,8 +3727,7 @@ ssize_t PlaybackThread::threadLoop_write()
     return bytesWritten;
 }
 
-// startMelComputation_l() must be called with AudioFlinger::mutex() held
-void PlaybackThread::startMelComputation_l(
+void PlaybackThread::startMelComputation(
         const sp<audio_utils::MelProcessor>& processor)
 {
     auto outputSink = static_cast<AudioStreamOutSink*>(mOutputSink.get());
@@ -3719,8 +3736,7 @@ void PlaybackThread::startMelComputation_l(
     }
 }
 
-// stopMelComputation_l() must be called with AudioFlinger::mutex() held
-void PlaybackThread::stopMelComputation_l()
+void PlaybackThread::stopMelComputation()
 {
     auto outputSink = static_cast<AudioStreamOutSink*>(mOutputSink.get());
     if (outputSink != nullptr) {
@@ -11801,8 +11817,7 @@ status_t MmapPlaybackThread::getPlaybackParameters(media::audio::common::AudioPl
     return NO_ERROR;
 }
 
-// startMelComputation_l() must be called with AudioFlinger::mutex() held
-void MmapPlaybackThread::startMelComputation_l(
+void MmapPlaybackThread::startMelComputation(
         const sp<audio_utils::MelProcessor>& processor)
 {
     ALOGV("%s(%d): SoundDose starting mel processor %s", __func__, id(),
@@ -11823,8 +11838,7 @@ void MmapPlaybackThread::startMelComputation_l(
     // assigned constant for each thread
 }
 
-// stopMelComputation_l() must be called with AudioFlinger::mutex() held
-void MmapPlaybackThread::stopMelComputation_l()
+void MmapPlaybackThread::stopMelComputation()
 {
     ALOGV("%s(%d): SoundDose pausing mel processor", __func__, id());
     if (auto melProcessor = mMelProcessor.load()) {
