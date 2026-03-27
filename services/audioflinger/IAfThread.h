@@ -394,10 +394,8 @@ public:
 
     virtual bool isStreamInitialized_l() const REQUIRES(mutex()) = 0;
     virtual bool isStreamInitialized() const EXCLUDES_ThreadBase_Mutex = 0;
-    virtual void startMelComputation_l(const sp<audio_utils::MelProcessor>& processor)
-            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
-    virtual void stopMelComputation_l()
-            REQUIRES(audio_utils::AudioFlinger_Mutex) = 0;
+    virtual void asyncStartMelComputation(const sp<audio_utils::MelProcessor>& processor) = 0;
+    virtual void asyncStopMelComputation() = 0;
 
     virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream, uid_t uid) const
             EXCLUDES_AUDIO_ALL = 0;

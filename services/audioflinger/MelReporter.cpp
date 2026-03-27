@@ -168,7 +168,6 @@ void MelReporter::onCreateAudioPatch(audio_patch_handle_t handle,
 }
 
 void MelReporter::startMelComputationForActivePatch_l(const ActiveMelPatch& patch)
-NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
 {
     auto outputThread = mAfMelReporterCallback->checkOutputThread_l(patch.streamHandle);
     if (outputThread == nullptr) {
@@ -182,14 +181,14 @@ NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
             ALOGI("%s add stream %d that uses device %d for CSD, nr of streams: %d", __func__,
                   patch.streamHandle, device.first, mActiveDevices[device.first]);
 
-            if (outputThread != nullptr && !useHalSoundDoseInterface_l()) {
-                outputThread->startMelComputation_l(
-                        mSoundDoseManager->getOrCreateProcessorForDevice(
-                                device.first,
-                                patch.streamHandle,
-                                outputThread->sampleRate(),
-                                outputThread->channelCount(),
-                                outputThread->format()));
+            if (!useHalSoundDoseInterface_l()) {
+                auto melProcessor = mSoundDoseManager->getOrCreateProcessorForDevice(
+                        device.first,
+                        patch.streamHandle,
+                        outputThread->sampleRate(),
+                        outputThread->channelCount(),
+                        outputThread->format());
+                outputThread->asyncStartMelComputation(melProcessor);
             }
         }
     }
@@ -268,7 +267,6 @@ void MelReporter::stopInternalMelComputation() {
 }
 
 void MelReporter::stopMelComputationForPatch_l(const ActiveMelPatch& patch)
-NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
 {
     auto outputThread = mAfMelReporterCallback->checkOutputThread_l(patch.streamHandle);
 
@@ -286,7 +284,7 @@ NO_THREAD_SAFETY_ANALYSIS  // access of AudioFlinger::checkOutputThread_l
 
     mSoundDoseManager->removeStreamProcessor(patch.streamHandle);
     if (outputThread != nullptr && !useHalSoundDoseInterface_l()) {
-        outputThread->stopMelComputation_l();
+        outputThread->asyncStopMelComputation();
     }
 }
 
