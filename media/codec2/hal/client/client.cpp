@@ -3624,12 +3624,8 @@ c2_status_t Codec2Client::Component::stop() {
 
 c2_status_t Codec2Client::Component::reset() {
     if (mApexBase) {
-        mApexHandler->stop();
-        if (__builtin_available(android 36, *)) {
-            return (c2_status_t)ApexCodec_Component_reset(mApexBase);
-        } else {
-            return C2_OMITTED;
-        }
+        // ApexHandler::stop() resets the underlying component
+        return mApexHandler->stop();
     }
     if (mAidlBase) {
         ::ndk::ScopedAStatus transStatus = mAidlBase->reset();
@@ -3650,12 +3646,8 @@ c2_status_t Codec2Client::Component::reset() {
 
 c2_status_t Codec2Client::Component::release() {
     if (mApexBase) {
-        mApexHandler->stop();
-        if (__builtin_available(android 36, *)) {
-            return (c2_status_t)ApexCodec_Component_reset(mApexBase);
-        } else {
-            return C2_OMITTED;
-        }
+        // ApexHandler::stop() resets the underlying component
+        return mApexHandler->stop();
     }
     if (mAidlBase) {
         std::shared_ptr<AidlGraphicBufferAllocator> gba =
