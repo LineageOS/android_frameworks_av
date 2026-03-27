@@ -33,38 +33,15 @@
 using namespace android;
 
 TEST(AudioHealthTest, AttachedDeviceFound) {
-    unsigned int numPorts;
-    unsigned int generation1;
     unsigned int generation;
-    struct audio_port_v7 *audioPorts = nullptr;
-    int attempts = 10;
-    do {
-        if (attempts-- < 0) {
-            free(audioPorts);
-            GTEST_FAIL() << "Query audio ports time out";
-        }
-        numPorts = 0;
-        ASSERT_EQ(NO_ERROR, AudioSystem::listAudioPorts(
-                AUDIO_PORT_ROLE_NONE, AUDIO_PORT_TYPE_DEVICE, &numPorts, nullptr, &generation1));
-        if (numPorts == 0) {
-            free(audioPorts);
-            GTEST_FAIL() << "Number of audio ports should not be zero";
-        }
+    std::vector<audio_port_v7> audioPorts;
+    ASSERT_EQ(NO_ERROR, AudioSystem::listAudioPorts(
+            AUDIO_PORT_ROLE_NONE, AUDIO_PORT_TYPE_DEVICE, audioPorts, &generation));
 
-        audioPorts = (struct audio_port_v7 *)realloc(
-                audioPorts, numPorts * sizeof(struct audio_port_v7));
-        status_t status = AudioSystem::listAudioPorts(
-                AUDIO_PORT_ROLE_NONE, AUDIO_PORT_TYPE_DEVICE, &numPorts, audioPorts, &generation);
-        if (status != NO_ERROR) {
-            free(audioPorts);
-            GTEST_FAIL() << "Query audio ports failed";
-        }
-    } while (generation1 != generation);
     std::unordered_set<audio_devices_t> attachedDevices;
-    for (int i = 0 ; i < numPorts; i++) {
-        attachedDevices.insert(audioPorts[i].ext.device.type);
+    for (const auto& port : audioPorts) {
+        attachedDevices.insert(port.ext.device.type);
     }
-    free(audioPorts);
 
     auto config = AudioPolicyConfig::loadFromApmXmlConfigWithFallback();
     ASSERT_NE(AudioPolicyConfig::kDefaultConfigSource, config->getSource());

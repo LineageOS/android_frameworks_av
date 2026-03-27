@@ -1859,20 +1859,15 @@ void anonymizePortBluetoothAddress(Port& port) {
 }
 
 Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
-                                          media::AudioPortType typeAidl, Int* count,
+                                          media::AudioPortType typeAidl,
                                           std::vector<media::AudioPortFw>* portsAidl,
                                           int32_t* _aidl_return) {
     audio_port_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPortRole_audio_port_role_t(roleAidl));
     audio_port_type_t type = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioPortType_audio_port_type_t(typeAidl));
-    unsigned int num_ports = VALUE_OR_RETURN_BINDER_STATUS(
-            convertIntegral<unsigned int>(count->value));
-    if (num_ports > MAX_ITEMS_PER_LIST) {
-        num_ports = MAX_ITEMS_PER_LIST;
-    }
-    unsigned int numPortsReq = num_ports;
-    std::unique_ptr<audio_port_v7[]> ports(new audio_port_v7[num_ports]);
+
+    std::vector<audio_port_v7> ports;
     unsigned int generation;
 
     const AttributionSourceState attributionSource = getCallingAttributionSource();
@@ -1886,20 +1881,18 @@ Status AudioPolicyService::listAudioPorts(media::AudioPortRole roleAidl,
         // so it is safe to access after releasing the mutex
         RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
                 mAudioPolicyManager->listAudioPorts(
-                        role, type, &num_ports, ports.get(), &generation)));
-        numPortsReq = std::min(numPortsReq, num_ports);
+                        role, type, ports, &generation)));
     }
 
     if (mustAnonymizeBluetoothAddress(attributionSource, getPermissionProvider())) {
-        for (size_t i = 0; i < numPortsReq; ++i) {
-            anonymizePortBluetoothAddress(ports[i]);
+        for (auto& port : ports) {
+            anonymizePortBluetoothAddress(port);
         }
     }
 
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-            convertRange(ports.get(), ports.get() + numPortsReq, std::back_inserter(*portsAidl),
+            convertRange(ports.begin(), ports.end(), std::back_inserter(*portsAidl),
                          legacy2aidl_audio_port_v7_AudioPortFw)));
-    count->value = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int32_t>(num_ports));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int32_t>(generation));
     return Status::ok();
 }
@@ -1981,16 +1974,9 @@ Status AudioPolicyService::releaseAudioPatch(int32_t handleAidl)
                                                    IPCThreadState::self()->getCallingUid()));
 }
 
-Status AudioPolicyService::listAudioPatches(Int* count,
-                                            std::vector<media::AudioPatchFw>* patchesAidl,
+Status AudioPolicyService::listAudioPatches(std::vector<media::AudioPatchFw>* patchesAidl,
                                             int32_t* _aidl_return) {
-    unsigned int num_patches = VALUE_OR_RETURN_BINDER_STATUS(
-            convertIntegral<unsigned int>(count->value));
-    if (num_patches > MAX_ITEMS_PER_LIST) {
-        num_patches = MAX_ITEMS_PER_LIST;
-    }
-    unsigned int numPatchesReq = num_patches;
-    std::unique_ptr<audio_patch[]> patches(new audio_patch[num_patches]);
+    std::vector<audio_patch> patches;
     unsigned int generation;
 
     const AttributionSourceState attributionSource = getCallingAttributionSource();
@@ -2004,25 +1990,23 @@ Status AudioPolicyService::listAudioPatches(Int* count,
         // AudioPolicyManager->listAudioPatches makes a deep copy of patches structs into patches
         // so it is safe to access after releasing the mutex
         RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-                mAudioPolicyManager->listAudioPatches(&num_patches, patches.get(), &generation)));
-        numPatchesReq = std::min(numPatchesReq, num_patches);
+                mAudioPolicyManager->listAudioPatches(patches, &generation)));
     }
 
     if (mustAnonymizeBluetoothAddress(attributionSource, getPermissionProvider())) {
-        for (size_t i = 0; i < numPatchesReq; ++i) {
-            for (size_t j = 0; j < patches[i].num_sources; ++j) {
-                anonymizePortBluetoothAddress(patches[i].sources[j]);
+        for (auto& patch : patches) {
+            for (size_t j = 0; j < patch.num_sources; ++j) {
+                anonymizePortBluetoothAddress(patch.sources[j]);
             }
-            for (size_t j = 0; j < patches[i].num_sinks; ++j) {
-                anonymizePortBluetoothAddress(patches[i].sinks[j]);
+            for (size_t j = 0; j < patch.num_sinks; ++j) {
+                anonymizePortBluetoothAddress(patch.sinks[j]);
             }
         }
     }
 
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
-            convertRange(patches.get(), patches.get() + numPatchesReq,
+            convertRange(patches.begin(), patches.end(),
                          std::back_inserter(*patchesAidl), legacy2aidl_audio_patch_AudioPatchFw)));
-    count->value = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int32_t>(num_patches));
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<int32_t>(generation));
     return Status::ok();
 }

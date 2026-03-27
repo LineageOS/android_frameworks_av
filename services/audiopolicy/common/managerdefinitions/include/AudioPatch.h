@@ -58,7 +58,7 @@ public:
 
     status_t removeAudioPatch(audio_patch_handle_t handle);
 
-    status_t listAudioPatches(unsigned int *num_patches, struct audio_patch *patches) const;
+    status_t listAudioPatches(std::vector<audio_patch>& patches) const;
 
     void dump(String8 *dst) const;
 };
