@@ -537,7 +537,7 @@ public:
                 const audio_attributes_t& attr,
                 uid_t uid,
                 audio_output_flags_t flags,
-                media::audio::common::FlushFromFrameSupport* support) const override;
+                media::audio::common::FlushFromFrameSupport* support) override;
 
         status_t useMmapForPcmOffload(bool* result) override;
 
