@@ -27,6 +27,7 @@
 #include <sys/select.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -51,6 +52,7 @@ namespace {
 using ::aidl::android::companion::virtualcamera::Format;
 using ::aidl::android::hardware::camera::common::Status;
 using ::aidl::android::hardware::camera::device::CameraBlob;
+using ::aidl::android::hardware::camera::device::CameraBlobId;
 using ::aidl::android::hardware::camera::device::Stream;
 
 using ScopedAImageReader =
@@ -58,7 +60,6 @@ using ScopedAImageReader =
                     CustomDeleter<AImageReader, AImageReader_delete>>;
 using ScopedAImage =
     std::unique_ptr<AImage, CustomDeleter<AImage, AImage_delete>>;
-
 constexpr int kHardwareBufferUsageFlags = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN |
                                           AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN;
 constexpr int kImageFrameCount = 10;
@@ -293,27 +294,68 @@ ndk::ScopedAStatus VirtualCameraImagePassthroughHandler::fillOutputBuffer(
     return cameraStatus(Status::INTERNAL_ERROR);
   }
 
-  if (outBufferSize < inputBufferSize) {
+  // Determine the actual payload size by checking for an official HAL footer.
+  int32_t payloadSize =
+      findActualPayloadSize(inputBuffer, inputBufferSize, mImageFormat);
+
+  if (outBufferSize < payloadSize) {
     ALOGW(
         "%s: BLOB input consumed from surface is larger (%d bytes) than output "
         "buffer size (%d bytes)",
-        __func__, inputBufferSize, outBufferSize);
+        __func__, payloadSize, outBufferSize);
   }
 
-  size_t bufferSize =
-      (outBufferSize < inputBufferSize) ? outBufferSize : inputBufferSize;
+  size_t copySize = std::min(static_cast<int32_t>(outBufferSize), payloadSize);
 
   // Write BLOB payload to beginning of output buffer
-  memcpy(outBuffer, inputBuffer, bufferSize);
+  memcpy(outBuffer, inputBuffer, copySize);
 
   // TODO(b/457285222): add BLOB footer to output buffer once ByteBuffer bug is
   // resolved. Note that the footer is an optional optimization so it is
   // acceptable to omit.
 
   ALOGV("%s: Successfully transferred BLOB payload, format=0x%x, size=%d",
-        __func__, mImageFormat, inputBufferSize);
+        __func__, mImageFormat, payloadSize);
 
   return ndk::ScopedAStatus::ok();
+}
+
+int32_t VirtualCameraImagePassthroughHandler::findActualPayloadSize(
+    const uint8_t* buffer, int32_t size, const Format format) const {
+  // Supported CameraBlob IDs for blob transport headers.
+  // JPEG and JPEG_APP_SEGMENTS are defined in CameraBlobId.aidl.
+  // HEIC and HEIC_CLEAR_ON_RELEASE are used for HEIC streams but are not yet
+  // included in the CameraBlobId AIDL enum.
+  // HEIC (0x00FE) is consistent with libcameraservice/api2/HeicCompositeStream.cpp.
+  // HEIC_CLEAR_ON_RELEASE (0x00FD) is used by some JNI users to indicate
+  // that the footer should be cleared upon image release.
+  static constexpr CameraBlobId kCameraBlobIdJpeg = CameraBlobId::JPEG;
+  static constexpr CameraBlobId kCameraBlobIdJpegAppSegments =
+      CameraBlobId::JPEG_APP_SEGMENTS;
+  static constexpr CameraBlobId kCameraBlobIdHeic =
+      static_cast<CameraBlobId>(0x00FE);
+  static constexpr CameraBlobId kCameraBlobIdHeicClearOnRelease =
+      static_cast<CameraBlobId>(0x00FD);
+
+  if ((format == Format::JPEG || format == Format::HEIC) &&
+      size >= static_cast<int32_t>(sizeof(CameraBlob))) {
+    const CameraBlob* blob =
+        reinterpret_cast<const CameraBlob*>(buffer + size - sizeof(CameraBlob));
+    if (blob->blobId == kCameraBlobIdJpeg ||
+        blob->blobId == kCameraBlobIdJpegAppSegments ||
+        blob->blobId == kCameraBlobIdHeic ||
+        blob->blobId == kCameraBlobIdHeicClearOnRelease) {
+      ALOGV("%s: Found CameraBlob footer. ID=0x%x, size=%d", __func__,
+            static_cast<int>(blob->blobId), blob->blobSizeBytes);
+      return blob->blobSizeBytes;
+    }
+  }
+
+  ALOGE(
+      "%s: CameraBlob footer NOT found or invalid. Defaulting to full buffer "
+      "size (%d)",
+      __func__, size);
+  return size;
 }
 
 void VirtualCameraImagePassthroughHandler::onFrameAvailable() {
