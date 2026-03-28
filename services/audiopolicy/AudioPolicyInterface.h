@@ -344,10 +344,9 @@ public:
                                          const audio_attributes_t& attributes) = 0;
 
     virtual status_t listAudioPorts(audio_port_role_t role,
-                                    audio_port_type_t type,
-                                    unsigned int *num_ports,
-                                    struct audio_port_v7 *ports,
-                                    unsigned int *generation) = 0;
+                                            audio_port_type_t type,
+                                            std::vector<audio_port_v7>& ports,
+                                            unsigned int *generation) = 0;
     virtual status_t listDeclaredDevicePorts(media::AudioPortRole role,
                                              std::vector<media::AudioPortFw>* result) = 0;
     virtual status_t getAudioPort(struct audio_port_v7 *port) = 0;
@@ -356,8 +355,7 @@ public:
                                        uid_t uid) = 0;
     virtual status_t releaseAudioPatch(audio_patch_handle_t handle,
                                           uid_t uid) = 0;
-    virtual status_t listAudioPatches(unsigned int *num_patches,
-                                      struct audio_patch *patches,
+    virtual status_t listAudioPatches(std::vector<audio_patch>& patches,
                                       unsigned int *generation) = 0;
     virtual status_t setAudioPortConfig(const struct audio_port_config *config) = 0;
     virtual void releaseResourcesForUid(uid_t uid) = 0;

@@ -5541,22 +5541,14 @@ status_t AudioPolicyManager::clearPreferredMixerAttributes(const audio_attribute
 
 status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
                                             audio_port_type_t type,
-                                            unsigned int *num_ports,
-                                            struct audio_port_v7 *ports,
+                                            std::vector<audio_port_v7>& ports,
                                             unsigned int *generation)
 {
-    if (num_ports == nullptr || (*num_ports != 0 && ports == nullptr) ||
-            generation == nullptr) {
+    if (generation == nullptr) {
         return BAD_VALUE;
     }
-    ALOGVV("listAudioPorts() role %d type %d num_ports %d ports %p", role, type, *num_ports, ports);
-    if (ports == nullptr) {
-        *num_ports = 0;
-    }
-
-    size_t portsWritten = 0;
-    size_t portsMax = *num_ports;
-    *num_ports = 0;
+    ALOGVV("listAudioPorts() role %d type %d", role, type);
+    ports.clear();
     if (type == AUDIO_PORT_TYPE_NONE || type == AUDIO_PORT_TYPE_DEVICE) {
         // do not report devices with type AUDIO_DEVICE_IN_STUB or AUDIO_DEVICE_OUT_STUB
         // as they are used by stub HALs by convention
@@ -5565,10 +5557,8 @@ status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
                 if (dev->type() == AUDIO_DEVICE_OUT_STUB) {
                     continue;
                 }
-                if (portsWritten < portsMax) {
-                    dev->toAudioPort(&ports[portsWritten++]);
-                }
-                (*num_ports)++;
+                ports.push_back(audio_port_v7{});
+                dev->toAudioPort(&ports.back());
             }
         }
         if (role == AUDIO_PORT_ROLE_SOURCE || role == AUDIO_PORT_ROLE_NONE) {
@@ -5576,36 +5566,32 @@ status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
                 if (dev->type() == AUDIO_DEVICE_IN_STUB) {
                     continue;
                 }
-                if (portsWritten < portsMax) {
-                    dev->toAudioPort(&ports[portsWritten++]);
-                }
-                (*num_ports)++;
+                ports.push_back(audio_port_v7{});
+                dev->toAudioPort(&ports.back());
             }
         }
     }
     if (type == AUDIO_PORT_TYPE_NONE || type == AUDIO_PORT_TYPE_MIX) {
         if (role == AUDIO_PORT_ROLE_SINK || role == AUDIO_PORT_ROLE_NONE) {
-            for (size_t i = 0; i < mInputs.size() && portsWritten < portsMax; i++) {
-                mInputs[i]->toAudioPort(&ports[portsWritten++]);
+            for (size_t i = 0; i < mInputs.size(); i++) {
+                audio_port_v7 port;
+                mInputs[i]->toAudioPort(&port);
+                ports.push_back(port);
             }
-            *num_ports += mInputs.size();
         }
         if (role == AUDIO_PORT_ROLE_SOURCE || role == AUDIO_PORT_ROLE_NONE) {
-            size_t numOutputs = 0;
             for (size_t i = 0; i < mOutputs.size(); i++) {
                 if (!mOutputs[i]->isDuplicated()) {
-                    numOutputs++;
-                    if (portsWritten < portsMax) {
-                        mOutputs[i]->toAudioPort(&ports[portsWritten++]);
-                    }
+                    audio_port_v7 port;
+                    mOutputs[i]->toAudioPort(&port);
+                    ports.push_back(port);
                 }
             }
-            *num_ports += numOutputs;
         }
     }
 
     *generation = curAudioPortGeneration();
-    ALOGVV("listAudioPorts() got %zu ports needed %d", portsWritten, *num_ports);
+    ALOGVV("%s got %zu ports generation %u", __func__, ports.size(), *generation);
     return NO_ERROR;
 }
 
@@ -6186,15 +6172,16 @@ status_t AudioPolicyManager::releaseAudioPatchInternal(audio_patch_handle_t hand
     return NO_ERROR;
 }
 
-status_t AudioPolicyManager::listAudioPatches(unsigned int *num_patches,
-                                              struct audio_patch *patches,
+status_t AudioPolicyManager::listAudioPatches(std::vector<struct audio_patch>& patches,
                                               unsigned int *generation)
 {
-    if (generation == NULL) {
+    if (generation == nullptr) {
         return BAD_VALUE;
     }
     *generation = curAudioPortGeneration();
-    return mAudioPatches.listAudioPatches(num_patches, patches);
+    status_t status = mAudioPatches.listAudioPatches(patches);
+    ALOGVV("%s num patches %zu, generation %u", __func__, patches.size(), *generation);
+    return status;
 }
 
 status_t AudioPolicyManager::setAudioPortConfig(const struct audio_port_config *config)

@@ -1894,11 +1894,9 @@ audio_offload_mode_t AudioSystem::getOffloadSupport(const audio_offload_info_t& 
 
 status_t AudioSystem::listAudioPorts(audio_port_role_t role,
                                      audio_port_type_t type,
-                                     unsigned int* num_ports,
-                                     struct audio_port_v7* ports,
+                                     std::vector<audio_port_v7>& ports,
                                      unsigned int* generation) {
-    if (num_ports == nullptr || (*num_ports != 0 && ports == nullptr) ||
-        generation == nullptr) {
+    if (generation == nullptr) {
         return BAD_VALUE;
     }
 
@@ -1909,16 +1907,14 @@ status_t AudioSystem::listAudioPorts(audio_port_role_t role,
             legacy2aidl_audio_port_role_t_AudioPortRole(role));
     media::AudioPortType typeAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_port_type_t_AudioPortType(type));
-    Int numPortsAidl;
-    numPortsAidl.value = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*num_ports));
     std::vector<media::AudioPortFw> portsAidl;
     int32_t generationAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->listAudioPorts(roleAidl, typeAidl, &numPortsAidl, &portsAidl, &generationAidl)));
-    *num_ports = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(numPortsAidl.value));
+            aps->listAudioPorts(roleAidl, typeAidl, &portsAidl, &generationAidl)));
     *generation = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(generationAidl));
-    RETURN_STATUS_IF_ERROR(convertRange(portsAidl.begin(), portsAidl.end(), ports,
+    RETURN_STATUS_IF_ERROR(convertRange(portsAidl.begin(), portsAidl.end(),
+                                        std::back_inserter(ports),
                                         aidl2legacy_AudioPortFw_audio_port_v7));
     return OK;
 }
@@ -1972,11 +1968,9 @@ status_t AudioSystem::releaseAudioPatch(audio_patch_handle_t handle) {
     return statusTFromBinderStatus(aps->releaseAudioPatch(handleAidl));
 }
 
-status_t AudioSystem::listAudioPatches(unsigned int* num_patches,
-                                       struct audio_patch* patches,
+status_t AudioSystem::listAudioPatches(std::vector<audio_patch>& patches,
                                        unsigned int* generation) {
-    if (num_patches == nullptr || (*num_patches != 0 && patches == nullptr) ||
-        generation == nullptr) {
+    if (generation == nullptr) {
         return BAD_VALUE;
     }
 
@@ -1984,16 +1978,13 @@ status_t AudioSystem::listAudioPatches(unsigned int* num_patches,
     if (aps == nullptr) return AudioPolicyServiceTraits::getError();
 
 
-    Int numPatchesAidl;
-    numPatchesAidl.value = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*num_patches));
     std::vector<media::AudioPatchFw> patchesAidl;
     int32_t generationAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->listAudioPatches(&numPatchesAidl, &patchesAidl, &generationAidl)));
-    *num_patches = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(numPatchesAidl.value));
+            aps->listAudioPatches(&patchesAidl, &generationAidl)));
     *generation = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(generationAidl));
-    RETURN_STATUS_IF_ERROR(convertRange(patchesAidl.begin(), patchesAidl.end(), patches,
+    RETURN_STATUS_IF_ERROR(convertRange(patchesAidl.begin(), patchesAidl.end(), std::back_inserter(patches),
                                         aidl2legacy_AudioPatchFw_audio_patch));
     return OK;
 }

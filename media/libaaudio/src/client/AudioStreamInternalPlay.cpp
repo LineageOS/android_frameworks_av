@@ -703,7 +703,8 @@ void AudioStreamInternalPlay::wakeupCallbackThread_l() {
     }
     mOffloadEosPending = false;
     mDraining = false;
-    mDrainingNanosValid = false;
+    mDrainingNanos = 0;
+    mNeedCallbackWakeup = true;
     mStreamEndCV.notify_one();
     mCallbackCV.notify_all();
 }
@@ -781,7 +782,6 @@ aaudio_result_t AudioStreamInternalPlay::drainStream(DrainType drainType) {
                 (int64_t)0, wakeUpNanosBootTime - android::elapsedRealtimeNano());
         if (mUseDataAvailableCallback) {
             mDrainingNanos = drainNanos;
-            mDrainingNanosValid = true;
             mCallbackCV.notify_all();
             return AAUDIO_OK;
         }
@@ -936,7 +936,6 @@ void *AudioStreamInternalPlay::callbackLoop() {
         int32_t callbackFrames = 0;
         if (mUseDataAvailableCallback) {
             android::audio_utils::unique_lock ul(mStreamMutex);
-            mDrainingNanosValid = false;
             // For data available callback, it doesn't transfer any data. Instead,
             // it signals a notification to client to call write for data transfer.
             {
@@ -951,6 +950,7 @@ void *AudioStreamInternalPlay::callbackLoop() {
             }
             timeoutNanosForDataAvailableCB =
                     callbackFrames * AAUDIO_NANOS_PER_SECOND / getSampleRate();
+            mNeedCallbackWakeup = false;
         } else {
             callbackFrames = mCallbackFrames;
         }
@@ -998,25 +998,20 @@ void *AudioStreamInternalPlay::callbackLoop() {
             // client write enough data for draining.
             {
                 android::audio_utils::unique_lock ul(mStreamMutex);
-                if (!mDrainingNanosValid) {
-                    mCallbackCV.wait_for(
-                            ul, std::chrono::nanoseconds(timeoutNanosForDataAvailableCB),
-                            [this]() REQUIRES(mStreamMutex) {
-                        return mDrainingNanosValid || !mCallbackEnabled.load();
-                    });
-                    ALOGD("Stopping waiting for draining nanos, mDrainingNanosValid=%d, "
-                          "callback enabled=%d",
-                          mDrainingNanosValid, mCallbackEnabled.load());
-                }
-                if (mDrainingNanosValid) {
+                mCallbackCV.wait_for(
+                        ul, std::chrono::nanoseconds(timeoutNanosForDataAvailableCB),
+                        [this]() REQUIRES(mStreamMutex) {
+                    return mNeedCallbackWakeup || mDraining;
+                });
+
+                if (mDrainingNanos > 0) {
                     mCallbackCV.wait_for(ul, std::chrono::nanoseconds(mDrainingNanos),
                                          [this]() REQUIRES(mStreamMutex) {
-                        return !mDraining;
+                        return mNeedCallbackWakeup || !mDraining;
                     });
                     ALOGW_IF(mDraining,
                              "After waiting for drain, still draining, stream is %s active",
                              isActive() ? "" : "not");
-                    mDraining = false;
                 }
             }
         } else {

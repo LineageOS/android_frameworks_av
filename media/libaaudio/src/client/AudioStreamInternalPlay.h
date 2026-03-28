@@ -202,7 +202,9 @@ private:
     // the `mDrainingNanos` is set when drain is needed after a write. Then the data callback
     // thread can use this value to drainStream and suspend.
     int64_t mDrainingNanos GUARDED_BY(mStreamMutex){0};
-    bool mDrainingNanosValid GUARDED_BY(mStreamMutex){false};
+    // `mNeedCallbackWakeup` set to true can wake up the callback thread if it is using data
+    // available callback and waiting for client to write data or service to drain.
+    bool mNeedCallbackWakeup GUARDED_BY(mStreamMutex){false};
 
     // This value is calculated when opening. It will not changed after open.
     int64_t mNanosPerBurst = 0;

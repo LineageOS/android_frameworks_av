@@ -529,8 +529,7 @@ public:
     /* List available audio ports and their attributes */
     static status_t listAudioPorts(audio_port_role_t role,
                                    audio_port_type_t type,
-                                   unsigned int *num_ports,
-                                   struct audio_port_v7 *ports,
+                                   std::vector<audio_port_v7>& ports,
                                    unsigned int *generation);
 
     static status_t listDeclaredDevicePorts(media::AudioPortRole role,
@@ -548,8 +547,7 @@ public:
     static status_t releaseAudioPatch(audio_patch_handle_t handle);
 
     /* List existing audio patches */
-    static status_t listAudioPatches(unsigned int *num_patches,
-                                      struct audio_patch *patches,
+    static status_t listAudioPatches(std::vector<audio_patch>& patches,
                                       unsigned int *generation);
     /* Set audio port configuration */
     static status_t setAudioPortConfig(const struct audio_port_config *config);

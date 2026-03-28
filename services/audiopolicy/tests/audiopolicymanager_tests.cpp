@@ -352,18 +352,11 @@ void AudioPolicyManagerTest::getInputForAttr(
 
 void AudioPolicyManagerTest::getAudioPorts(audio_port_type_t type, audio_port_role_t role,
         std::vector<audio_port_v7>* ports) {
-    uint32_t numPorts = 0;
-    uint32_t generation1;
+    uint32_t generation;
     status_t ret;
 
-    ret = mManager->listAudioPorts(role, type, &numPorts, nullptr, &generation1);
+    ret = mManager->listAudioPorts(role, type, *ports, &generation);
     ASSERT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
-
-    uint32_t generation2;
-    ports->resize(numPorts);
-    ret = mManager->listAudioPorts(role, type, &numPorts, ports->data(), &generation2);
-    ASSERT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
-    ASSERT_EQ(generation1, generation2) << "Generations changed during ports retrieval";
 }
 
 bool AudioPolicyManagerTest::findDevicePort(audio_port_role_t role,
@@ -2276,23 +2269,17 @@ std::vector<audio_format_t> AudioPolicyManagerTestForHdmi::getReportedSurroundFo
 
 std::unordered_set<audio_format_t>
         AudioPolicyManagerTestForHdmi::getFormatsFromPorts() {
-    uint32_t numPorts = 0;
-    uint32_t generation1;
+    uint32_t generation;
+    std::vector<audio_port_v7> ports;
     status_t ret;
     std::unordered_set<audio_format_t> formats;
     ret = mManager->listAudioPorts(
-            AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE, &numPorts, nullptr, &generation1);
+            AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE, ports, &generation);
     EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
     if (ret != NO_ERROR) {
         return formats;
     }
-    struct audio_port_v7 ports[numPorts];
-    ret = mManager->listAudioPorts(
-            AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE, &numPorts, ports, &generation1);
-    EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
-    if (ret != NO_ERROR) {
-        return formats;
-    }
+
     for (const auto &port : ports) {
         for (size_t i = 0; i < port.num_audio_profiles; ++i) {
             formats.insert(port.audio_profiles[i].format);
