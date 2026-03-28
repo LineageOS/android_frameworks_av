@@ -639,7 +639,7 @@ void AAudioServiceStreamBase::run() {
         }
 
         // Is it time to enter standby?
-        if ((isIdle() || isDisconnected_l())
+        if (isIdle()
                 && isStandbyImplemented()
                 && !isStandby_l()
                 && (AudioClock::getNanoseconds() >= mStandbyTime)) {
@@ -895,8 +895,6 @@ void AAudioServiceStreamBase::disconnect() {
 
 void AAudioServiceStreamBase::disconnect_l() {
     if (!isDisconnected_l() && getState() != AAUDIO_STREAM_STATE_CLOSED) {
-        mStandbyTime = AudioClock::getNanoseconds();
-
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT)
             .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
