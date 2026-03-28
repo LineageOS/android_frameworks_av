@@ -56,6 +56,7 @@ namespace android {
 
 using media::VolumeShaper;
 using android::content::AttributionSourceState;
+using android::media::audio::common::FlushFromFrameAccuracy;
 
 // TODO: Move to a separate .h
 
@@ -1037,12 +1038,34 @@ void AudioTrack::pause()
 }
 
 status_t AudioTrack::flushFromFrame(
-        android::media::audio::common::FlushFromFrameAccuracy /*accuracy*/,
+        FlushFromFrameAccuracy accuracy,
         int64_t requestedPosition,
         int64_t* actualFlushedPosition) {
+    if (mAudioTrack == nullptr) {
+        return NO_INIT;
+    }
+    if (accuracy != FlushFromFrameAccuracy::EXACT &&
+        accuracy != FlushFromFrameAccuracy::BEST_EFFORT) {
+        return BAD_VALUE;
+    }
+    const auto writtenFrameCount = getWrittenFramesCount();
+    if (requestedPosition < 0 || requestedPosition > writtenFrameCount) {
+        return BAD_VALUE;
+    }
+    if (requestedPosition == writtenFrameCount) {
+        *actualFlushedPosition = writtenFrameCount;
+        return NO_ERROR;
+    }
+    if (accuracy == FlushFromFrameAccuracy::EXACT) {
+        AudioTimestamp timestamp{};
+        if (getTimestamp(timestamp) != OK || requestedPosition < timestamp.mPosition) {
+            return BAD_VALUE;
+        }
+    }
     // Dummy implementation. Need to call to the HAL.
-    *actualFlushedPosition = requestedPosition;
-    return NO_ERROR;
+    // Currently always return the written frame count as the flushed or suggested position.
+    *actualFlushedPosition = writtenFrameCount;
+    return accuracy == FlushFromFrameAccuracy::EXACT ? BAD_VALUE : NO_ERROR;
 }
 
 status_t AudioTrack::setVolume(float left, float right)
