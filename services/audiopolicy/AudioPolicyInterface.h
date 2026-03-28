@@ -565,7 +565,7 @@ public:
             const audio_attributes_t& attr,
             uid_t uid,
             audio_output_flags_t flags,
-            media::audio::common::FlushFromFrameSupport* support) const = 0;
+            media::audio::common::FlushFromFrameSupport* support) = 0;
 
     virtual status_t useMmapForPcmOffload(bool* result) = 0;
 };

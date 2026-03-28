@@ -43,6 +43,8 @@ namespace android {
 namespace companion {
 namespace virtualcamera {
 
+class VirtualCameraRenderThreadTest;
+
 /**
  * VirtualCameraImagePassthroughHandler
  *
@@ -82,7 +84,22 @@ class VirtualCameraImagePassthroughHandler : public VirtualCameraImageHandler {
   void onFrameAvailable();
 
  private:
+  friend class VirtualCameraRenderThreadTest;
+
   void resetFrameAvailableSignalingMechanism();
+
+  /**
+   * Scans the buffer to determine the actual payload size by searching for the
+   * transition point where zero-padding begins.
+   *
+   * @param buffer The input buffer to scan.
+   * @param size The total size of the input buffer.
+   * @param format The image format (JPEG or HEIC).
+   * @return The detected payload size, or the original size if detection fails.
+   */
+  int32_t findActualPayloadSize(
+      const uint8_t* buffer, int32_t size,
+      ::aidl::android::companion::virtualcamera::Format format) const;
 
   VirtualCameraSessionContext& mSessionContext;
   ::aidl::android::companion::virtualcamera::Format mImageFormat;

@@ -117,16 +117,18 @@ private:
         bool csdActive;
     };
 
-    void stopInternalMelComputation();
+    void stopInternalMelComputation() EXCLUDES_MelReporter_Mutex;
     audio_utils::mutex& mutex() const RETURN_CAPABILITY(audio_utils::MelReporter_Mutex) {
         return mMutex;
     }
 
     /** Should be called with the following order of locks: mAudioFlinger.mutex() -> mutex(). */
-    void stopMelComputationForPatch_l(const ActiveMelPatch& patch) REQUIRES(mutex());
+    void stopMelComputationForPatch_l(const ActiveMelPatch& patch)
+            REQUIRES(audio_utils::AudioFlinger_Mutex, mutex());
 
     /** Should be called with the following order of locks: mAudioFlinger.mutex() -> mutex(). */
-    void startMelComputationForActivePatch_l(const ActiveMelPatch& patch) REQUIRES(mutex());
+    void startMelComputationForActivePatch_l(const ActiveMelPatch& patch)
+            REQUIRES(audio_utils::AudioFlinger_Mutex, mutex());
 
     std::optional<audio_patch_handle_t>
     activePatchStreamHandle_l(audio_io_handle_t streamHandle) REQUIRES(mutex());
