@@ -102,22 +102,18 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
                           int32_t *_aidl_return) {
     static_assert(std::is_same_v<aaudio_result_t, std::decay_t<typeof(*_aidl_return)>>);
 
-    // Because the FROZEN notification may come early and the UNFROZEN notification
-    // may (rarely) come in late, we wait 500 ms before opening new streams for
-    // a frozen app.
     const pid_t callingPid = IPCThreadState::self()->getCallingPid();
-    constexpr int kTimeoutMs = 500;
 
     auto checkFrozen = [&](const char* where) {
         const auto [frozen, freezeTime] =
                 AAudioClientTracker::getInstance().getFrozenStatus(callingPid);
-        const bool skip = freezeTime > 0 && (systemTime(SYSTEM_TIME_MONOTONIC) - freezeTime)
-                 < kTimeoutMs * NANOS_PER_MILLISECOND;
-        if (skip) {
-            ALOGW("openStream denied for pid %d at %s - frozen within %d ms",
-                    callingPid, where, kTimeoutMs);
+        const int deltaMs = (systemTime(SYSTEM_TIME_MONOTONIC) - freezeTime)
+                / NANOS_PER_MILLISECOND;
+        if (frozen) {
+            ALOGW("openStream denied for pid %d at %s - frozen for %d ms",
+                    callingPid, where, deltaMs);
         }
-        return skip;
+        return frozen;
     };
 
     if (checkFrozen("begin")) AIDL_RETURN(AAUDIO_ERROR_INTERNAL);
