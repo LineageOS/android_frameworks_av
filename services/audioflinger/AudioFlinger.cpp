@@ -2361,24 +2361,20 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     // TODO pass wrapped object around
     adjAttributionSource = std::move(validatedAttrSource).unwrapInto();
 
-    // Because the FROZEN notification may come early and the UNFROZEN notification
-    // may (rarely) come in late, we wait 500 ms before accepting any new AudioRecords for
-    // a frozen app.
     sp<NotificationClient> notificationClient; // acquire notificationClient outside of AF lock.
-    constexpr int kTimeoutMs = 500;
+
     auto checkFrozen = [&](const char* where, sp<NotificationClient> nc) {
         if (!nc) return false;
 
         const auto [frozen, freezeTime] = nc->getFrozenStatus();
-        // we don't care whether we are frozen or not, it is just freezeTime.
-        const bool skip = freezeTime > 0 && (systemTime(SYSTEM_TIME_MONOTONIC) - freezeTime)
-                  < kTimeoutMs * NANOS_PER_MILLISECOND;
-        if (skip) {
-            ALOGW("createRecord: record request denied for pid %d at %s - frozen within %d ms",
-                    adjAttributionSource.pid, where, kTimeoutMs);
+        const int deltaMs = (systemTime(SYSTEM_TIME_MONOTONIC) - freezeTime)
+                / NANOS_PER_MILLISECOND;
+        if (frozen) {
+            ALOGW("createRecord: record request denied for pid %d at %s - frozen for %d ms",
+                    adjAttributionSource.pid, where, deltaMs);
             lStatus = PERMISSION_DENIED;
         }
-        return skip;
+        return frozen;
     };
 
     // further format checks are performed by createRecordTrack_l()
