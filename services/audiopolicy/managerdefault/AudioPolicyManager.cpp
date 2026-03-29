@@ -10179,6 +10179,11 @@ status_t AudioPolicyManager::getFlushFromFrameSupport(
                         AUDIO_OUTPUT_FLAG_MMAP_NOIRQ | AUDIO_OUTPUT_FLAG_DIRECT);
         flags = kMmapOffloadFlags;
     }
+    if (!useMmapBackend && (flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) == AUDIO_OUTPUT_FLAG_NONE) {
+        // Temporarily disable flushFromFrame support on classical PCM offload path.
+        *support = media::audio::common::FlushFromFrameSupport::UNSUPPORTED;
+        return NO_ERROR;
+    }
 
     auto outputDevices = mEngine->getOutputDevicesForAttributes(
             attr, uid, nullptr /*preferredDevice*/, false);
