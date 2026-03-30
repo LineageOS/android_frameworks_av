@@ -2684,7 +2684,13 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
     outputDesc->setClientActive(client, true);
 
     if (client->hasPreferredDevice(true)) {
-        devices = getNewOutputDevices(outputDesc, false /*fromCache*/);
+        if (outputDesc->sameExclusivePreferredDevicesCount() > 0) {
+            // Preferred device may be exclusive, use only if no other active clients on this output
+            devices = DeviceVector(
+                        mAvailableOutputDevices.getDeviceFromId(client->preferredDeviceId()));
+        } else {
+            devices = getNewOutputDevices(outputDesc, false /*fromCache*/);
+        }
         if (devices != outputDesc->devices()) {
             checkStrategyRoute(clientStrategy, outputDesc->mIoHandle);
         }
