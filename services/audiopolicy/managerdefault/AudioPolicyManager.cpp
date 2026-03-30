@@ -4786,6 +4786,32 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
         // Only apply special touch sound delay once
         delayMs = 0;
     }
+    bool willRouteToSco = false;
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
+        DeviceVector newDevices = getNewOutputDevices(outputDesc, true /*fromCache*/);
+        if (std::any_of(newDevices.begin(), newDevices.end(), [](const auto& x) {
+                return audio_is_bluetooth_out_sco_device(x->type());
+            })) {
+            willRouteToSco = true;
+            break;
+        }
+    }
+
+    if (willRouteToSco) {
+        for (size_t i = 0; i < mOutputs.size(); i++) {
+            sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
+            if (outputDesc == mPrimaryOutput) continue;
+            const auto oldDevices = outputDesc->devices();
+            if (std::any_of(oldDevices.begin(), oldDevices.end(), [](const auto&x) {
+                            return audio_is_a2dp_out_device(x->type());
+                        })) {
+                ALOGI("%s clearing A2DP patch preemptively %d", __func__, outputDesc->mIoHandle);
+                resetOutputDevice(outputDesc, /* delayMs= */ 0, nullptr);
+            }
+        }
+    }
+
     std::map<audio_io_handle_t, DeviceVector> outputsToReopen;
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
