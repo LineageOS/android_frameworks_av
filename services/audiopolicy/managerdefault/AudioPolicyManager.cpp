@@ -3000,12 +3000,22 @@ status_t AudioPolicyManager::stopSource(const sp<SwAudioOutputDescriptor>& outpu
             // one being selected for this output
             std::map<audio_io_handle_t, DeviceVector> outputsToReopen;
             uint32_t delayMs = outputDesc->latency()*2;
+            // see getNewOutputDevices -- output activity on these streams are special: they affect
+            // the routing on other outputs. For example, ALARM activity on primary results in media
+            // playback on deep buffer routing to a2dp+speaker. As such, when stopping the alarm
+            // output, we must re-evaluate routing (on the same module) on all other outputs.
+            const auto mostRecentStrat =
+                    outputDesc->getMostRecentStrategy(std::numeric_limits<int32_t>::max());
+            const bool forceReeval =
+                    mostRecentStrat == streamToStrategy(AUDIO_STREAM_ALARM, clientUid) ||
+                    mostRecentStrat ==
+                            streamToStrategy(AUDIO_STREAM_ENFORCED_AUDIBLE, clientUid);
             for (size_t i = 0; i < mOutputs.size(); i++) {
                 sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
                 if (desc != outputDesc &&
                         desc->isActive() &&
                         outputDesc->sharesHwModuleWith(desc) &&
-                        (newDevices != desc->devices())) {
+                        (newDevices != desc->devices() || forceReeval)) {
                     DeviceVector newDevices2 = getNewOutputDevices(desc, false /*fromCache*/);
                     bool force = desc->devices() != newDevices2;
 
