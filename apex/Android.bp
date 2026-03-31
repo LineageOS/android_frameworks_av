@@ -186,16 +186,26 @@ filegroup {
 
 apex_defaults {
     name: "com.android.media.swcodec-defaults",
-    binaries: [
-        "mediaswcodec",
-    ],
+    multilib: {
+        first: {
+            binaries: [
+                "mediaswcodec",
+            ],
+            native_shared_libs: [
+                "libcodec2_hidl@1.0",
+                "libcodec2_hidl@1.1",
+                "libcodec2_hidl@1.2",
+            ],
+        },
+    },
     native_shared_libs: [
-        "libcodec2_hidl@1.0",
-        "libcodec2_hidl@1.1",
-        "libcodec2_hidl@1.2",
         "libcom.android.media.swcodec.apexcodecs",
         "libstagefright_foundation",
     ],
+    compile_multilib: select(release_flag("RELEASE_APEX_CODECS"), {
+        true: "both",
+        default: "first",
+    }),
     prebuilts: [
         "com.android.media.swcodec-mediaswcodec.rc",
         "com.android.media.swcodec-mediaswcodec.32rc",
