@@ -8561,6 +8561,9 @@ reacquire_wakelock:
                 // go to sleep
                 mWaitWorkCV.wait(_l);
                 ALOGV("RecordThread: loop starting");
+                // Force metadata update when exiting standby
+                mActiveTracks.setHasChanged();
+                updateMetadata_l();
                 goto reacquire_wakelock;
             }
 
