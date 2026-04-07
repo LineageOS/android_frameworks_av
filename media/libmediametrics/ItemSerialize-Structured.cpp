@@ -62,6 +62,7 @@ std::shared_ptr<StructuredItem> writeItemToStructured(mediametrics::Item& item)
     for (auto &prop : item) {
         ::android::media::metrics::StructuredItem::Property *lProp =
             new ::android::media::metrics::StructuredItem::Property();
+
         lProp->mName = prop.getName();
         auto lElem = prop.get();
         switch (lElem.index()) {
@@ -91,6 +92,8 @@ std::shared_ptr<StructuredItem> writeItemToStructured(mediametrics::Item& item)
                 break;
         }
         ret->properties.push_back(*lProp);
+        // push_back() makes a copy, we need to clean up the original
+        delete lProp;
     }
 
   return ret;
