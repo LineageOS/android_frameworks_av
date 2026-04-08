@@ -441,7 +441,9 @@ private:
     std::atomic_bool mInputMetEos;
     std::once_flag mRenderWarningFlag;
 
-    uint64_t mLastInputBufferAvailableTs;
+    // Timestamp of last pipeline activity: either a successful input buffer queue or a render/release
+    // of output buffer. Used to detect pipeline stall and trigger queueDummyWork.
+    uint64_t mLastPipelineActiveTs;
     std::mutex mTsLock;
     bool mIsHWDecoder;
 
