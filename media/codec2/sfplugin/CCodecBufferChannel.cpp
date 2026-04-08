@@ -399,7 +399,7 @@ CCodecBufferChannel::CCodecBufferChannel(const std::shared_ptr<CCodecCallback>& 
       mRenderingDepth(3u),
       mMetaMode(MODE_NONE),
       mInputMetEos(false),
-      mLastInputBufferAvailableTs(0u),
+      mLastPipelineActiveTs(0u),
       mIsHWDecoder(false),
       mSendEncryptedInfoBuffer(false),
       mSendEncryptionInfo(false),
@@ -1466,13 +1466,13 @@ void CCodecBufferChannel::feedInputBufferIfAvailable() {
     feedInputBufferIfAvailableInternal();
 
     // limit this WA to qc hw decoder only
-    // if feedInputBufferIfAvailableInternal() successfully (has available input buffer),
-    // mLastInputBufferAvailableTs would be updated. otherwise, not input buffer available
+    // mLastPipelineActiveTs is updated when input buffer is queued (here) or output buffer is
+    // rendered/released. If elapsed time exceeds threshold, pipeline may be stalled.
     if (mIsHWDecoder) {
         std::lock_guard<std::mutex> tsLock(mTsLock);
         uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
                 PipelineWatcher::Clock::now().time_since_epoch()).count();
-        if (now - mLastInputBufferAvailableTs > kPipelinePausedTimeoutMs) {
+        if (now - mLastPipelineActiveTs > kPipelinePausedTimeoutMs) {
             ALOGV("[WA] long time elapsed since last input queued, let's queue a specific work to "
                     "HAL to notify something");
             queueDummyWork();
@@ -1533,7 +1533,7 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
 
         {
             std::lock_guard<std::mutex> tsLock(mTsLock);
-            mLastInputBufferAvailableTs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            mLastPipelineActiveTs = std::chrono::duration_cast<std::chrono::milliseconds>(
                     PipelineWatcher::Clock::now().time_since_epoch()).count();
         }
 
@@ -1931,6 +1931,25 @@ void CCodecBufferChannel::onBufferReleasedFromOutputSurface(uint32_t generation)
     if (comp) {
       SurfaceCallbackHandler::GetInstance().post(
                 SurfaceCallbackHandler::ON_BUFFER_RELEASED, comp, generation);
+    }
+    // VT scenario: all output buffers may have been queued to BufferQueue before app goes to
+    // background. When app resumes, SurfaceTexture directly consumes them without going through
+    // renderOutputBuffer(), so queueDummyWork() is never triggered via feedInputBufferIfAvailable().
+    // We add the same stall detection here to cover this path.
+    if (mIsHWDecoder) {
+        QueueGuard guard(mSync);
+        if (guard.isRunning()) {
+            std::lock_guard<std::mutex> tsLock(mTsLock);
+            uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    PipelineWatcher::Clock::now().time_since_epoch()).count();
+            if (now - mLastPipelineActiveTs > kPipelinePausedTimeoutMs) {
+                ALOGV("[WA] buffer released from surface after long pipeline idle, "
+                        "queue dummy work to wake up HAL allocation thread");
+                queueDummyWork();
+            }
+            // Update timestamp: surface has consumed a buffer, pipeline is active again
+            mLastPipelineActiveTs = now;
+        }
     }
 }
 
@@ -2641,7 +2660,7 @@ status_t CCodecBufferChannel::requestInitialInputBuffers(
 
     if (!clientInputBuffers.empty()) {
         std::lock_guard<std::mutex> tsLock(mTsLock);
-        mLastInputBufferAvailableTs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        mLastPipelineActiveTs = std::chrono::duration_cast<std::chrono::milliseconds>(
                 PipelineWatcher::Clock::now().time_since_epoch()).count();
     }
 
