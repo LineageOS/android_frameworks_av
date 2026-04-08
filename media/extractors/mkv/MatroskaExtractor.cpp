@@ -1102,10 +1102,9 @@ media_status_t MatroskaSource::read(
             AMediaFormat_delete(meta);
             if (bigEndian == 1 && bitPerFrame == 16) {
                 // Big-endian -> little-endian
-                uint16_t *dstData = (uint16_t *)frame->data() + frame->range_offset();
-                uint16_t *srcData = (uint16_t *)frame->data() + frame->range_offset();
+                uint16_t *data = (uint16_t *)((uint8_t *)frame->data() + frame->range_offset());
                 for (size_t i = 0; i < frame->range_length() / 2; i++) {
-                    dstData[i] = ntohs(srcData[i]);
+                    data[i] = ntohs(data[i]);
                 }
             }
         }
