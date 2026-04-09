@@ -10278,13 +10278,14 @@ status_t AudioPolicyManager::useMmapForPcmOffload(bool* result) {
     char buf[PROPERTY_VALUE_MAX] = {};
     *result = false;
 
+    // TODO: b/479291234, change default value to true when fully tested.
     if (const auto mmapOffloadProfile = mHwModules.getCompatibleProfile(
                 mmapOffloadFlags, false /*isInput*/);
             mmapOffloadProfile == nullptr) {
         // If MMAP offload is not supported, never use MMAP for PCM offload via AudioTrack
         ALOGD("%s: do not prefer mmap pcm offload as mmap pcm offload is not supported", __func__);
         *result = false;
-    } else if (!property_get_bool(preferMmapPcmOffloadSysProp, true /* default_value */)) {
+    } else if (!property_get_bool(preferMmapPcmOffloadSysProp, false /* default_value */)) {
         // If persist.media.audio.prefer_mmap_pcm_offload is false, never use MMAP for
         // PCM offload via AudioTrack
         ALOGD("%s: do not prefer mmap pcm offload as by %s is false",

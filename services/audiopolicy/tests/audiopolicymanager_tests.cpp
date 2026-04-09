@@ -1763,11 +1763,20 @@ TEST_F(AudioPolicyManagerTestWithConfigurationFile, GetFlushFromFrameSupport) {
                                                            "", "", AUDIO_FORMAT_DEFAULT));
 
     // Pcm 16 bit is currently supported for flushFromFrame.
+    // TODO: b/497353630 - remove this check when classic PCM Offload
+    // supports flushFromFrame.
+    bool useMmapForPcmOffload = false;
+    EXPECT_EQ(NO_ERROR, mManager->useMmapForPcmOffload(&useMmapForPcmOffload));
+
     for (const auto flags : {offloadFlags, mmapOffloadFlags}) {
         support = FlushFromFrameSupport::UNSUPPORTED;
+        const bool inMmap = ((flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) || useMmapForPcmOffload);
+        const auto expectedSupport = inMmap // only MMap currently supported
+                ? FlushFromFrameSupport::SUPPORTED : FlushFromFrameSupport::UNSUPPORTED;
+
         EXPECT_EQ(NO_ERROR,
                   mManager->getFlushFromFrameSupport(pcm16Bit, mediaAttr, uid, flags, &support));
-        EXPECT_EQ(FlushFromFrameSupport::SUPPORTED, support);
+        EXPECT_EQ(expectedSupport, support);
     }
 
     // For MP3 and PCM32 bit, flushFromFrame is not supported.

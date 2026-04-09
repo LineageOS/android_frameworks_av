@@ -676,7 +676,8 @@ aaudio_result_t AudioStreamInternalPlay::requestStop_l() {
             activateStream_l();
         }
         // For offload stream, force draining all to avoid original drain allows soft wakeup.
-        int64_t offloadSafeMarginInFrames = mOffloadSafeMarginInFrames;
+        int64_t offloadSafeMarginInFrames =
+                getDeviceSampleRate() * 100 / AAUDIO_MILLIS_PER_SECOND;
         // Use BootTime for wakeup time as the device may have be suspended.
         const int64_t wakeUpNanosBootTime = mClockModel.convertPositionToBootTime(
                 mAudioEndpoint->getDataWriteCounter() - offloadSafeMarginInFrames);
