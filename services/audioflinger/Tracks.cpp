@@ -3764,6 +3764,9 @@ getHardeningDecision(audio_usage_t usage, IAfThreadCallback& cb, uid_t uid) {
                 return {EnforcementLevel::PARTIAL, SYSTEM_USAGE};
             }
         }
+        if (pp.checkPermission(PermissionEnum::BLUETOOTH_CONNECT, uid).value_or(false)) {
+            return {EnforcementLevel::PARTIAL, PRIVILEGED_APP};
+        }
         if (pp.getHighestTargetSdkForUid(uid).value_or(1000) < 37) {
             return {EnforcementLevel::PARTIAL, TARGET_SDK};
         }
