@@ -116,7 +116,7 @@
             <Limit name="bitrate" range="13000" />
             <Attribute name="software-codec" />
         </MediaCodec>
-        <MediaCodec name="c2.android.iamf.decoder" type="audio/iamf" minsdk="36" variant="!slow-cpu">
+        <MediaCodec name="c2.android.iamf.decoder" type="audio/iamf" minsdk="36">
             <!-- IAMF v1.0 (Simple and Base profiles) support up to 18 input channels.
                  See https://aomediacodec.github.io/iamf/v1.0.0-errata.html#syntax-layout. -->
             <Limit name="channel-count" max="18" />
