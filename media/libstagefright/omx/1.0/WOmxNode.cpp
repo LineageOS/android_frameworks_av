@@ -50,12 +50,12 @@ status_t LWOmxNode::getParameter(
     status_t transStatus = toStatusT(mBase->getParameter(
             toRawIndexType(index),
             tParams,
-            [&fnStatus, params](
+            [&fnStatus, params, size](
                     Status status, hidl_vec<uint8_t> const& outParams) {
                 fnStatus = toStatusT(status);
                 std::copy(
                         outParams.data(),
-                        outParams.data() + outParams.size(),
+                        outParams.data() + std::min(outParams.size(), size),
                         static_cast<uint8_t*>(params));
             }));
     return transStatus == NO_ERROR ? fnStatus : transStatus;
@@ -80,7 +80,7 @@ status_t LWOmxNode::getConfig(
                 fnStatus = toStatusT(status);
                 std::copy(
                         outParams.data(),
-                        outParams.data() + size,
+                        outParams.data() + std::min(outParams.size(), size),
                         static_cast<uint8_t*>(params));
             }));
     return transStatus == NO_ERROR ? fnStatus : transStatus;
