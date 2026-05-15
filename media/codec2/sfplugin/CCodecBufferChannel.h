@@ -386,11 +386,7 @@ private:
         bool bounded;
     };
     Mutexed<Output> mOutput;
-    struct Flush {
-        std::list<std::unique_ptr<C2Work>> codecInitData;
-        std::vector<std::unique_ptr<C2Param>> delayAfter;
-    };
-    Mutexed<Flush> mFlush;
+    Mutexed<std::list<std::unique_ptr<C2Work>>> mFlushedConfigs;
 
     std::atomic_uint64_t mFrameIndex;
     std::atomic_uint64_t mFirstValidFrameIndex;
