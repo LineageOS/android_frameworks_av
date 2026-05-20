@@ -1356,6 +1356,22 @@ status_t MediaImageDecoder::onOutputReceived(
         height = slice_height;
     }
 
+    if (crop_left < 0 || crop_top < 0 || crop_right < crop_left || crop_bottom < crop_top
+            || width <= 0 || height <= 0 || crop_bottom >= height || crop_right >= width
+            || stride < 0) {
+        ALOGE("Invalid crop, width and height in outputFormat. crop_left: %d, crop_right: %d,"
+                " crop_top: %d, crop_bottom: %d, width: %d, height: %d", crop_left, crop_right,
+                crop_top, crop_bottom, width, height);
+        return ERROR_MALFORMED;
+    }
+    if (stride < 0 || (stride & 1) != 0) {
+        // stride could be zero and must be even.
+        // If the client set the stride to zero,
+        // the BitmapParams constructor calculates it based on width and bpp.
+        ALOGE("Invalid stride in outputFormat: %d", stride);
+        return ERROR_MALFORMED;
+    }
+
     int32_t crop_width, crop_height;
     crop_width = crop_right - crop_left + 1;
     crop_height = crop_bottom - crop_top + 1;
