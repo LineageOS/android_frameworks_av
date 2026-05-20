@@ -142,14 +142,14 @@ bool convertCleanApertureToRect(uint32_t imageW, uint32_t imageH, const CleanApe
 
     *left = centerX.getInt32();
     *top = centerY.getInt32();
-    *right = *left + clapW;
-    *bottom = *top + clapH;
 
     // Make sure that the crop rect is within the image bounds.
-    if (*left > (UINT32_MAX - clapW) || *right > imageW || *top > (UINT32_MAX - clapH) ||
-        *bottom > imageH) {
+    if ((int64_t)*left + clapW > (int64_t)imageW || (int64_t)*top + clapH > (int64_t)imageH) {
         return false;
     }
+
+    *right = *left + clapW;
+    *bottom = *top + clapH;
     return true;
 }
 

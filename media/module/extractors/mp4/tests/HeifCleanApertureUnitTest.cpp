@@ -51,6 +51,9 @@ const InvalidClapPropertyParam kInvalidClapPropertyTestParams[] = {
         {120, 160, {Fraction(96, 1), Fraction(132, 5), Fraction(0, 1), Fraction(0, 1)}},
         {722, 1024, {Fraction(385, 1), Fraction(330, 1), Fraction(103, 1), Fraction(-308, 1)}},
         {1024, 722, {Fraction(330, 1), Fraction(385, 1), Fraction(-308, 1), Fraction(103, 1)}},
+        // Signed integer overflow in horizontal/vertical offset + width/height calculation.
+        {2, 2, {Fraction(2, 1), Fraction(2, 1), Fraction(0x7FFFFFFE, 1), Fraction(0, 1)}},
+        {2, 2, {Fraction(2, 1), Fraction(2, 1), Fraction(0, 1), Fraction(0x7FFFFFFE, 1)}},
 };
 
 using InvalidClapPropertyTest = ::testing::TestWithParam<InvalidClapPropertyParam>;
