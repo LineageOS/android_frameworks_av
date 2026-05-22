@@ -409,6 +409,11 @@ bool DynamicsProcessingContext::validateBandConfig(const std::vector<T>& bands, 
             LOG(ERROR) << __func__ << " " << band.toString() << " found duplicate";
             return false;
         }
+        if (!std::isfinite(band.cutoffFrequencyHz) || band.cutoffFrequencyHz < 0 ||
+            band.cutoffFrequencyHz > (float)mCommon.input.base.sampleRate / 2) {
+            LOG(ERROR) << __func__ << " " << band.toString() << " invalid cutoffFrequencyHz";
+            return false;
+        }
         freqs[band.band] = band.cutoffFrequencyHz;
     }
     return true;

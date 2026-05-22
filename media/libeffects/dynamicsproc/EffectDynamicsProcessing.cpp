@@ -1090,6 +1090,11 @@ int DP_setParameter(DynamicsProcessingContext *pContext,
         const float cutoffFrequency = values[1].f;
         const float gain = values[2].f;
 
+        if (!std::isfinite(cutoffFrequency) || cutoffFrequency < 0 ||
+                cutoffFrequency > (float)pContext->mConfig.inputCfg.samplingRate / 2) {
+            status = -EINVAL;
+            break;
+        }
 
         ALOGVV(" %s channel: %d, band::%d, enabled:%d, cutoffFrequency:%f, gain%f\n",
                 (command == DP_PARAM_PRE_EQ_BAND ? "preEqBand" : "postEqBand"), channel, band,
@@ -1180,6 +1185,12 @@ int DP_setParameter(DynamicsProcessingContext *pContext,
         const float expanderRatio = values[8].f;
         const float preGain = values[9].f;
         const float postGain = values[10].f;
+
+        if (!std::isfinite(cutoffFrequency) || cutoffFrequency < 0 ||
+                cutoffFrequency > (float)pContext->mConfig.inputCfg.samplingRate / 2) {
+            status = -EINVAL;
+            break;
+        }
 
         ALOGVV(" mbcBand channel: %d, band::%d, enabled:%d, cutoffFrequency:%f, attackTime:%f,"
                 "releaseTime:%f, ratio:%f, threshold:%f, kneeWidth:%f, noiseGateThreshold:%f,"
