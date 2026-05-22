@@ -614,7 +614,7 @@ void StagefrightMetadataRetriever::parseMetaData() {
 
     float captureFps;
     if (meta->findFloat(kKeyCaptureFramerate, &captureFps)) {
-        sprintf(tmp, "%f", captureFps);
+        snprintf(tmp, sizeof(tmp), "%f", captureFps);
         mMetaData.add(METADATA_KEY_CAPTURE_FRAMERATE, String8(tmp));
     }
 
