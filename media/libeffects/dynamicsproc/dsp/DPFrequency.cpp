@@ -20,6 +20,7 @@
 #include <log/log.h>
 #include "DPFrequency.h"
 #include <algorithm>
+#include <cmath>
 #include <sys/param.h>
 
 namespace dp_fx {
@@ -89,9 +90,12 @@ void ChannelBuffer::initBuffers(unsigned int blockSize, unsigned int overlapSize
 }
 
 void ChannelBuffer::computeBinStartStop(BandParams &bp, size_t binStart) {
-
     bp.binStart = binStart;
-    bp.binStop = (int)(0.5 + bp.freqCutoffHz * mBlockSize / mSamplingRate);
+    const size_t maxBin = mBlockSize / 2; // Nyquist bin
+    const float raw = 0.5f + bp.freqCutoffHz * (float)mBlockSize / (float)mSamplingRate;
+    bp.binStop = (!std::isfinite(raw) || raw < 0.0f) ? 0
+               : (raw > (float)maxBin)               ? maxBin
+               : (size_t)raw;
 }
 
 //== LinkedLimiters Helper
@@ -506,7 +510,8 @@ size_t DPFrequency::processFirstStages(ChannelBuffer &cb) {
             float preGainFactor = dBtoLinear(pMbcBandParams->gainPreDb);
             float preGainSquared = preGainFactor * preGainFactor;
 
-            for (size_t k = pMbcBandParams->binStart; k <= pMbcBandParams->binStop; k++) {
+            for (size_t k = pMbcBandParams->binStart;
+                 k <= pMbcBandParams->binStop && k < maxBin; k++) {
                 fEnergySum += std::norm(cb.complexTemp[k]) * preGainSquared; //mag squared
             }
 
@@ -567,7 +572,8 @@ size_t DPFrequency::processFirstStages(ChannelBuffer &cb) {
             newFactor *= dBtoLinear(pMbcBandParams->gainPostDb);
 
             //apply to this band
-            for (size_t k = pMbcBandParams->binStart; k <= pMbcBandParams->binStop; k++) {
+            for (size_t k = pMbcBandParams->binStart;
+                 k <= pMbcBandParams->binStop && k < maxBin; k++) {
                 cb.complexTemp[k] *= newFactor;
             }
 
