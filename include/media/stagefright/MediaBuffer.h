@@ -63,7 +63,8 @@ public:
     MediaBuffer(const sp<ABuffer> &buffer);
 
     MediaBuffer(const sp<IMemory> &mem) :
-        MediaBuffer((uint8_t *)mem->pointer() + sizeof(SharedControl), mem->size()) {
+        MediaBuffer((uint8_t *)mem->pointer() + sizeof(SharedControl),
+                    mem->size() > sizeof(SharedControl) ? mem->size() - sizeof(SharedControl) : 0) {
         // delegate and override mMemory
         mMemory = mem;
     }
