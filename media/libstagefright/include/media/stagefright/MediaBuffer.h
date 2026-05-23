@@ -52,7 +52,8 @@ public:
          //       (see declaration for details).
          //       Either document why it is safe in this case or address the
          //       issue (e.g. by copying).
-        MediaBuffer((uint8_t *)mem->unsecurePointer() + sizeof(SharedControl), mem->size()) {
+        MediaBuffer((uint8_t *)mem->unsecurePointer() + sizeof(SharedControl),
+                    mem->size() > sizeof(SharedControl) ? mem->size() - sizeof(SharedControl) : 0) {
         // delegate and override mMemory
         mMemory = mem;
     }
