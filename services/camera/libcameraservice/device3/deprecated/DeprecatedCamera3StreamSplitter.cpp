@@ -735,9 +735,25 @@ void DeprecatedCamera3StreamSplitter::returnOutputBufferLocked(
         return;
     }
 
-    auto outputSlots = *mOutputSlots[from];
+    auto& outputSlots = *mOutputSlots[from];
+    if (slot < 0 || static_cast<size_t>(slot) >= outputSlots.size()) {
+        SP_LOGE("%s: Slot received %d is out of bounds (max %zu)!", __FUNCTION__, slot,
+                outputSlots.size());
+        return;
+    }
+
     buffer = outputSlots[slot];
-    BufferTracker& tracker = *(mBuffers[buffer->getId()]);
+    if (buffer == nullptr) {
+        SP_LOGE("%s: Slot %d contains a null buffer!", __FUNCTION__, slot);
+        return;
+    }
+
+    auto it = mBuffers.find(buffer->getId());
+    if (it == mBuffers.end()) {
+        SP_LOGE("%s: Buffer %" PRIu64 " is not being tracked", __FUNCTION__, buffer->getId());
+        return;
+    }
+    BufferTracker& tracker = *(it->second);
     // Merge the release fence of the incoming buffer so that the fence we send
     // back to the input includes all of the outputs' fences
     if (fence != nullptr && fence->isValid()) {
