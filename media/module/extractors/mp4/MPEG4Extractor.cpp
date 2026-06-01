@@ -201,7 +201,7 @@ private:
     uint64_t mElstInitialEmptyEditTicks;
 
     size_t parseNALSize(const uint8_t *data) const;
-    status_t parseChunk(off64_t *offset);
+    status_t parseChunk(off64_t *offset, int depth = 0);
     status_t parseTrackFragmentHeader(off64_t offset, off64_t size);
     status_t parseTrackFragmentRun(off64_t offset, off64_t size);
     status_t parseSampleAuxiliaryInformationSizes(off64_t offset, off64_t size);
@@ -5903,7 +5903,10 @@ media_status_t MPEG4Source::stop() {
     return AMEDIA_OK;
 }
 
-status_t MPEG4Source::parseChunk(off64_t *offset) {
+status_t MPEG4Source::parseChunk(off64_t *offset, int depth) {
+    if (depth > 100) {
+        return ERROR_MALFORMED;
+    }
     uint32_t hdr[2];
     if (mDataSource->readAt(*offset, hdr, 8) < 8) {
         return ERROR_IO;
@@ -5944,7 +5947,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
                 mCurrentMoofSize = chunk_data_size;
             }
             while (*offset < stop_offset) {
-                status_t err = parseChunk(offset);
+                status_t err = parseChunk(offset, depth + 1);
                 if (err != OK) {
                     return err;
                 }
@@ -5982,7 +5985,7 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
                         mNextMoofOffset = *offset;
                         break;
                     } else if (chunk_type == FOURCC("mdat") && chunk_size > 0) {
-                        status_t err = parseChunk(offset);
+                        status_t err = parseChunk(offset, depth + 1);
                         if (err != OK) {
                             return err;
                         }
