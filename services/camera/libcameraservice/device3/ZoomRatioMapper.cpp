@@ -349,7 +349,7 @@ status_t ZoomRatioMapper::separateZoomFromCropLocked(CameraMetadata* metadata, b
     camera_metadata_entry_t entry;
     for (auto region : kMeteringRegionsToCorrect) {
         entry = metadata->find(region);
-        for (size_t j = 0; j < entry.count; j += 5) {
+        for (size_t j = 0; j + 5 <= entry.count; j += 5) {
             int32_t weight = entry.data.i32[j + 4];
             if (weight == 0) {
                 continue;
@@ -396,7 +396,7 @@ status_t ZoomRatioMapper::combineZoomAndCropLocked(CameraMetadata* metadata, boo
     // Unscale regions with zoomRatio
     for (auto region : kMeteringRegionsToCorrect) {
         entry = metadata->find(region);
-        for (size_t j = 0; j < entry.count; j += 5) {
+        for (size_t j = 0; j + 5 <= entry.count; j += 5) {
             int32_t weight = entry.data.i32[j + 4];
             if (weight == 0) {
                 continue;
