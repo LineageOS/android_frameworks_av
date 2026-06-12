@@ -398,5 +398,35 @@ TEST(RotationMapperTest, Transform180) {
     EXPECT_EQUAL_WITHIN_N(full_landmarks, e.data.i32, 1, "App-side face landmarks aren't right");
 }
 
+TEST(RotationMapperTest, MeteringRegionsBoundsTest) {
+    status_t res;
+
+    CameraMetadata deviceInfo = setupDeviceInfo(testActiveArray,
+            basicModes);
+
+    RotateAndCropMapper mapper(&deviceInfo);
+
+    CameraMetadata request;
+    uint8_t mode = ANDROID_SCALER_ROTATE_AND_CROP_90;
+    auto full_crop = std::vector<int32_t>{0,0, testActiveArray[2], testActiveArray[3]};
+    int32_t aeRegions[] = {10, 10, 100, 100, 50, 999};
+
+    request.update(ANDROID_SCALER_ROTATE_AND_CROP,
+            &mode, 1);
+    request.update(ANDROID_SCALER_CROP_REGION,
+            full_crop.data(), full_crop.size());
+    int32_t aeRegionsPoison[] = {10, 10, 100, 100, 50,
+                              20, 20, 200, 200, 50};
+    request.update(ANDROID_CONTROL_AE_REGIONS, aeRegionsPoison, 10);
+    request.update(ANDROID_CONTROL_AE_REGIONS,
+            aeRegions, 6);
+
+    res = mapper.updateCaptureRequest(&request);
+    ASSERT_EQ(res, OK);
+
+    auto entry = request.find(ANDROID_CONTROL_AE_REGIONS);
+    ASSERT_EQ(entry.count, 6U);
+    EXPECT_EQ(entry.data.i32[5], 999);
+}
 
 } // namespace rotateAndCropMapperTest
