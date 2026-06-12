@@ -163,7 +163,7 @@ status_t RotateAndCropMapper::updateCaptureRequest(CameraMetadata *request) {
 
     for (auto regionTag : kMeteringRegionsToCorrect) {
         entry = request->find(regionTag);
-        for (size_t i = 0; i < entry.count; i += 5) {
+        for (size_t i = 0; i + 5 <= entry.count; i += 5) {
             int32_t weight = entry.data.i32[i + 4];
             if (weight == 0) {
                 continue;
@@ -292,7 +292,7 @@ status_t RotateAndCropMapper::updateCaptureResult(CameraMetadata *result) {
 
     for (auto regionTag : kMeteringRegionsToCorrect) {
         entry = result->find(regionTag);
-        for (size_t i = 0; i < entry.count; i += 5) {
+        for (size_t i = 0; i + 5 <= entry.count; i += 5) {
             int32_t weight = entry.data.i32[i + 4];
             if (weight == 0) {
                 continue;

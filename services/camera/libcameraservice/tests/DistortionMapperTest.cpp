@@ -379,3 +379,30 @@ TEST(DistortionMapperTest, CompareToOpenCV) {
                 << expCoords[i] << ", " << expCoords[i + 1] << ")";
     }
 }
+
+TEST(DistortionMapperTest, MeteringRegionsBoundsTest) {
+    status_t res;
+
+    DistortionMapper m;
+    int32_t activeArray[] = {100, 100, 1000, 750};
+    int32_t preCorrectionActiveArray[] = {100, 100, 2000, 1500};
+    setupTestMapper(&m, identityDistortion, testICal,
+            activeArray, preCorrectionActiveArray);
+
+    CameraMetadata request;
+    uint8_t mode = ANDROID_DISTORTION_CORRECTION_MODE_FAST;
+    request.update(ANDROID_DISTORTION_CORRECTION_MODE, &mode, 1);
+
+    int32_t aeRegionsPoison[] = {10, 10, 100, 100, 50,
+                              20, 20, 200, 200, 50};
+    request.update(ANDROID_CONTROL_AE_REGIONS, aeRegionsPoison, 10);
+    int32_t aeRegions[] = {10, 10, 100, 100, 50, 999};
+    request.update(ANDROID_CONTROL_AE_REGIONS, aeRegions, 6);
+
+    res = m.correctCaptureRequest(&request);
+    ASSERT_EQ(res, OK);
+
+    camera_metadata_entry_t entry = request.find(ANDROID_CONTROL_AE_REGIONS);
+    ASSERT_EQ(entry.count, 6U);
+    EXPECT_EQ(entry.data.i32[5], 999);
+}
