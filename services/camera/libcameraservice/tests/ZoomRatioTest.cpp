@@ -471,3 +471,40 @@ TEST(ZoomRatioTest, ZoomOverZoomRangeTest) {
     subZoomOverZoomRangeTest(false/*usePreCorrectArray*/);
     subZoomOverZoomRangeTest(true/*usePreCorrectArray*/);
 }
+
+TEST(ZoomRatioTest, MeteringRegionsBoundsTest) {
+    status_t res;
+    ZoomRatioMapper mapper;
+    float zoomRatioRange[2] = {1.0f, 4.0f};
+    res = setupTestMapper(&mapper, 4.0/*maxDigitalZoom*/,
+            testActiveArraySize, testPreCorrActiveArraySize,
+            true/*hasZoomRatioRange*/, zoomRatioRange,
+            false/*usePreCorrectArray*/);
+    ASSERT_EQ(res, OK);
+
+    CameraMetadata metadata;
+    // Set scalerCropRegion to 2.0x so that `updateCaptureRequest` modifies
+    // the aeRegions
+    int32_t scalerCropRegion[] = {
+            testActiveArraySize[0] + testActiveArraySize[2]/4,
+            testActiveArraySize[1] + testActiveArraySize[3]/4,
+            testActiveArraySize[2]/2,
+            testActiveArraySize[3]/2,
+    };
+    metadata.update(ANDROID_SCALER_CROP_REGION, scalerCropRegion, 4);
+    // First set aeRegions to be a poinson value so that the OOB read
+    // returns non-0 value.
+    int32_t aeRegionsPoison[] = {10, 10, 100, 100, 50,
+                              20, 20, 200, 200, 50};
+    metadata.update(ANDROID_CONTROL_AE_REGIONS, aeRegionsPoison, 10);
+    // Set aeRegions to a smaller array to check for OOB read/write
+    int32_t aeRegions[] = {10, 10, 100, 100, 50, 999};
+    metadata.update(ANDROID_CONTROL_AE_REGIONS, aeRegions, 6);
+
+    res = mapper.updateCaptureRequest(&metadata);
+    ASSERT_EQ(res, OK);
+
+    camera_metadata_entry_t entry = metadata.find(ANDROID_CONTROL_AE_REGIONS);
+    ASSERT_EQ(entry.count, 6U);
+    EXPECT_EQ(entry.data.i32[5], 999);
+}
