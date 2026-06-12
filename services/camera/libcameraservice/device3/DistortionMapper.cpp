@@ -145,7 +145,7 @@ status_t DistortionMapper::correctCaptureRequest(CameraMetadata *request) {
     if (e.count != 0 && e.data.u8[0] != ANDROID_DISTORTION_CORRECTION_MODE_OFF) {
         for (auto region : kMeteringRegionsToCorrect) {
             e = request->find(region);
-            for (size_t j = 0; j < e.count; j += 5) {
+            for (size_t j = 0; j + 5 <= e.count; j += 5) {
                 int32_t weight = e.data.i32[j + 4];
                 if (weight == 0) {
                     continue;
@@ -184,7 +184,7 @@ status_t DistortionMapper::correctCaptureResult(CameraMetadata *result) {
     if (e.count != 0 && e.data.u8[0] != ANDROID_DISTORTION_CORRECTION_MODE_OFF) {
         for (auto region : kMeteringRegionsToCorrect) {
             e = result->find(region);
-            for (size_t j = 0; j < e.count; j += 5) {
+            for (size_t j = 0; j + 5 <= e.count; j += 5) {
                 int32_t weight = e.data.i32[j + 4];
                 if (weight == 0) {
                     continue;
