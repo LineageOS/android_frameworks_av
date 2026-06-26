@@ -299,50 +299,59 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
                                const SharedBufferHidl& hSource, size_t offset,
                                const CryptoPlugin::SubSample* subSamples, size_t numSubSamples,
                                const DestinationBufferHidl& hDestination, AString* errorDetailMsg) {
-    Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
-
     Mode aMode;
-    if (!convertCryptoMode(mode, &aMode)) {
-        return UNKNOWN_ERROR;
-    }
-
     Pattern aPattern;
-    aPattern.encryptBlocks = pattern.mEncryptBlocks;
-    aPattern.skipBlocks = pattern.mSkipBlocks;
-
     std::vector<SubSample> stdSubSamples;
-    for (size_t i = 0; i < numSubSamples; i++) {
-        SubSample subSample;
-        subSample.numBytesOfClearData = subSamples[i].mNumBytesOfClearData;
-        subSample.numBytesOfEncryptedData = subSamples[i].mNumBytesOfEncryptedData;
-        stdSubSamples.push_back(subSample);
-    }
-
     bool secure;
-    if (hDestination.type == BufferTypeHidl::SHARED_MEMORY) {
-        status_t status = checkSharedBuffer(hDestination.nonsecureMemory);
+    std::shared_ptr<ICryptoPluginAidl> plugin;
+
+    {
+        Mutex::Autolock autoLock(mLock);
+
+        if (mInitCheck != OK) {
+            return mInitCheck;
+        }
+
+        if (!convertCryptoMode(mode, &aMode)) {
+            return UNKNOWN_ERROR;
+        }
+
+        aPattern.encryptBlocks = pattern.mEncryptBlocks;
+        aPattern.skipBlocks = pattern.mSkipBlocks;
+
+        for (size_t i = 0; i < numSubSamples; i++) {
+            SubSample subSample;
+            subSample.numBytesOfClearData = subSamples[i].mNumBytesOfClearData;
+            subSample.numBytesOfEncryptedData = subSamples[i].mNumBytesOfEncryptedData;
+            stdSubSamples.push_back(subSample);
+        }
+
+        if (hDestination.type == BufferTypeHidl::SHARED_MEMORY) {
+            status_t status = checkSharedBuffer(hDestination.nonsecureMemory);
+            if (status != OK) {
+                return status;
+            }
+            secure = false;
+        } else if (hDestination.type == BufferTypeHidl::NATIVE_HANDLE) {
+            secure = true;
+        } else {
+            android_errorWriteLog(0x534e4554, "70526702");
+            return UNKNOWN_ERROR;
+        }
+
+        status_t status = checkSharedBuffer(hSource);
         if (status != OK) {
             return status;
         }
-        secure = false;
-    } else if (hDestination.type == BufferTypeHidl::NATIVE_HANDLE) {
-        secure = true;
-    } else {
-        android_errorWriteLog(0x534e4554, "70526702");
-        return UNKNOWN_ERROR;
+
+        plugin = mPlugin;
     }
 
-    status_t status = checkSharedBuffer(hSource);
-    if (status != OK) {
-        return status;
+    if (plugin == nullptr) {
+        return NO_INIT;
     }
 
     status_t err = UNKNOWN_ERROR;
-    mLock.unlock();
 
     std::vector<uint8_t> keyIdAidl(toStdVec(keyId, 16));
     std::vector<uint8_t> ivAidl(toStdVec(iv, 16));
@@ -360,7 +369,7 @@ ssize_t CryptoHalAidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
 
 
     int32_t result = 0;
-    ::ndk::ScopedAStatus statusAidl = mPlugin->decrypt(args, &result);
+    ::ndk::ScopedAStatus statusAidl = plugin->decrypt(args, &result);
 
     err = statusAidlToDrmStatus(statusAidl);
     std::string msgStr(statusAidl.getMessage());
@@ -379,59 +388,68 @@ DrmStatus CryptoHalAidl::getKeyHandle(const uint8_t keyId[16], CryptoPlugin::Mod
                                       size_t sourceSize, size_t offset,
                                       const CryptoPlugin::SubSample* subSamples,
                                       size_t numSubSamples, Vector<uint8_t>& keyHandle) {
-    Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
-
-    int32_t version = 0;
-    if (mPlugin->getInterfaceVersion(&version).isOk() && version < 2) {
-        return DrmStatus(ERROR_UNSUPPORTED, "getKeyHandle is not supported by the HAL");
-    }
-
     Mode aMode;
-    if (!convertCryptoMode(mode, &aMode)) {
-        return UNKNOWN_ERROR;
-    }
+    std::shared_ptr<ICryptoPluginAidl> plugin;
 
-    // Validate subsample integrity against the source buffer size.
-    size_t totalSampleSize = 0;
-    bool hasEncryptedData = false;
-    for (size_t i = 0; i < numSubSamples; ++i) {
-        size_t currentSubSampleSize;
-        if (__builtin_add_overflow(subSamples[i].mNumBytesOfClearData,
-                                   subSamples[i].mNumBytesOfEncryptedData, &currentSubSampleSize) ||
-            __builtin_add_overflow(totalSampleSize, currentSubSampleSize, &totalSampleSize)) {
-            return DrmStatus(BAD_VALUE, "Subsample sizes overflow.");
+    {
+        Mutex::Autolock autoLock(mLock);
+
+        if (mInitCheck != OK) {
+            return mInitCheck;
         }
-        if (subSamples[i].mNumBytesOfEncryptedData > 0) {
-            hasEncryptedData = true;
+
+        int32_t version = 0;
+        if (mPlugin->getInterfaceVersion(&version).isOk() && version < 2) {
+            return DrmStatus(ERROR_UNSUPPORTED, "getKeyHandle is not supported by the HAL");
         }
+
+        if (!convertCryptoMode(mode, &aMode)) {
+            return UNKNOWN_ERROR;
+        }
+
+        // Validate subsample integrity against the source buffer size.
+        size_t totalSampleSize = 0;
+        bool hasEncryptedData = false;
+        for (size_t i = 0; i < numSubSamples; ++i) {
+            size_t currentSubSampleSize;
+            if (__builtin_add_overflow(subSamples[i].mNumBytesOfClearData,
+                                       subSamples[i].mNumBytesOfEncryptedData, &currentSubSampleSize) ||
+                __builtin_add_overflow(totalSampleSize, currentSubSampleSize, &totalSampleSize)) {
+                return DrmStatus(BAD_VALUE, "Subsample sizes overflow.");
+            }
+            if (subSamples[i].mNumBytesOfEncryptedData > 0) {
+                hasEncryptedData = true;
+            }
+        }
+
+        if (totalSampleSize > sourceSize) {
+            ALOGE("getKeyHandle validation failed: sample size (%zu) > buffer size (%lu)",
+                  totalSampleSize, static_cast<unsigned long>(sourceSize));
+            return DrmStatus(BAD_VALUE, "Sample size larger than source buffer size.");
+        }
+
+        if (hasEncryptedData && mode == CryptoPlugin::kMode_Unencrypted) {
+            // Invalid data.
+            return DrmStatus(BAD_VALUE, "data is encrypted but mode is unencrypted");
+        }
+
+        // Validate memory offset.
+        size_t totalSrcSize = offset;
+        if (__builtin_add_overflow(totalSrcSize, sourceSize, &totalSrcSize)) {
+            return DrmStatus(BAD_VALUE, "source buffer size overflow");
+        }
+
+        plugin = mPlugin;
     }
 
-    if (totalSampleSize > sourceSize) {
-        ALOGE("getKeyHandle validation failed: sample size (%zu) > buffer size (%lu)",
-              totalSampleSize, static_cast<unsigned long>(sourceSize));
-        return DrmStatus(BAD_VALUE, "Sample size larger than source buffer size.");
+    if (plugin == nullptr) {
+        return NO_INIT;
     }
-
-    if (hasEncryptedData && mode == CryptoPlugin::kMode_Unencrypted) {
-        // Invalid data.
-        return DrmStatus(BAD_VALUE, "data is encrypted but mode is unencrypted");
-    }
-
-    // Validate memory offset.
-    size_t totalSrcSize = offset;
-    if (__builtin_add_overflow(totalSrcSize, sourceSize, &totalSrcSize)) {
-        return DrmStatus(BAD_VALUE, "source buffer size overflow");
-    }
-    mLock.unlock();
 
     std::vector<uint8_t> keyIdAidl(toStdVec(keyId, 16));
 
     KeyHandleResult result;
-    ::ndk::ScopedAStatus statusAidl = mPlugin->getKeyHandle(keyIdAidl, aMode, &result);
+    ::ndk::ScopedAStatus statusAidl = plugin->getKeyHandle(keyIdAidl, aMode, &result);
 
     status_t err = statusAidlToDrmStatus(statusAidl);
     if (err != OK) {
