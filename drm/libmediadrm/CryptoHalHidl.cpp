@@ -278,70 +278,81 @@ ssize_t CryptoHalHidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
                                const CryptoPlugin::SubSample* subSamples, size_t numSubSamples,
                                const drm::V1_0::DestinationBuffer& hDestination,
                                AString* errorDetailMsg) {
-    Mutex::Autolock autoLock(mLock);
-
-    if (mInitCheck != OK) {
-        return mInitCheck;
-    }
-
     Mode hMode;
-    switch (mode) {
-        case CryptoPlugin::kMode_Unencrypted:
-            hMode = Mode::UNENCRYPTED;
-            break;
-        case CryptoPlugin::kMode_AES_CTR:
-            hMode = Mode::AES_CTR;
-            break;
-        case CryptoPlugin::kMode_AES_WV:
-            hMode = Mode::AES_CBC_CTS;
-            break;
-        case CryptoPlugin::kMode_AES_CBC:
-            hMode = Mode::AES_CBC;
-            break;
-        default:
-            return UNKNOWN_ERROR;
-    }
-
     Pattern hPattern;
-    hPattern.encryptBlocks = pattern.mEncryptBlocks;
-    hPattern.skipBlocks = pattern.mSkipBlocks;
-
     std::vector<SubSample> stdSubSamples;
-    for (size_t i = 0; i < numSubSamples; i++) {
-        SubSample subSample;
-        subSample.numBytesOfClearData = subSamples[i].mNumBytesOfClearData;
-        subSample.numBytesOfEncryptedData = subSamples[i].mNumBytesOfEncryptedData;
-        stdSubSamples.push_back(subSample);
-    }
-    auto hSubSamples = hidl_vec<SubSample>(stdSubSamples);
-
     bool secure;
-    if (hDestination.type == BufferType::SHARED_MEMORY) {
-        status_t status = checkSharedBuffer(hDestination.nonsecureMemory);
+    sp<ICryptoPlugin> plugin;
+    sp<drm::V1_2::ICryptoPlugin> pluginV1_2;
+
+    {
+        Mutex::Autolock autoLock(mLock);
+
+        if (mInitCheck != OK) {
+            return mInitCheck;
+        }
+
+        switch (mode) {
+            case CryptoPlugin::kMode_Unencrypted:
+                hMode = Mode::UNENCRYPTED;
+                break;
+            case CryptoPlugin::kMode_AES_CTR:
+                hMode = Mode::AES_CTR;
+                break;
+            case CryptoPlugin::kMode_AES_WV:
+                hMode = Mode::AES_CBC_CTS;
+                break;
+            case CryptoPlugin::kMode_AES_CBC:
+                hMode = Mode::AES_CBC;
+                break;
+            default:
+                return UNKNOWN_ERROR;
+        }
+
+        hPattern.encryptBlocks = pattern.mEncryptBlocks;
+        hPattern.skipBlocks = pattern.mSkipBlocks;
+
+        for (size_t i = 0; i < numSubSamples; i++) {
+            SubSample subSample;
+            subSample.numBytesOfClearData = subSamples[i].mNumBytesOfClearData;
+            subSample.numBytesOfEncryptedData = subSamples[i].mNumBytesOfEncryptedData;
+            stdSubSamples.push_back(subSample);
+        }
+
+        if (hDestination.type == BufferType::SHARED_MEMORY) {
+            status_t status = checkSharedBuffer(hDestination.nonsecureMemory);
+            if (status != OK) {
+                return status;
+            }
+            secure = false;
+        } else if (hDestination.type == BufferType::NATIVE_HANDLE) {
+            secure = true;
+        } else {
+            android_errorWriteLog(0x534e4554, "70526702");
+            return UNKNOWN_ERROR;
+        }
+
+        status_t status = checkSharedBuffer(hSource);
         if (status != OK) {
             return status;
         }
-        secure = false;
-    } else if (hDestination.type == BufferType::NATIVE_HANDLE) {
-        secure = true;
-    } else {
-        android_errorWriteLog(0x534e4554, "70526702");
-        return UNKNOWN_ERROR;
+
+        plugin = mPlugin;
+        pluginV1_2 = mPluginV1_2;
     }
 
-    status_t status = checkSharedBuffer(hSource);
-    if (status != OK) {
-        return status;
+    if (plugin == nullptr) {
+        return NO_INIT;
     }
 
+    auto hSubSamples = hidl_vec<SubSample>(stdSubSamples);
     status_t err = UNKNOWN_ERROR;
     uint32_t bytesWritten = 0;
 
     Return<void> hResult;
 
-    mLock.unlock();
-    if (mPluginV1_2 != NULL) {
-        hResult = mPluginV1_2->decrypt_1_2(
+    if (pluginV1_2 != NULL) {
+        hResult = pluginV1_2->decrypt_1_2(
                 secure, toHidlArray16(keyId), toHidlArray16(iv), hMode, hPattern, hSubSamples,
                 hSource, offset, hDestination,
                 [&](Status_V1_2 status, uint32_t hBytesWritten, hidl_string hDetailedError) {
@@ -354,7 +365,7 @@ ssize_t CryptoHalHidl::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
                     err = toStatusT(status);
                 });
     } else {
-        hResult = mPlugin->decrypt(
+        hResult = plugin->decrypt(
                 secure, toHidlArray16(keyId), toHidlArray16(iv), hMode, hPattern, hSubSamples,
                 hSource, offset, hDestination,
                 [&](Status status, uint32_t hBytesWritten, hidl_string hDetailedError) {
