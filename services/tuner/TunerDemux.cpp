@@ -95,6 +95,10 @@ TunerDemux::~TunerDemux() {
 
 ::ndk::ScopedAStatus TunerDemux::getAvSyncHwId(const shared_ptr<ITunerFilter>& tunerFilter,
                                                int32_t* _aidl_return) {
+    if (tunerFilter == nullptr || tunerFilter->isRemote()) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_ARGUMENT));
+    }
     shared_ptr<IFilter> halFilter = (static_cast<TunerFilter*>(tunerFilter.get()))->getHalFilter();
     return mDemux->getAvSyncHwId(halFilter, _aidl_return);
 }

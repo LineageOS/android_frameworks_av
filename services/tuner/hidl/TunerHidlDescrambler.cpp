@@ -45,6 +45,10 @@ TunerHidlDescrambler::~TunerHidlDescrambler() {
 
 ::ndk::ScopedAStatus TunerHidlDescrambler::setDemuxSource(
         const shared_ptr<ITunerDemux>& in_tunerDemux) {
+    if (in_tunerDemux == nullptr || in_tunerDemux->isRemote()) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_ARGUMENT));
+    }
     HidlResult res = mDescrambler->setDemuxSource(
             static_cast<TunerHidlDemux*>(in_tunerDemux.get())->getId());
     if (res != HidlResult::SUCCESS) {
@@ -63,6 +67,10 @@ TunerHidlDescrambler::~TunerHidlDescrambler() {
 
 ::ndk::ScopedAStatus TunerHidlDescrambler::addPid(
         const DemuxPid& in_pid, const shared_ptr<ITunerFilter>& in_optionalSourceFilter) {
+    if (in_optionalSourceFilter != nullptr && in_optionalSourceFilter->isRemote()) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_ARGUMENT));
+    }
     sp<HidlIFilter> halFilter =
             (in_optionalSourceFilter == nullptr)
                     ? nullptr
@@ -76,6 +84,10 @@ TunerHidlDescrambler::~TunerHidlDescrambler() {
 
 ::ndk::ScopedAStatus TunerHidlDescrambler::removePid(
         const DemuxPid& in_pid, const shared_ptr<ITunerFilter>& in_optionalSourceFilter) {
+    if (in_optionalSourceFilter != nullptr && in_optionalSourceFilter->isRemote()) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_ARGUMENT));
+    }
     sp<HidlIFilter> halFilter =
             (in_optionalSourceFilter == nullptr)
                     ? nullptr
