@@ -307,7 +307,7 @@ TunerHidlFilter::~TunerHidlFilter() {
 
 ::ndk::ScopedAStatus TunerHidlFilter::setDataSource(const shared_ptr<ITunerFilter>& filter) {
     Mutex::Autolock _l(mLock);
-    if (filter == nullptr) {
+    if (filter == nullptr || filter->isRemote()) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
     }
