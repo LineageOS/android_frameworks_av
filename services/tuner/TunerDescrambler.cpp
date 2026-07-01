@@ -52,6 +52,10 @@ TunerDescrambler::~TunerDescrambler() {
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
+    if (in_tunerDemux == nullptr || in_tunerDemux->isRemote()) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_ARGUMENT));
+    }
     return mDescrambler->setDemuxSource((static_cast<TunerDemux*>(in_tunerDemux.get()))->getId());
 }
 
@@ -73,6 +77,10 @@ TunerDescrambler::~TunerDescrambler() {
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
+    if (in_optionalSourceFilter != nullptr && in_optionalSourceFilter->isRemote()) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_ARGUMENT));
+    }
     shared_ptr<IFilter> halFilter =
             (in_optionalSourceFilter == nullptr)
                     ? nullptr
@@ -89,6 +97,10 @@ TunerDescrambler::~TunerDescrambler() {
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
+    if (in_optionalSourceFilter != nullptr && in_optionalSourceFilter->isRemote()) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_ARGUMENT));
+    }
     shared_ptr<IFilter> halFilter =
             (in_optionalSourceFilter == nullptr)
                     ? nullptr

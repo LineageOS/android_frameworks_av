@@ -67,7 +67,7 @@ TunerDvr::~TunerDvr() {
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    if (in_filter == nullptr) {
+    if (in_filter == nullptr || in_filter->isRemote()) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
     }
@@ -88,7 +88,7 @@ TunerDvr::~TunerDvr() {
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    if (in_filter == nullptr) {
+    if (in_filter == nullptr || in_filter->isRemote()) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
     }

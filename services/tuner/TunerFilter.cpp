@@ -189,7 +189,7 @@ TunerFilter::~TunerFilter() {
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    if (filter == nullptr) {
+    if (filter == nullptr || filter->isRemote()) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
     }

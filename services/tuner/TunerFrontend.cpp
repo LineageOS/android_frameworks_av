@@ -107,7 +107,7 @@ TunerFrontend::~TunerFrontend() {
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    if (lnb == nullptr) {
+    if (lnb == nullptr || lnb->isRemote()) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
     }

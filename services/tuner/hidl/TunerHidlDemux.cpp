@@ -18,10 +18,12 @@
 
 #include "TunerHidlDemux.h"
 
+#include <aidl/android/hardware/tv/tuner/Result.h>
 #include "TunerHidlDvr.h"
 #include "TunerHidlFilter.h"
 #include "TunerHidlTimeFilter.h"
 
+using ::aidl::android::hardware::tv::tuner::Result;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterSubType;
 
 using HidlDemuxAlpFilterType = ::android::hardware::tv::tuner::V1_0::DemuxAlpFilterType;
@@ -165,6 +167,10 @@ TunerHidlDemux::~TunerHidlDemux() {
                 static_cast<int32_t>(HidlResult::UNAVAILABLE));
     }
 
+    if (tunerFilter == nullptr || tunerFilter->isRemote()) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::INVALID_ARGUMENT));
+    }
     uint32_t avSyncHwId;
     HidlResult res;
     sp<HidlIFilter> halFilter = static_cast<TunerHidlFilter*>(tunerFilter.get())->getHalFilter();
