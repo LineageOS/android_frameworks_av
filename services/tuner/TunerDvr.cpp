@@ -52,7 +52,7 @@ TunerDvr::~TunerDvr() {
 }
 
 ::ndk::ScopedAStatus TunerDvr::attachFilter(const shared_ptr<ITunerFilter>& in_filter) {
-    if (in_filter == nullptr) {
+    if (in_filter == nullptr || in_filter->isRemote()) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
     }
@@ -67,7 +67,7 @@ TunerDvr::~TunerDvr() {
 }
 
 ::ndk::ScopedAStatus TunerDvr::detachFilter(const shared_ptr<ITunerFilter>& in_filter) {
-    if (in_filter == nullptr) {
+    if (in_filter == nullptr || in_filter->isRemote()) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
     }
