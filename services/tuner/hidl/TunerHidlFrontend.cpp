@@ -264,7 +264,7 @@ TunerHidlFrontend::~TunerHidlFrontend() {
 }
 
 ::ndk::ScopedAStatus TunerHidlFrontend::setLnb(const shared_ptr<ITunerLnb>& lnb) {
-    if (lnb == nullptr) {
+    if (lnb == nullptr || lnb->isRemote()) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
                 static_cast<int32_t>(Result::INVALID_ARGUMENT));
     }
