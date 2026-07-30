@@ -19,10 +19,13 @@
 
 #include <inttypes.h>
 
+<<<<<<< HEAD   (475269ec44acec82792be6b01fb8e16357d4d2c8 Merge cherrypicks of ['googleplex-android-review.googlesourc)
 #include <android_media_codec.h>
 
+=======
+#include <android-base/properties.h>
+>>>>>>> CHANGE (254cf16849be9b029444cc5519dd2cea63f3f404 libmediaplayerservice: fix thumbnail property read)
 #include <utils/Log.h>
-#include <cutils/properties.h>
 
 #include "StagefrightMetadataRetriever.h"
 #include "FrameDecoder.h"
@@ -253,7 +256,7 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
         return NULL;
     }
 
-    bool preferhw = property_get_bool(
+    bool preferhw = android::base::GetBoolProperty(
             "media.stagefright.thumbnail.prefer_hw_codecs", false);
     uint32_t flags = preferhw ? 0 : MediaCodecList::kPreferSoftwareCodecs;
     Vector<AString> matchingCodecs;
@@ -440,7 +443,17 @@ sp<IMemory> StagefrightMetadataRetriever::getFrameInternal(
         mAlbumArt = MediaAlbumArt::fromData(dataSize, data);
     }
 
+<<<<<<< HEAD   (475269ec44acec82792be6b01fb8e16357d4d2c8 Merge cherrypicks of ['googleplex-android-review.googlesourc)
     bool preferhw = property_get_bool(
+=======
+    const char *mime;
+    if (!trackMeta->findCString(kKeyMIMEType, &mime)) {
+        ALOGE("video track has no mime information.");
+        return NULL;
+    }
+
+    bool preferhw = android::base::GetBoolProperty(
+>>>>>>> CHANGE (254cf16849be9b029444cc5519dd2cea63f3f404 libmediaplayerservice: fix thumbnail property read)
             "media.stagefright.thumbnail.prefer_hw_codecs", false);
     uint32_t flags = preferhw ? 0 : MediaCodecList::kPreferSoftwareCodecs;
 
