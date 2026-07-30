@@ -21,8 +21,8 @@
 
 #include <android_media_codec.h>
 
+#include <android-base/properties.h>
 #include <utils/Log.h>
-#include <cutils/properties.h>
 
 #include "StagefrightMetadataRetriever.h"
 #include "FrameDecoder.h"
@@ -253,7 +253,7 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
         return NULL;
     }
 
-    bool preferhw = property_get_bool(
+    bool preferhw = android::base::GetBoolProperty(
             "media.stagefright.thumbnail.prefer_hw_codecs", false);
     uint32_t flags = preferhw ? 0 : MediaCodecList::kPreferSoftwareCodecs;
     Vector<AString> matchingCodecs;
@@ -440,7 +440,7 @@ sp<IMemory> StagefrightMetadataRetriever::getFrameInternal(
         mAlbumArt = MediaAlbumArt::fromData(dataSize, data);
     }
 
-    bool preferhw = property_get_bool(
+    bool preferhw = android::base::GetBoolProperty(
             "media.stagefright.thumbnail.prefer_hw_codecs", false);
     uint32_t flags = preferhw ? 0 : MediaCodecList::kPreferSoftwareCodecs;
 
