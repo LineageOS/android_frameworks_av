@@ -16,6 +16,24 @@
       "message": "i see no issue with property_get_bool() here.",
       "revId": "071494fc4e3debdd7040b4f8ce2a67e777409410",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "a65f79dc_97fec987",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 37188
+      },
+      "writtenOn": "2026-08-05T16:55:47Z",
+      "side": 1,
+      "message": "\u0027media.stagefright.thumbnail.prefer_hw_codecs\u0027 is longer than 31 symbol, it causes an error \"E libc: The property name length for \"media.stagefright.thumbnail.prefer_hw_codecs\" is \u003e\u003d 31; please use __system_property_read_callback to read this property. (the name is truncated to \"media.stagefright.thumbnail.pre\")\"",
+      "parentUuid": "6554b132_a5e081ec",
+      "revId": "071494fc4e3debdd7040b4f8ce2a67e777409410",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
