@@ -34,6 +34,24 @@
       "parentUuid": "6554b132_a5e081ec",
       "revId": "071494fc4e3debdd7040b4f8ce2a67e777409410",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "63170ecd_3643953f",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 10067
+      },
+      "writtenOn": "2026-08-05T16:59:18Z",
+      "side": 1,
+      "message": "i tested this with a small c program and it read it just fine and didn\u0027t log anything.",
+      "parentUuid": "a65f79dc_97fec987",
+      "revId": "071494fc4e3debdd7040b4f8ce2a67e777409410",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
