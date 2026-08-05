@@ -52,6 +52,24 @@
       "parentUuid": "a65f79dc_97fec987",
       "revId": "071494fc4e3debdd7040b4f8ce2a67e777409410",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6ba1fac4_af65dc86",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 37188
+      },
+      "writtenOn": "2026-08-05T17:10:27Z",
+      "side": 1,
+      "message": "The issue here is not property_get_bool() in general, but this specific long property name on the target runtime.\n\nOn my device (Redmi Note 11), these call sites trigger:\n\nE libc: The property name length for \"media.stagefright.thumbnail.prefer_hw_codecs\" is \u003e\u003d 31; please use __system_property_read_callback to read this property.\n\nSo the switch to android::base::GetBoolProperty() is meant to avoid that libc warning for this property.",
+      "parentUuid": "63170ecd_3643953f",
+      "revId": "071494fc4e3debdd7040b4f8ce2a67e777409410",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
