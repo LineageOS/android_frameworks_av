@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "3d1a20fa_fa7f408c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 4550
+      },
+      "writtenOn": "2026-08-06T17:55:05Z",
+      "side": 1,
+      "message": "Why not just reuse persist.vendor.camera.privapp.list? We don\u0027t need yet another flag",
+      "revId": "bd9d2e3106e5b80a4493553118d5e6727a48f901",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
