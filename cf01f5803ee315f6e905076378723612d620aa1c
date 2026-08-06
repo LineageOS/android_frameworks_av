@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "57381f7d_14239516",
+        "filename": "services/camera/libcameraservice/device3/Camera3OutputUtils.cpp",
+        "patchSetId": 3
+      },
+      "lineNbr": 1103,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2026-08-06T02:53:50Z",
+      "side": 1,
+      "message": "120 chars, split line",
+      "revId": "cf01f5803ee315f6e905076378723612d620aa1c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
