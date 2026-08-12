@@ -7486,7 +7486,7 @@ media_status_t MPEG4Source::fragmentedRead(
 
     if (!mIsAVC && !mIsHEVC && !mIsVVC && !(mIsDolbyVision && mNALLengthSize)) {
         if (newBuffer) {
-            if (!isInRange((size_t)0u, mBuffer->size(), size)) {
+            if (!isInRange((size_t)0u, mBuffer->size() + 1, size)) {
                 mBuffer->release();
                 mBuffer = NULL;
 
@@ -7549,7 +7549,7 @@ media_status_t MPEG4Source::fragmentedRead(
         bool isMalFormed = false;
         int32_t max_size;
         if (!AMediaFormat_getInt32(mFormat, AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, &max_size)
-                || !isInRange((size_t)0u, (size_t)max_size, size)) {
+                || !isInRange((size_t)0u, (size_t)max_size + 1, size)) {
             isMalFormed = true;
         } else {
             data = mSrcBuffer;
