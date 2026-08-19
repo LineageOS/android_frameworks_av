@@ -959,7 +959,33 @@ void C2SoftApvDec::process(const std::unique_ptr<C2Work>& work,
             work->result = C2_CORRUPTED;
             return;
         }
+        for (int i = 0; i < aui.num_frms; i++) {
+            if (aui.frm_info[i].profile_idc != OAPV_PROFILE_422_10 &&
+                // While 12-bit is not technically supported, the lower 2 bits will be ignored later
+                // when handling P210 format.
+                aui.frm_info[i].profile_idc != OAPV_PROFILE_422_12) {
+                ALOGE("Unsupported profile %d", aui.frm_info[i].profile_idc);
+                work->result = C2_CORRUPTED;
+                return;
+            }
 
+            if (aui.frm_info[i].w > MAX_SUPPORTED_WIDTH ||
+                aui.frm_info[i].h > MAX_SUPPORTED_HEIGHT) {
+                ALOGE("Stream resolution of %dx%d is not supported.", aui.frm_info[i].w,
+                      aui.frm_info[i].h);
+                work->result = C2_CORRUPTED;
+                return;
+            }
+
+            if (i > 0 && (aui.frm_info[i].w != aui.frm_info[0].w ||
+                          aui.frm_info[i].h != aui.frm_info[0].h)) {
+                ALOGE("Stream with multiple frames of different dimensions is not supported "
+                      "(%dx%d vs %dx%d).",
+                      aui.frm_info[i].w, aui.frm_info[i].h, aui.frm_info[0].w, aui.frm_info[0].h);
+                work->result = C2_CORRUPTED;
+                return;
+            }
+        }
         /* create decoding frame buffers */
         mOutFrames.num_frms = aui.num_frms;
         if (mOutFrames.num_frms <= 0) {
@@ -971,12 +997,6 @@ void C2SoftApvDec::process(const std::unique_ptr<C2Work>& work,
         for (int i = 0; i < mOutFrames.num_frms; i++) {
             oapv_frm_info_t* finfo = &aui.frm_info[i];
             oapv_frm_t* frm = &mOutFrames.frm[i];
-
-            if (finfo->w > MAX_SUPPORTED_WIDTH || finfo->h > MAX_SUPPORTED_HEIGHT) {
-                ALOGE("Stream resolution of %dx%d is not supported.", finfo->w, finfo->h);
-                work->result = C2_CORRUPTED;
-                return;
-            }
 
             if (finfo->pbu_type == OAPV_PBU_TYPE_PRIMARY_FRAME && !reportResolutionChange) {
                 if (mWidth != finfo->w || mHeight != finfo->h) {
