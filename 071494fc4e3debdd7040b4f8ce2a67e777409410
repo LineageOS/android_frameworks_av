@@ -70,6 +70,23 @@
       "parentUuid": "63170ecd_3643953f",
       "revId": "071494fc4e3debdd7040b4f8ce2a67e777409410",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "2c384b65_3979a373",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 37188
+      },
+      "writtenOn": "2026-08-27T18:40:20Z",
+      "side": 1,
+      "message": "For reference, the truncation warning is defined directly in AOSP Bionic:\nhttps://android.googlesource.com/platform/bionic/+/refs/heads/main/libc/system_properties/system_properties.cpp\n\n\"media.stagefright.thumbnail.prefer_hw_codecs\" is 44 characters long, exceeding PROP_NAME_MAX (32). \n\nWhen calling legacy property_get_bool(), Bionic\u0027s SystemProperties::Read() truncates the name and logs the error via async_safe_format_log. Because it writes directly to Android\u0027s logd rather than stdout/stderr, a standalone C test executable won\u0027t output anything to the console, but it triggers immediately in logcat on-device:\n\"E libc: The property name length for \u0027media.stagefright.thumbnail.prefer_hw_codecs\u0027 is \u003e\u003d 31...\"\n\nMigrating to android::base::GetBoolProperty() uses __system_property_read_callback, avoiding legacy property name limits.",
+      "revId": "071494fc4e3debdd7040b4f8ce2a67e777409410",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
