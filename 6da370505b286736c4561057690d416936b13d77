@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "fd8a92d3_b9a29227",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 4
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2026-08-28T01:26:32Z",
+      "side": 1,
+      "message": "Still valid for the few who ship motcamera, and still no way to do high res 108MP in aperture",
+      "revId": "6da370505b286736c4561057690d416936b13d77",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
