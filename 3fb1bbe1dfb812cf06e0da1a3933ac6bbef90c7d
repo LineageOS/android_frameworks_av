@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b4fa00be_99685633",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 8
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 19252
+      },
+      "writtenOn": "2026-08-30T03:23:46Z",
+      "side": 1,
+      "message": "Let\u0027s hold off on this, maybe there\u0027s a way to just fix or change the moto camera app for tundra since it\u0027s the only one with the issue",
+      "revId": "3fb1bbe1dfb812cf06e0da1a3933ac6bbef90c7d",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
