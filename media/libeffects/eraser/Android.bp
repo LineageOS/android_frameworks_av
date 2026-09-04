@@ -80,6 +80,7 @@ cc_library_shared {
     ],
     visibility: [
         "//hardware/interfaces/audio/aidl/default:__subpackages__",
+        "//hardware/mainline/common/interfaces/audio/mainline",
     ],
     relative_install_path: "soundfx",
 }
