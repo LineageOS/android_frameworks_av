@@ -303,6 +303,12 @@ void addSupportedColorFormats(
         //   all other codecs:    Surface, YUV420s, <the rest>
         // TODO: get this preference via Codec2 API
 
+        if (::android::base::GetBoolProperty("media.c2.prefer_rgba8888", false)
+                && std::find(supportedColorFormats.begin(), supportedColorFormats.end(),
+                      COLOR_Format32bitABGR8888) != supportedColorFormats.end()) {
+            addDefaultColorFormat(COLOR_Format32bitABGR8888);
+        }
+
         // vendor video codecs prefer opaque format
         if (trait.name.find("android") == std::string::npos) {
             addDefaultColorFormat(COLOR_FormatSurface);
