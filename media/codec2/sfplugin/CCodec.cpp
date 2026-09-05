@@ -1611,11 +1611,41 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     }
                 }
             }
+            const bool forceRgba8888Requested =
+                    ::android::base::GetBoolProperty("media.c2.force_rgba8888", false);
+            const bool preferRgba8888Requested = forceRgba8888Requested
+                    || ::android::base::GetBoolProperty("media.c2.prefer_rgba8888", false);
+            bool forceRgba8888 = false;
+            bool preferRgba8888 = false;
+            if (preferRgba8888Requested
+                    && (config->mDomain & Config::IS_VIDEO)
+                    && !(config->mDomain & Config::IS_ENCODER)
+                    && !config->mTunneled) {
+                C2StreamPixelFormatInfo::output pixelFormat;
+                std::vector<C2FieldSupportedValuesQuery> query = {
+                    C2FieldSupportedValuesQuery::Possible(
+                            C2ParamField::Make(pixelFormat, pixelFormat.value)),
+                };
+                if (comp->querySupportedValues(query, C2_MAY_BLOCK) == C2_OK
+                        && query[0].status == C2_OK
+                        && query[0].values.type == C2FieldSupportedValues::VALUES) {
+                    for (C2Value::Primitive value : query[0].values.values) {
+                        if (value.u32 == HAL_PIXEL_FORMAT_RGBA_8888) {
+                            preferRgba8888 = true;
+                            forceRgba8888 = forceRgba8888Requested;
+                            break;
+                        }
+                    }
+                }
+            }
             if (!msg->findInt32(KEY_COLOR_FORMAT, &format)) {
                 // Also handle default color format (encoders require color format, so this is only
                 // needed for decoders.
                 if (!(config->mDomain & Config::IS_ENCODER)) {
-                    if (surface == nullptr) {
+                    if (preferRgba8888) {
+                        format = COLOR_Format32bitABGR8888;
+                        ALOGD("Decoder w/o color format set: using preferred RGBA_8888");
+                    } else if (surface == nullptr) {
                         const char *prefix = "";
                         if (flexSemiPlanarPixelFormat.count(8) != 0) {
                             format = COLOR_FormatYUV420SemiPlanar;
@@ -1631,6 +1661,11 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     defaultColorFormat = format;
                 }
             } else {
+                if (forceRgba8888) {
+                    format = COLOR_Format32bitABGR8888;
+                    msg->setInt32(KEY_COLOR_FORMAT, format);
+                    ALOGD("Overriding requested decoder color format with RGBA_8888");
+                }
                 if ((config->mDomain & Config::IS_ENCODER) || !surface) {
                     if (vendorSdkVersion < __ANDROID_API_S__ &&
                             (format == COLOR_FormatYUV420Planar ||
