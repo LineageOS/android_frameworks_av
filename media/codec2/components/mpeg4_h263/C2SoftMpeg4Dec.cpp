@@ -161,11 +161,15 @@ public:
                 .withConstValue(defaultColorInfo)
                 .build());
 
-        // TODO: support more formats?
         addParameter(
                 DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
-                .withConstValue(new C2StreamPixelFormatInfo::output(
-                                     0u, HAL_PIXEL_FORMAT_YCBCR_420_888))
+                .withDefault(new C2StreamPixelFormatInfo::output(
+                        0u, HAL_PIXEL_FORMAT_YCBCR_420_888))
+                .withFields({C2F(mPixelFormat, value).oneOf({
+                        HAL_PIXEL_FORMAT_YCBCR_420_888,
+                        HAL_PIXEL_FORMAT_RGBA_8888,
+                })})
+                .withSetter(Setter<decltype(*mPixelFormat)>::StrictValueWithNoDeps)
                 .build());
     }
 
@@ -212,6 +216,10 @@ public:
 
     uint32_t getMaxWidth() const { return mMaxSize->width; }
     uint32_t getMaxHeight() const { return mMaxSize->height; }
+
+    std::shared_ptr<C2StreamPixelFormatInfo::output> getPixelFormat_l() const {
+        return mPixelFormat;
+    }
 
 private:
     std::shared_ptr<C2StreamProfileLevelInfo::input> mProfileLevel;
@@ -365,18 +373,24 @@ c2_status_t C2SoftMpeg4Dec::ensureDecoderState(const std::shared_ptr<C2BlockPool
             }
         }
     }
-    if (mOutBlock &&
-            (mOutBlock->width() != align(mWidth, 16) || mOutBlock->height() != mHeight)) {
+    uint32_t format;
+    {
+        IntfImpl::Lock lock = mIntf->lock();
+        format = mIntf->getPixelFormat_l()->value == HAL_PIXEL_FORMAT_RGBA_8888
+                ? HAL_PIXEL_FORMAT_RGBA_8888 : HAL_PIXEL_FORMAT_YV12;
+    }
+    if (mOutBlock && (mOutBlock->width() != align(mWidth, 16) ||
+            mOutBlock->height() != mHeight || mOutputPixelFormat != format)) {
         mOutBlock.reset();
     }
     if (!mOutBlock) {
-        uint32_t format = HAL_PIXEL_FORMAT_YV12;
         C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
         c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16), mHeight, format, usage, &mOutBlock);
         if (err != C2_OK) {
             ALOGE("fetchGraphicBlock for Output failed with status %d", err);
             return err;
         }
+        mOutputPixelFormat = format;
         ALOGV("provided (%dx%d) required (%dx%d)",
               mOutBlock->width(), mOutBlock->height(), mWidth, mHeight);
     }
@@ -606,14 +620,7 @@ void C2SoftMpeg4Dec::process(
             return;
         }
 
-        uint8_t *outputBufferY = wView.data()[C2PlanarLayout::PLANE_Y];
-        uint8_t *outputBufferU = wView.data()[C2PlanarLayout::PLANE_U];
-        uint8_t *outputBufferV = wView.data()[C2PlanarLayout::PLANE_V];
-
         C2PlanarLayout layout = wView.layout();
-        size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-        size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
-        size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
         size_t srcYStride = align(mWidth, 16);
         size_t srcUStride = srcYStride / 2;
         size_t srcVStride = srcYStride / 2;
@@ -622,9 +629,22 @@ void C2SoftMpeg4Dec::process(
         const uint8_t *srcU = (const uint8_t *)srcY + vStride * srcYStride;
         const uint8_t *srcV = (const uint8_t *)srcY + vStride * srcYStride * 5 / 4;
 
-        convertYUV420Planar8ToYV12(outputBufferY, outputBufferU, outputBufferV, srcY, srcU, srcV,
-                                   srcYStride, srcUStride, srcVStride, dstYStride, dstUStride,
-                                   dstVStride, mWidth, mHeight);
+        if (mOutputPixelFormat == HAL_PIXEL_FORMAT_RGBA_8888) {
+            convertPlanar8ToRGBA8888(
+                    wView.data()[C2PlanarLayout::PLANE_Y],
+                    layout.planes[C2PlanarLayout::PLANE_Y].rowInc,
+                    srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+                    mWidth, mHeight, false, CONV_FORMAT_I420);
+        } else {
+            convertYUV420Planar8ToYV12(
+                    wView.data()[C2PlanarLayout::PLANE_Y],
+                    wView.data()[C2PlanarLayout::PLANE_U],
+                    wView.data()[C2PlanarLayout::PLANE_V], srcY, srcU, srcV,
+                    srcYStride, srcUStride, srcVStride,
+                    layout.planes[C2PlanarLayout::PLANE_Y].rowInc,
+                    layout.planes[C2PlanarLayout::PLANE_U].rowInc,
+                    layout.planes[C2PlanarLayout::PLANE_V].rowInc, mWidth, mHeight);
+        }
 
         inPos += inSize - (size_t)tmpInSize;
         finishWork(workIndex, work);

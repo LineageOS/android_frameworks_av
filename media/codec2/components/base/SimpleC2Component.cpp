@@ -23,6 +23,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
 
+#include <algorithm>
 #include <inttypes.h>
 #include <libyuv.h>
 #include <vector>
@@ -38,7 +39,6 @@ namespace android {
 
 // libyuv version required for I410ToAB30Matrix and I210ToAB30Matrix.
 #if LIBYUV_VERSION >= 1780
-#include <algorithm>
 #define HAVE_LIBYUV_I410_I210_TO_AB30 1
 #else
 #define HAVE_LIBYUV_I410_I210_TO_AB30 0
@@ -151,7 +151,7 @@ namespace {
 static C2ColorAspectsStruct FillMissingColorAspects(
         std::shared_ptr<const C2ColorAspectsStruct> aspects,
         int32_t width, int32_t height) {
-    C2ColorAspectsStruct _aspects;
+    C2ColorAspectsStruct _aspects{};
     if (aspects) {
         _aspects = *aspects;
     }
@@ -844,6 +844,95 @@ void convertPlanar8ToRGBA8888(
     } else {
         libyuv::I420ToARGBMatrix(srcY, srcYStride, srcV, srcVStride, srcU, srcUStride,
                                  dstRGBA, dstRGBAStride, constants, width, height);
+    }
+}
+
+void convertPlanar16ToRGBA8888(
+        uint8_t* dstRGBA, size_t dstRGBAStride, const uint16_t* srcY,
+        const uint16_t* srcU, const uint16_t* srcV, size_t srcYStride,
+        size_t srcUStride, size_t srcVStride, uint32_t width, uint32_t height,
+        uint32_t bitDepth, bool isMonochrome, CONV_FORMAT_T format,
+        std::shared_ptr<const C2ColorAspectsStruct> aspects) {
+    std::vector<uint16_t> neutralChroma;
+    if (isMonochrome) {
+        neutralChroma.assign(width, 1u << (bitDepth - 1));
+        srcU = srcV = neutralChroma.data();
+        srcUStride = srcVStride = 0;
+    }
+
+    const C2ColorAspectsStruct filledAspects = FillMissingColorAspects(aspects, width, height);
+    const libyuv::YuvConstants* constants = GetYvuConstantsForAspects(filledAspects);
+    if (bitDepth == 10) {
+        if (format == CONV_FORMAT_I444) {
+            libyuv::I410ToARGBMatrix(srcY, srcYStride, srcV, srcVStride, srcU, srcUStride,
+                                     dstRGBA, dstRGBAStride, constants, width, height);
+        } else if (format == CONV_FORMAT_I422) {
+            libyuv::I210ToARGBMatrix(srcY, srcYStride, srcV, srcVStride, srcU, srcUStride,
+                                     dstRGBA, dstRGBAStride, constants, width, height);
+        } else {
+            libyuv::I010ToARGBMatrix(srcY, srcYStride, srcV, srcVStride, srcU, srcUStride,
+                                     dstRGBA, dstRGBAStride, constants, width, height);
+        }
+        return;
+    }
+    if (bitDepth == 12 && format == CONV_FORMAT_I420) {
+        libyuv::I012ToARGBMatrix(srcY, srcYStride, srcV, srcVStride, srcU, srcUStride,
+                                 dstRGBA, dstRGBAStride, constants, width, height);
+        return;
+    }
+
+    const size_t chromaWidth = format == CONV_FORMAT_I444 ? width : (width + 1) / 2;
+    const size_t chromaHeight = format == CONV_FORMAT_I420 ? (height + 1) / 2 : height;
+    std::vector<uint8_t> planar8(width * height + 2 * chromaWidth * chromaHeight);
+    uint8_t* tmpY = planar8.data();
+    uint8_t* tmpU = tmpY + width * height;
+    uint8_t* tmpV = tmpU + chromaWidth * chromaHeight;
+    const uint32_t shift = bitDepth - 8;
+    for (size_t y = 0; y < height; ++y) {
+        for (size_t x = 0; x < width; ++x) {
+            tmpY[y * width + x] = srcY[y * srcYStride + x] >> shift;
+        }
+    }
+    if (!isMonochrome) {
+        for (size_t y = 0; y < chromaHeight; ++y) {
+            for (size_t x = 0; x < chromaWidth; ++x) {
+                tmpU[y * chromaWidth + x] = srcU[y * srcUStride + x] >> shift;
+                tmpV[y * chromaWidth + x] = srcV[y * srcVStride + x] >> shift;
+            }
+        }
+    }
+    convertPlanar8ToRGBA8888(
+            dstRGBA, dstRGBAStride, tmpY, tmpU, tmpV, width, chromaWidth,
+            chromaWidth, width, height, isMonochrome, format, aspects);
+}
+
+void convertP210ToRGBA8888(
+        uint8_t* dstRGBA, size_t dstRGBAStride, const uint16_t* srcY,
+        const uint16_t* srcUV, size_t srcYStride, size_t srcUVStride,
+        uint32_t width, uint32_t height,
+        std::shared_ptr<const C2ColorAspectsStruct> aspects) {
+    const C2ColorAspectsStruct filledAspects = FillMissingColorAspects(aspects, width, height);
+    const bool fullRange = filledAspects.range == C2Color::RANGE_FULL;
+    const libyuv::YuvConstants* constants;
+    switch (filledAspects.matrix) {
+        case C2Color::MATRIX_BT709:
+            constants = fullRange ? &libyuv::kYuvF709Constants : &libyuv::kYuvH709Constants;
+            break;
+        case C2Color::MATRIX_BT2020:
+            constants = fullRange ? &libyuv::kYuvV2020Constants : &libyuv::kYuv2020Constants;
+            break;
+        case C2Color::MATRIX_BT601:
+        default:
+            constants = fullRange ? &libyuv::kYuvJPEGConstants : &libyuv::kYuvI601Constants;
+            break;
+    }
+    libyuv::P210ToARGBMatrix(srcY, srcYStride, srcUV, srcUVStride, dstRGBA,
+                             dstRGBAStride, constants, width, height);
+    for (size_t y = 0; y < height; ++y) {
+        uint8_t* row = dstRGBA + y * dstRGBAStride;
+        for (size_t x = 0; x < width; ++x) {
+            std::swap(row[x * 4], row[x * 4 + 2]);
+        }
     }
 }
 

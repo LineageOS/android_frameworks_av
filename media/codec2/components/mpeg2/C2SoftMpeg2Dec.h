@@ -125,6 +125,7 @@ struct C2SoftMpeg2Dec : public SimpleC2Component {
                        size_t inSize,
                        uint32_t tsMarker);
     bool getSeqInfo();
+    void convertToRGBA(C2GraphicView &view);
     c2_status_t ensureDecoderState(const std::shared_ptr<C2BlockPool> &pool);
     void finishWork(uint64_t index, const std::unique_ptr<C2Work> &work);
     status_t setFlushMode();
@@ -159,6 +160,9 @@ struct C2SoftMpeg2Dec : public SimpleC2Component {
     uint32_t mWidth = 320;
     uint32_t mHeight = 240;
     uint32_t mStride = 0;
+    uint32_t mOutputPixelFormat = 0;
+    uint8_t *mConversionBuffer = nullptr;
+    size_t mConversionBufferSize = 0;
     bool mSignalledOutputEos = false;
     bool mSignalledError = false;
     bool mKeepThreadsActive = false;

@@ -128,6 +128,7 @@ private:
                        size_t inSize,
                        uint32_t tsMarker);
     bool getVuiParams();
+    void convertToRGBA(C2GraphicView &view);
     c2_status_t ensureDecoderState(const std::shared_ptr<C2BlockPool> &pool);
     void finishWork(uint64_t index, const std::unique_ptr<C2Work> &work);
     status_t setFlushMode();
@@ -160,6 +161,9 @@ private:
     uint32_t mWidth;
     uint32_t mHeight;
     uint32_t mStride;
+    uint32_t mOutputPixelFormat;
+    uint8_t *mConversionBuffer;
+    size_t mConversionBufferSize;
     bool mSignalledOutputEos;
     bool mSignalledError;
     bool mHeaderDecoded;

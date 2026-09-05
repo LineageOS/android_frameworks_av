@@ -155,10 +155,15 @@ class C2SoftAomDec::IntfImpl : public SimpleInterface<void>::BaseParams {
                 .withSetter(DefaultColorAspectsSetter)
                 .build());
 
-        // TODO: support more formats?
+        std::vector<uint32_t> pixelFormats = {
+            HAL_PIXEL_FORMAT_YCBCR_420_888,
+            HAL_PIXEL_FORMAT_RGBA_8888,
+        };
         addParameter(DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
-                         .withConstValue(new C2StreamPixelFormatInfo::output(
+                         .withDefault(new C2StreamPixelFormatInfo::output(
                              0u, HAL_PIXEL_FORMAT_YCBCR_420_888))
+                         .withFields({C2F(mPixelFormat, value).oneOf(pixelFormats)})
+                         .withSetter((Setter<decltype(*mPixelFormat)>::StrictValueWithNoDeps))
                          .build());
     }
 
@@ -224,6 +229,10 @@ class C2SoftAomDec::IntfImpl : public SimpleInterface<void>::BaseParams {
     }
     std::shared_ptr<C2StreamColorAspectsTuning::output> getDefaultColorAspects_l() {
         return mDefaultColorAspects;
+    }
+
+    std::shared_ptr<C2StreamPixelFormatInfo::output> getPixelFormat_l() const {
+        return mPixelFormat;
     }
 
     static C2R Hdr10PlusInfoInputSetter(bool mayBlock, C2P<C2StreamHdr10PlusInfo::input> &me) {
@@ -537,21 +546,37 @@ bool C2SoftAomDec::outputBuffer(
         }
     }
 
-    CHECK(img->fmt == AOM_IMG_FMT_I420 || img->fmt == AOM_IMG_FMT_I42016);
-
     std::shared_ptr<C2GraphicBlock> block;
     uint32_t format = HAL_PIXEL_FORMAT_YV12;
     std::shared_ptr<C2StreamColorAspectsTuning::output> defaultColorAspects;
-    if (img->fmt == AOM_IMG_FMT_I42016) {
+    bool outputRGBA8888 = false;
+    {
         IntfImpl::Lock lock = mIntf->lock();
         defaultColorAspects = mIntf->getDefaultColorAspects_l();
+        outputRGBA8888 =
+                mIntf->getPixelFormat_l()->value == HAL_PIXEL_FORMAT_RGBA_8888;
+    }
 
+    if (outputRGBA8888) {
+        format = HAL_PIXEL_FORMAT_RGBA_8888;
+    } else if (img->fmt == AOM_IMG_FMT_I42016) {
         if (defaultColorAspects->primaries == C2Color::PRIMARIES_BT2020 &&
             defaultColorAspects->matrix == C2Color::MATRIX_BT2020 &&
             defaultColorAspects->transfer == C2Color::TRANSFER_ST2084) {
             format = HAL_PIXEL_FORMAT_RGBA_1010102;
         }
     }
+    const bool highBitDepth = img->fmt == AOM_IMG_FMT_I42016
+            || img->fmt == AOM_IMG_FMT_I42216 || img->fmt == AOM_IMG_FMT_I44416;
+    CONV_FORMAT_T sourceFormat = CONV_FORMAT_I420;
+    if (img->fmt == AOM_IMG_FMT_I422 || img->fmt == AOM_IMG_FMT_I42216) {
+        sourceFormat = CONV_FORMAT_I422;
+    } else if (img->fmt == AOM_IMG_FMT_I444 || img->fmt == AOM_IMG_FMT_I44416) {
+        sourceFormat = CONV_FORMAT_I444;
+    } else {
+        CHECK(img->fmt == AOM_IMG_FMT_I420 || img->fmt == AOM_IMG_FMT_I42016);
+    }
+    CHECK(outputRGBA8888 || sourceFormat == CONV_FORMAT_I420);
     C2MemoryUsage usage = {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
 
     c2_status_t err = pool->fetchGraphicBlock(align(mWidth, 16), mHeight,
@@ -576,22 +601,34 @@ bool C2SoftAomDec::outputBuffer(
           (int)*(int64_t*)img->user_priv);
 
     uint8_t* dstY = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_Y]);
-    uint8_t* dstU = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_U]);
-    uint8_t* dstV = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_V]);
+    uint8_t* dstU = nullptr;
+    uint8_t* dstV = nullptr;
     size_t srcYStride = img->stride[AOM_PLANE_Y];
     size_t srcUStride = img->stride[AOM_PLANE_U];
     size_t srcVStride = img->stride[AOM_PLANE_V];
     C2PlanarLayout layout = wView.layout();
     size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-    size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
-    size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+    size_t dstUStride = 0;
+    size_t dstVStride = 0;
+    if (format != HAL_PIXEL_FORMAT_RGBA_8888) {
+        dstU = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_U]);
+        dstV = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_V]);
+        dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+        dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+    }
 
-    if (img->fmt == AOM_IMG_FMT_I42016) {
+    if (highBitDepth) {
         const uint16_t *srcY = (const uint16_t *)img->planes[AOM_PLANE_Y];
         const uint16_t *srcU = (const uint16_t *)img->planes[AOM_PLANE_U];
         const uint16_t *srcV = (const uint16_t *)img->planes[AOM_PLANE_V];
 
-        if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
+        if (format == HAL_PIXEL_FORMAT_RGBA_8888) {
+            convertPlanar16ToRGBA8888(
+                    dstY, dstYStride, srcY, srcU, srcV, srcYStride / 2,
+                    srcUStride / 2, srcVStride / 2, mWidth, mHeight,
+                    img->bit_depth, false, sourceFormat,
+                    std::static_pointer_cast<const C2ColorAspectsStruct>(defaultColorAspects));
+        } else if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
             convertYUV420Planar16ToY410OrRGBA1010102(
                     (uint32_t *)dstY, srcY, srcU, srcV, srcYStride / 2, srcUStride / 2,
                     srcVStride / 2, dstYStride / sizeof(uint32_t), mWidth, mHeight,
@@ -605,8 +642,16 @@ bool C2SoftAomDec::outputBuffer(
         const uint8_t *srcY = (const uint8_t *)img->planes[AOM_PLANE_Y];
         const uint8_t *srcU = (const uint8_t *)img->planes[AOM_PLANE_U];
         const uint8_t *srcV = (const uint8_t *)img->planes[AOM_PLANE_V];
-        convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                                   srcVStride, dstYStride, dstUStride, dstVStride, mWidth, mHeight);
+        if (format == HAL_PIXEL_FORMAT_RGBA_8888) {
+            convertPlanar8ToRGBA8888(
+                    dstY, dstYStride, srcY, srcU, srcV, srcYStride, srcUStride,
+                    srcVStride, mWidth, mHeight, false, sourceFormat,
+                    std::static_pointer_cast<const C2ColorAspectsStruct>(defaultColorAspects));
+        } else {
+            convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride,
+                                       srcUStride, srcVStride, dstYStride, dstUStride,
+                                       dstVStride, mWidth, mHeight);
+        }
     }
     finishWork(*(int64_t*)img->user_priv, work, std::move(block));
     block = nullptr;

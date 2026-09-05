@@ -280,7 +280,10 @@ class C2SoftApvDec::IntfImpl : public SimpleInterface<void>::BaseParams {
                         .build());
 
         // TODO: support more formats?
-        std::vector<uint32_t> pixelFormats = {HAL_PIXEL_FORMAT_YCBCR_420_888};
+        std::vector<uint32_t> pixelFormats = {
+                HAL_PIXEL_FORMAT_YCBCR_420_888,
+                HAL_PIXEL_FORMAT_RGBA_8888,
+        };
         if (isHalPixelFormatSupported((AHardwareBuffer_Format)HAL_PIXEL_FORMAT_YCBCR_P010)) {
             pixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
         }
@@ -1279,7 +1282,7 @@ status_t C2SoftApvDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
         ALOGW("No output frames");
         return false;
     }
-    bool isMonochrome = OAPV_CS_GET_FORMAT(imgbOutput->cs) == OAPV_CS_YCBCR400;
+    bool isMonochrome = OAPV_CS_GET_FORMAT(imgbOutput->cs) == OAPV_CF_YCBCR400;
 
     getVuiParams(work);
     struct ApvHdrInfo hdrInfo = {};
@@ -1294,7 +1297,11 @@ status_t C2SoftApvDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
 
     uint32_t format = HAL_PIXEL_FORMAT_YV12;
     std::shared_ptr<C2StreamColorAspectsInfo::output> codedColorAspects;
-    if (mPixelFormatInfo->value != HAL_PIXEL_FORMAT_YCBCR_420_888) {
+    if (mPixelFormatInfo->value == HAL_PIXEL_FORMAT_RGBA_8888) {
+        format = HAL_PIXEL_FORMAT_RGBA_8888;
+        IntfImpl::Lock lock = mIntf->lock();
+        codedColorAspects = mIntf->getColorAspects_l();
+    } else if (mPixelFormatInfo->value != HAL_PIXEL_FORMAT_YCBCR_420_888) {
         if ((mPixelFormatInfo->value != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) &&
             isHalPixelFormatSupported((AHardwareBuffer_Format)mPixelFormatInfo->value)) {
             format = mPixelFormatInfo->value;
@@ -1353,15 +1360,69 @@ status_t C2SoftApvDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
     ALOGV("provided (%dx%d) required (%dx%d)", block->width(), block->height(), mWidth, mHeight);
 
     uint8_t* dstY = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_Y]);
-    uint8_t* dstU = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_U]);
-    uint8_t* dstV = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_V]);
+    uint8_t* dstU = nullptr;
+    uint8_t* dstV = nullptr;
 
     C2PlanarLayout layout = wView.layout();
     size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-    size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
-    size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+    size_t dstUStride = 0;
+    size_t dstVStride = 0;
+    if (format != HAL_PIXEL_FORMAT_RGBA_8888) {
+        dstU = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_U]);
+        dstV = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_V]);
+        dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+        dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+    }
 
-    if(format == HAL_PIXEL_FORMAT_RGBA_1010102) {
+    if (format == HAL_PIXEL_FORMAT_RGBA_8888) {
+        const int bitDepth = OAPV_CS_GET_BIT_DEPTH(imgbOutput->cs);
+        const int sourceFormat = OAPV_CS_GET_FORMAT(imgbOutput->cs);
+        if (bitDepth == 10 && sourceFormat == OAPV_CF_PLANAR2) {
+            convertP210ToRGBA8888(
+                    dstY, dstYStride, (const uint16_t*)imgbOutput->a[0],
+                    (const uint16_t*)imgbOutput->a[1], imgbOutput->s[0] / 2,
+                    imgbOutput->s[1] / 2, mWidth, mHeight, codedColorAspects);
+        } else if (bitDepth > 8 && bitDepth <= 16) {
+            if (sourceFormat != OAPV_CF_YCBCR400 && sourceFormat != OAPV_CF_YCBCR420
+                    && sourceFormat != OAPV_CF_YCBCR422
+                    && sourceFormat != OAPV_CF_YCBCR444) {
+                ALOGE("Unsupported APV source format %d for RGBA_8888", sourceFormat);
+                work->result = C2_CORRUPTED;
+                return UNKNOWN_ERROR;
+            }
+            CONV_FORMAT_T convFormat = sourceFormat == OAPV_CF_YCBCR444
+                    ? CONV_FORMAT_I444
+                    : (sourceFormat == OAPV_CF_YCBCR422 ? CONV_FORMAT_I422
+                                                        : CONV_FORMAT_I420);
+            convertPlanar16ToRGBA8888(
+                    dstY, dstYStride, (const uint16_t*)imgbOutput->a[0],
+                    (const uint16_t*)imgbOutput->a[1],
+                    (const uint16_t*)imgbOutput->a[2], imgbOutput->s[0] / 2,
+                    imgbOutput->s[1] / 2, imgbOutput->s[2] / 2, mWidth, mHeight,
+                    bitDepth, isMonochrome, convFormat, codedColorAspects);
+        } else if (bitDepth == 8) {
+            if (sourceFormat != OAPV_CF_YCBCR400 && sourceFormat != OAPV_CF_YCBCR420
+                    && sourceFormat != OAPV_CF_YCBCR422
+                    && sourceFormat != OAPV_CF_YCBCR444) {
+                ALOGE("Unsupported APV source format %d for RGBA_8888", sourceFormat);
+                work->result = C2_CORRUPTED;
+                return UNKNOWN_ERROR;
+            }
+            CONV_FORMAT_T convFormat = sourceFormat == OAPV_CF_YCBCR444
+                    ? CONV_FORMAT_I444
+                    : (sourceFormat == OAPV_CF_YCBCR422 ? CONV_FORMAT_I422
+                                                        : CONV_FORMAT_I420);
+            convertPlanar8ToRGBA8888(
+                    dstY, dstYStride, (const uint8_t*)imgbOutput->a[0],
+                    (const uint8_t*)imgbOutput->a[1], (const uint8_t*)imgbOutput->a[2],
+                    imgbOutput->s[0], imgbOutput->s[1], imgbOutput->s[2], mWidth,
+                    mHeight, isMonochrome, convFormat, codedColorAspects);
+        } else {
+            ALOGE("Unsupported APV source bit depth %d for RGBA_8888", bitDepth);
+            work->result = C2_CORRUPTED;
+            return UNKNOWN_ERROR;
+        }
+    } else if(format == HAL_PIXEL_FORMAT_RGBA_1010102) {
         if (OAPV_CS_GET_BIT_DEPTH(imgbOutput->cs) == 10) {
             const uint16_t* srcY = (const uint16_t*)imgbOutput->a[0];
             const uint16_t* srcU = (const uint16_t*)imgbOutput->a[1];

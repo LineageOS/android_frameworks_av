@@ -80,6 +80,7 @@ struct C2SoftHevcDec : public SimpleC2Component {
                        size_t inSize,
                        uint32_t tsMarker);
     bool getVuiParams();
+    void convertToRGBA(C2GraphicView &view);
     // TODO:This is not the right place for colorAspects functions. These should
     // be part of c2-vndk so that they can be accessed by all video plugins
     // until then, make them feel at home
@@ -118,6 +119,9 @@ struct C2SoftHevcDec : public SimpleC2Component {
     uint32_t mWidth;
     uint32_t mHeight;
     uint32_t mStride;
+    uint32_t mOutputPixelFormat;
+    uint8_t *mConversionBuffer;
+    size_t mConversionBufferSize;
     bool mSignalledOutputEos;
     bool mSignalledError;
     bool mHeaderDecoded;

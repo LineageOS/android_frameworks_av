@@ -218,7 +218,10 @@ public:
                 .build());
 
         // TODO: support more formats?
-        std::vector<uint32_t> pixelFormats = {HAL_PIXEL_FORMAT_YCBCR_420_888};
+        std::vector<uint32_t> pixelFormats = {
+            HAL_PIXEL_FORMAT_YCBCR_420_888,
+            HAL_PIXEL_FORMAT_RGBA_8888,
+        };
 #ifdef VP9
         if (isHalPixelFormatSupported((AHardwareBuffer_Format)HAL_PIXEL_FORMAT_YCBCR_P010)) {
             pixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
@@ -735,7 +738,13 @@ status_t C2SoftVpxDec::outputBuffer(
         }
 
     }
-    if(img->fmt != VPX_IMG_FMT_I420 && img->fmt != VPX_IMG_FMT_I42016) {
+    const bool outputRGBARequested =
+            mPixelFormatInfo->value == HAL_PIXEL_FORMAT_RGBA_8888;
+    if (img->fmt != VPX_IMG_FMT_I420 && img->fmt != VPX_IMG_FMT_I42016
+            && !(outputRGBARequested
+                    && (img->fmt == VPX_IMG_FMT_I422 || img->fmt == VPX_IMG_FMT_I444
+                            || img->fmt == VPX_IMG_FMT_I42216
+                            || img->fmt == VPX_IMG_FMT_I44416))) {
         ALOGE("img->fmt %d not supported", img->fmt);
         mSignalledError = true;
         work->workletsProcessed = 1u;
@@ -746,7 +755,11 @@ status_t C2SoftVpxDec::outputBuffer(
     std::shared_ptr<C2GraphicBlock> block;
     uint32_t format = HAL_PIXEL_FORMAT_YV12;
     std::shared_ptr<C2StreamColorAspectsTuning::output> defaultColorAspects;
-    if (img->fmt == VPX_IMG_FMT_I42016 &&
+    if (outputRGBARequested) {
+        format = HAL_PIXEL_FORMAT_RGBA_8888;
+        IntfImpl::Lock lock = mIntf->lock();
+        defaultColorAspects = mIntf->getDefaultColorAspects_l();
+    } else if (img->fmt == VPX_IMG_FMT_I42016 &&
             mPixelFormatInfo->value != HAL_PIXEL_FORMAT_YCBCR_420_888) {
         IntfImpl::Lock lock = mIntf->lock();
         defaultColorAspects = mIntf->getDefaultColorAspects_l();
@@ -801,23 +814,42 @@ status_t C2SoftVpxDec::outputBuffer(
            ((c2_cntr64_t *)img->user_priv)->peekll());
 
     uint8_t *dstY = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_Y]);
-    uint8_t *dstU = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_U]);
-    uint8_t *dstV = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_V]);
+    uint8_t *dstU = nullptr;
+    uint8_t *dstV = nullptr;
 
     size_t srcYStride = img->stride[VPX_PLANE_Y];
     size_t srcUStride = img->stride[VPX_PLANE_U];
     size_t srcVStride = img->stride[VPX_PLANE_V];
     C2PlanarLayout layout = wView.layout();
     size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-    size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
-    size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+    size_t dstUStride = 0;
+    size_t dstVStride = 0;
+    if (format != HAL_PIXEL_FORMAT_RGBA_8888) {
+        dstU = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_U]);
+        dstV = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_V]);
+        dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+        dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+    }
 
-    if (img->fmt == VPX_IMG_FMT_I42016) {
+    if (img->fmt == VPX_IMG_FMT_I42016 || img->fmt == VPX_IMG_FMT_I42216
+            || img->fmt == VPX_IMG_FMT_I44416) {
         const uint16_t *srcY = (const uint16_t *)img->planes[VPX_PLANE_Y];
         const uint16_t *srcU = (const uint16_t *)img->planes[VPX_PLANE_U];
         const uint16_t *srcV = (const uint16_t *)img->planes[VPX_PLANE_V];
 
-        if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
+        if (format == HAL_PIXEL_FORMAT_RGBA_8888) {
+            CONV_FORMAT_T sourceFormat = CONV_FORMAT_I420;
+            if (img->fmt == VPX_IMG_FMT_I44416) {
+                sourceFormat = CONV_FORMAT_I444;
+            } else if (img->fmt == VPX_IMG_FMT_I42216) {
+                sourceFormat = CONV_FORMAT_I422;
+            }
+            convertPlanar16ToRGBA8888(
+                    dstY, dstYStride, srcY, srcU, srcV, srcYStride / 2,
+                    srcUStride / 2, srcVStride / 2, mWidth, mHeight,
+                    img->bit_depth, false, sourceFormat,
+                    std::static_pointer_cast<const C2ColorAspectsStruct>(defaultColorAspects));
+        } else if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
             Mutexed<ConversionQueue>::Locked queue(*mQueue);
             size_t i = 0;
             constexpr size_t kHeight = 64;
@@ -859,8 +891,22 @@ status_t C2SoftVpxDec::outputBuffer(
         const uint8_t *srcU = (const uint8_t *)img->planes[VPX_PLANE_U];
         const uint8_t *srcV = (const uint8_t *)img->planes[VPX_PLANE_V];
 
-        convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
-                                   srcVStride, dstYStride, dstVStride, dstVStride, mWidth, mHeight);
+        CONV_FORMAT_T sourceFormat = CONV_FORMAT_I420;
+        if (img->fmt == VPX_IMG_FMT_I444) {
+            sourceFormat = CONV_FORMAT_I444;
+        } else if (img->fmt == VPX_IMG_FMT_I422) {
+            sourceFormat = CONV_FORMAT_I422;
+        }
+        if (format == HAL_PIXEL_FORMAT_RGBA_8888) {
+            convertPlanar8ToRGBA8888(
+                    dstY, dstYStride, srcY, srcU, srcV, srcYStride, srcUStride,
+                    srcVStride, mWidth, mHeight, false, sourceFormat,
+                    std::static_pointer_cast<const C2ColorAspectsStruct>(defaultColorAspects));
+        } else {
+            convertPlanar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
+                                 srcVStride, dstYStride, dstUStride, dstVStride, mWidth, mHeight,
+                                 false, sourceFormat);
+        }
     }
     finishWork(((c2_cntr64_t *)img->user_priv)->peekull(), work, std::move(block));
     return OK;

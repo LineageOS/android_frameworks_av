@@ -243,7 +243,10 @@ class C2SoftDav1dDec::IntfImpl : public SimpleInterface<void>::BaseParams {
                         .withSetter(ColorAspectsSetter, mDefaultColorAspects, mCodedColorAspects)
                         .build());
 
-        std::vector<uint32_t> pixelFormats = {HAL_PIXEL_FORMAT_YCBCR_420_888};
+        std::vector<uint32_t> pixelFormats = {
+                HAL_PIXEL_FORMAT_YCBCR_420_888,
+                HAL_PIXEL_FORMAT_RGBA_8888,
+        };
         if (isHalPixelFormatSupported((AHardwareBuffer_Format)HAL_PIXEL_FORMAT_YCBCR_P010)) {
             pixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
         }
@@ -1020,7 +1023,12 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
     std::shared_ptr<C2GraphicBlock> block;
     uint32_t format = HAL_PIXEL_FORMAT_YV12;
     std::shared_ptr<C2StreamColorAspectsInfo::output> codedColorAspects;
-    if (bitdepth == 10 && mPixelFormatInfo->value != HAL_PIXEL_FORMAT_YCBCR_420_888) {
+    if (mPixelFormatInfo->value == HAL_PIXEL_FORMAT_RGBA_8888) {
+        format = HAL_PIXEL_FORMAT_RGBA_8888;
+        IntfImpl::Lock lock = mIntf->lock();
+        codedColorAspects = mIntf->getColorAspects_l();
+    } else if (bitdepth == 10 &&
+               mPixelFormatInfo->value != HAL_PIXEL_FORMAT_YCBCR_420_888) {
         IntfImpl::Lock lock = mIntf->lock();
         codedColorAspects = mIntf->getColorAspects_l();
         bool allowRGBA1010102 = false;
@@ -1074,13 +1082,19 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
     mOutputBufferIndex = out_frameIndex;
 
     uint8_t* dstY = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_Y]);
-    uint8_t* dstU = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_U]);
-    uint8_t* dstV = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_V]);
+    uint8_t* dstU = nullptr;
+    uint8_t* dstV = nullptr;
 
     C2PlanarLayout layout = wView.layout();
     size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-    size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
-    size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+    size_t dstUStride = 0;
+    size_t dstVStride = 0;
+    if (format != HAL_PIXEL_FORMAT_RGBA_8888) {
+        dstU = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_U]);
+        dstV = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_V]);
+        dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+        dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+    }
 
     CONV_FORMAT_T convFormat;
     switch (img.p.layout) {
@@ -1095,7 +1109,18 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
             break;
     }
 
-    if (bitdepth == 10) {
+    if (format == HAL_PIXEL_FORMAT_RGBA_8888 && bitdepth > 8) {
+        const uint16_t* srcY = (const uint16_t*)img.data[0];
+        const uint16_t* srcU = (const uint16_t*)img.data[1];
+        const uint16_t* srcV = (const uint16_t*)img.data[2];
+        const size_t srcYStride = img.stride[0] / 2;
+        const size_t srcUStride = img.stride[1] / 2;
+        const size_t srcVStride = img.stride[1] / 2;
+        convertPlanar16ToRGBA8888(
+                dstY, dstYStride, srcY, srcU, srcV, srcYStride, srcUStride,
+                srcVStride, mWidth, mHeight, bitdepth, isMonochrome, convFormat,
+                std::static_pointer_cast<const C2ColorAspectsStruct>(codedColorAspects));
+    } else if (bitdepth == 10) {
         // TODO: b/277797541 - Investigate if we can ask DAV1D to output the required format during
         // decompression to avoid color conversion.
         const uint16_t* srcY = (const uint16_t*)img.data[0];
@@ -1187,9 +1212,16 @@ bool C2SoftDav1dDec::outputBuffer(const std::shared_ptr<C2BlockPool>& pool,
         mC2SoftDav1dDump.dumpOutput<uint8_t>(srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
                                              mWidth, mHeight);
 #endif
-        convertPlanar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
-                             dstYStride, dstUStride, dstVStride, mWidth, mHeight, isMonochrome,
-                             convFormat);
+        if (format == HAL_PIXEL_FORMAT_RGBA_8888) {
+            convertPlanar8ToRGBA8888(
+                    dstY, dstYStride, srcY, srcU, srcV, srcYStride, srcUStride,
+                    srcVStride, mWidth, mHeight, isMonochrome, convFormat,
+                    std::static_pointer_cast<const C2ColorAspectsStruct>(codedColorAspects));
+        } else {
+            convertPlanar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride,
+                                 srcUStride, srcVStride, dstYStride, dstUStride,
+                                 dstVStride, mWidth, mHeight, isMonochrome, convFormat);
+        }
     }
 
     finishWork(out_frameIndex, work, std::move(block), img);

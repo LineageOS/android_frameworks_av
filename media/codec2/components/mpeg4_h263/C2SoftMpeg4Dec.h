@@ -65,6 +65,7 @@ struct C2SoftMpeg4Dec : public SimpleC2Component {
     uint32_t mWidth;
     uint32_t mHeight;
     uint32_t mNumSamplesOutput;
+    uint32_t mOutputPixelFormat = 0;
 
     bool mIsMpeg4;
     bool mInitialized;

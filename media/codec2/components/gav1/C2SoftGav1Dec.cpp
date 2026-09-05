@@ -857,7 +857,7 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   std::shared_ptr<C2GraphicBlock> block;
   uint32_t format = HAL_PIXEL_FORMAT_YV12;
   std::shared_ptr<C2StreamColorAspectsInfo::output> codedColorAspects;
-  if (buffer->bitdepth == 8 && mPixelFormatInfo->value == HAL_PIXEL_FORMAT_RGBA_8888) {
+  if (mPixelFormatInfo->value == HAL_PIXEL_FORMAT_RGBA_8888) {
     format = HAL_PIXEL_FORMAT_RGBA_8888;
     IntfImpl::Lock lock = mIntf->lock();
     codedColorAspects = mIntf->getColorAspects_l();
@@ -954,7 +954,20 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
       dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
   }
 
-  if (buffer->bitdepth == 12) {
+  if (format == HAL_PIXEL_FORMAT_RGBA_8888 && buffer->bitdepth > 8) {
+      CONV_FORMAT_T sourceFormat = CONV_FORMAT_I420;
+      if (buffer->image_format == libgav1::kImageFormatYuv444) {
+          sourceFormat = CONV_FORMAT_I444;
+      } else if (buffer->image_format == libgav1::kImageFormatYuv422) {
+          sourceFormat = CONV_FORMAT_I422;
+      }
+      convertPlanar16ToRGBA8888(
+              dstY, dstYStride, (const uint16_t*)buffer->plane[0],
+              (const uint16_t*)buffer->plane[1], (const uint16_t*)buffer->plane[2],
+              buffer->stride[0] / 2, buffer->stride[1] / 2, buffer->stride[2] / 2,
+              mWidth, mHeight, buffer->bitdepth, isMonochrome, sourceFormat,
+              std::static_pointer_cast<const C2ColorAspectsStruct>(codedColorAspects));
+  } else if (buffer->bitdepth == 12) {
 #if LIBYUV_VERSION >= 1871
       const uint16_t *srcY = (const uint16_t *)buffer->plane[0];
       const uint16_t *srcU = (const uint16_t *)buffer->plane[1];
