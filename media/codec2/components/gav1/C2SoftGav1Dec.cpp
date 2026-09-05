@@ -227,7 +227,10 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
               .withSetter(ColorAspectsSetter, mDefaultColorAspects, mCodedColorAspects)
               .build());
 
-    std::vector<uint32_t> pixelFormats = {HAL_PIXEL_FORMAT_YCBCR_420_888};
+    std::vector<uint32_t> pixelFormats = {
+        HAL_PIXEL_FORMAT_YCBCR_420_888,
+        HAL_PIXEL_FORMAT_RGBA_8888,
+    };
     if (isHalPixelFormatSupported((AHardwareBuffer_Format)HAL_PIXEL_FORMAT_YCBCR_P010)) {
         pixelFormats.push_back(HAL_PIXEL_FORMAT_YCBCR_P010);
     }
@@ -854,7 +857,12 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   std::shared_ptr<C2GraphicBlock> block;
   uint32_t format = HAL_PIXEL_FORMAT_YV12;
   std::shared_ptr<C2StreamColorAspectsInfo::output> codedColorAspects;
-  if (buffer->bitdepth >= 10 && mPixelFormatInfo->value != HAL_PIXEL_FORMAT_YCBCR_420_888) {
+  if (buffer->bitdepth == 8 && mPixelFormatInfo->value == HAL_PIXEL_FORMAT_RGBA_8888) {
+    format = HAL_PIXEL_FORMAT_RGBA_8888;
+    IntfImpl::Lock lock = mIntf->lock();
+    codedColorAspects = mIntf->getColorAspects_l();
+  } else if (buffer->bitdepth >= 10
+          && mPixelFormatInfo->value != HAL_PIXEL_FORMAT_YCBCR_420_888) {
     IntfImpl::Lock lock = mIntf->lock();
     codedColorAspects = mIntf->getColorAspects_l();
     bool allowRGBA1010102 = false;
@@ -932,14 +940,19 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   ALOGV("provided (%dx%d) required (%dx%d), out frameindex %d", block->width(),
         block->height(), mWidth, mHeight, (int)buffer->user_private_data);
 
-  uint8_t *dstY = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_Y]);
-  uint8_t *dstU = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_U]);
-  uint8_t *dstV = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_V]);
-
   C2PlanarLayout layout = wView.layout();
+  uint8_t *dstY = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_Y]);
   size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
-  size_t dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
-  size_t dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+  uint8_t *dstU = nullptr;
+  uint8_t *dstV = nullptr;
+  size_t dstUStride = 0;
+  size_t dstVStride = 0;
+  if (format != HAL_PIXEL_FORMAT_RGBA_8888) {
+      dstU = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_U]);
+      dstV = const_cast<uint8_t *>(wView.data()[C2PlanarLayout::PLANE_V]);
+      dstUStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+      dstVStride = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
+  }
 
   if (buffer->bitdepth == 12) {
 #if LIBYUV_VERSION >= 1871
@@ -1098,7 +1111,18 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     size_t srcUStride = buffer->stride[1];
     size_t srcVStride = buffer->stride[2];
 
-    if (buffer->image_format == libgav1::kImageFormatYuv444) {
+    if (format == HAL_PIXEL_FORMAT_RGBA_8888) {
+        CONV_FORMAT_T sourceFormat = CONV_FORMAT_I420;
+        if (buffer->image_format == libgav1::kImageFormatYuv444) {
+            sourceFormat = CONV_FORMAT_I444;
+        } else if (buffer->image_format == libgav1::kImageFormatYuv422) {
+            sourceFormat = CONV_FORMAT_I422;
+        }
+        convertPlanar8ToRGBA8888(
+                dstY, dstYStride, srcY, srcU, srcV, srcYStride, srcUStride,
+                srcVStride, mWidth, mHeight, isMonochrome, sourceFormat,
+                std::static_pointer_cast<const C2ColorAspectsStruct>(codedColorAspects));
+    } else if (buffer->image_format == libgav1::kImageFormatYuv444) {
         libyuv::I444ToI420(srcY, srcYStride, srcU, srcUStride, srcV, srcVStride,
                            dstY, dstYStride, dstU, dstUStride, dstV, dstVStride,
                            mWidth, mHeight);

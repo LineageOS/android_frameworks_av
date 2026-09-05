@@ -25,6 +25,7 @@
 
 #include <inttypes.h>
 #include <libyuv.h>
+#include <vector>
 
 #include <C2Config.h>
 #include <C2Debug.h>
@@ -240,6 +241,20 @@ static const struct Coeffs GetCoeffsForAspects(const C2ColorAspectsStruct &aspec
         } else {
             return Coeffs { 1196, 1724, 192, 668, 2200, 64 };
         }
+    }
+}
+
+static const libyuv::YuvConstants* GetYvuConstantsForAspects(
+        const C2ColorAspectsStruct& aspects) {
+    const bool fullRange = aspects.range == C2Color::RANGE_FULL;
+    switch (aspects.matrix) {
+        case C2Color::MATRIX_BT709:
+            return fullRange ? &libyuv::kYvuF709Constants : &libyuv::kYvuH709Constants;
+        case C2Color::MATRIX_BT2020:
+            return fullRange ? &libyuv::kYvuV2020Constants : &libyuv::kYvu2020Constants;
+        case C2Color::MATRIX_BT601:
+        default:
+            return fullRange ? &libyuv::kYvuJPEGConstants : &libyuv::kYvuI601Constants;
     }
 }
 
@@ -802,6 +817,33 @@ void convertPlanar8ToYV12(uint8_t* dstY, uint8_t* dstU, uint8_t* dstV, const uin
         convertYUV420Planar8ToYV12(dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride,
                                    srcVStride, dstYStride, dstUStride, dstVStride, width, height,
                                    isMonochrome);
+    }
+}
+
+void convertPlanar8ToRGBA8888(
+        uint8_t* dstRGBA, size_t dstRGBAStride, const uint8_t* srcY,
+        const uint8_t* srcU, const uint8_t* srcV, size_t srcYStride,
+        size_t srcUStride, size_t srcVStride, uint32_t width, uint32_t height,
+        bool isMonochrome, CONV_FORMAT_T format,
+        std::shared_ptr<const C2ColorAspectsStruct> aspects) {
+    std::vector<uint8_t> neutralChroma;
+    if (isMonochrome) {
+        neutralChroma.assign(width, kNeutralUVBitDepth8);
+        srcU = srcV = neutralChroma.data();
+        srcUStride = srcVStride = 0;
+    }
+
+    const C2ColorAspectsStruct filledAspects = FillMissingColorAspects(aspects, width, height);
+    const libyuv::YuvConstants* constants = GetYvuConstantsForAspects(filledAspects);
+    if (format == CONV_FORMAT_I444) {
+        libyuv::I444ToARGBMatrix(srcY, srcYStride, srcV, srcVStride, srcU, srcUStride,
+                                 dstRGBA, dstRGBAStride, constants, width, height);
+    } else if (format == CONV_FORMAT_I422) {
+        libyuv::I422ToARGBMatrix(srcY, srcYStride, srcV, srcVStride, srcU, srcUStride,
+                                 dstRGBA, dstRGBAStride, constants, width, height);
+    } else {
+        libyuv::I420ToARGBMatrix(srcY, srcYStride, srcV, srcVStride, srcU, srcUStride,
+                                 dstRGBA, dstRGBAStride, constants, width, height);
     }
 }
 

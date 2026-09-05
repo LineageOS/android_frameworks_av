@@ -407,6 +407,11 @@ sp<ConstGraphicBlockBuffer> ConstGraphicBlockBuffer::AllocateEmpty(
     if (format->findInt32(KEY_COLOR_FORMAT, &colorFormat)) {
         if (colorFormat == COLOR_FormatYUVP010) {
             bpp = 24;  // 16(Y) + 4(U) + 4(V)
+        } else if (colorFormat == COLOR_Format32bitABGR8888
+                || colorFormat == COLOR_Format32bitARGB8888
+                || colorFormat == COLOR_Format32bitBGRA8888
+                || colorFormat == COLOR_FormatRGBAFlexible) {
+            bpp = 32;
         }
     }
     sp<ABuffer> aBuffer(alloc(align(width, 16) * align(height, 16) * bpp / 8));

@@ -753,6 +753,7 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                     it = nameToPixelFormatMap.try_emplace(client->getServiceName()).first;
                     PixelFormatMap &pixelFormatMap = it->second;
                     pixelFormatMap[HAL_PIXEL_FORMAT_YCBCR_420_888] = COLOR_FormatYUV420Flexible;
+                    pixelFormatMap[HAL_PIXEL_FORMAT_RGBA_8888]     = COLOR_Format32bitABGR8888;
                     pixelFormatMap[HAL_PIXEL_FORMAT_YCBCR_P010]    = COLOR_FormatYUVP010;
                     pixelFormatMap[HAL_PIXEL_FORMAT_RGBA_1010102]  = COLOR_Format32bitABGR2101010;
                     pixelFormatMap[HAL_PIXEL_FORMAT_RGBA_FP16]     = COLOR_Format64bitABGRFloat;

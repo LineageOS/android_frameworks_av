@@ -1134,7 +1134,6 @@ GraphicView2MediaImageConverter::GraphicView2MediaImageConverter(
             return;
         case C2PlanarLayout::TYPE_RGB:
             mediaImage->mType = MediaImage2::MEDIA_IMAGE_TYPE_RGB;
-            // TODO: support MediaImage layout
             switch (mClientColorFormat) {
                 case COLOR_FormatSurface:
                 case COLOR_FormatRGBFlexible:
@@ -1156,10 +1155,16 @@ GraphicView2MediaImageConverter::GraphicView2MediaImageConverter(
                 mInitCheck = BAD_VALUE;
                 return;
             }
+            for (uint32_t i = 0; i < layout.numPlanes; ++i) {
+                mediaImage->mPlane[i].mOffset = i;
+                mediaImage->mPlane[i].mColInc = layout.numPlanes + 1;
+                mediaImage->mPlane[i].mRowInc = stride * (layout.numPlanes + 1);
+                mediaImage->mPlane[i].mHorizSubsampling = 1;
+                mediaImage->mPlane[i].mVertSubsampling = 1;
+            }
             break;
         case C2PlanarLayout::TYPE_RGBA:
             mediaImage->mType = MediaImage2::MEDIA_IMAGE_TYPE_RGBA;
-            // TODO: support MediaImage layout
             switch (mClientColorFormat) {
                 case COLOR_FormatSurface:
                 case COLOR_FormatRGBAFlexible:
@@ -1181,6 +1186,13 @@ GraphicView2MediaImageConverter::GraphicView2MediaImageConverter(
                 ALOGD("Converter: %d planes for RGBA layout", layout.numPlanes);
                 mInitCheck = BAD_VALUE;
                 return;
+            }
+            for (uint32_t i = 0; i < layout.numPlanes; ++i) {
+                mediaImage->mPlane[i].mOffset = i;
+                mediaImage->mPlane[i].mColInc = 4;
+                mediaImage->mPlane[i].mRowInc = stride * 4;
+                mediaImage->mPlane[i].mHorizSubsampling = 1;
+                mediaImage->mPlane[i].mVertSubsampling = 1;
             }
             break;
         default:

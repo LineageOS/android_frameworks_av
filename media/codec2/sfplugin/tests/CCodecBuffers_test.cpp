@@ -289,6 +289,63 @@ TEST(RawGraphicOutputBuffersTest, FlexYuvColorFormat) {
     }
 }
 
+TEST(RawGraphicOutputBuffersTest, Rgba8888ColorFormat) {
+    constexpr int32_t kWidth = 320;
+    constexpr int32_t kHeight = 240;
+    std::shared_ptr<RawGraphicOutputBuffers> buffers =
+            std::make_shared<RawGraphicOutputBuffers>("test RGBA_8888");
+
+    sp<AMessage> format{new AMessage};
+    format->setInt32(KEY_WIDTH, kWidth);
+    format->setInt32(KEY_HEIGHT, kHeight);
+    format->setInt32(KEY_COLOR_FORMAT, COLOR_Format32bitABGR8888);
+    format->setInt32("android._color-format", COLOR_Format32bitABGR8888);
+    buffers->setFormat(format);
+
+    std::shared_ptr<C2BlockPool> pool;
+    ASSERT_EQ(OK, GetCodec2BlockPool(C2BlockPool::BASIC_GRAPHIC, nullptr, &pool));
+    std::shared_ptr<C2GraphicBlock> block;
+    ASSERT_EQ(OK, pool->fetchGraphicBlock(
+            kWidth, kHeight, HAL_PIXEL_FORMAT_RGBA_8888,
+            C2MemoryUsage{C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE}, &block));
+
+    {
+        C2GraphicView view = block->map().get();
+        ASSERT_EQ(C2_OK, view.error());
+        ASSERT_EQ(C2PlanarLayout::TYPE_RGBA, view.layout().type);
+        ASSERT_EQ(4u, view.layout().numPlanes);
+        for (uint32_t plane = 0; plane < 4; ++plane) {
+            uint8_t *row = view.data()[plane];
+            const C2PlaneInfo &info = view.layout().planes[plane];
+            for (int32_t y = 0; y < kHeight; ++y) {
+                for (int32_t x = 0; x < kWidth; ++x) {
+                    row[x * info.colInc] = (x + y + plane) & 0xff;
+                }
+                row += info.rowInc;
+            }
+        }
+    }
+
+    std::shared_ptr<C2Buffer> c2Buffer = C2Buffer::CreateGraphicBuffer(
+            block->share(block->crop(), C2Fence{}));
+    size_t index;
+    sp<MediaCodecBuffer> clientBuffer;
+    ASSERT_EQ(OK, buffers->registerBuffer(c2Buffer, &index, &clientBuffer));
+    ASSERT_NE(nullptr, clientBuffer);
+    sp<ABuffer> imageData;
+    ASSERT_TRUE(clientBuffer->format()->findBuffer("image-data", &imageData));
+    MediaImage2 *img = reinterpret_cast<MediaImage2 *>(imageData->data());
+    ASSERT_EQ(MediaImage2::MEDIA_IMAGE_TYPE_RGBA, img->mType);
+    ASSERT_EQ(4u, img->mNumPlanes);
+    ASSERT_GE(clientBuffer->capacity(), static_cast<size_t>(kWidth * kHeight * 4));
+    for (uint32_t plane = 0; plane < 4; ++plane) {
+        EXPECT_EQ(plane, img->mPlane[plane].mOffset);
+        EXPECT_EQ(4, img->mPlane[plane].mColInc);
+        EXPECT_GE(img->mPlane[plane].mRowInc, kWidth * 4);
+        EXPECT_EQ(plane, clientBuffer->data()[img->mPlane[plane].mOffset]);
+    }
+}
+
 TEST(RawGraphicOutputBuffersTest, P010ColorFormat) {
     constexpr int32_t kWidth = 320;
     constexpr int32_t kHeight = 240;

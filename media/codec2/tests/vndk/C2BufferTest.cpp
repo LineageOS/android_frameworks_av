@@ -286,11 +286,13 @@ public:
         return std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++);
     }
 
-    void allocateGraphic(uint32_t width, uint32_t height) {
+    void allocateGraphic(
+            uint32_t width, uint32_t height,
+            uint32_t format = HAL_PIXEL_FORMAT_YCBCR_420_888) {
         c2_status_t err = mGraphicAllocator->newGraphicAllocation(
                 width,
                 height,
-                HAL_PIXEL_FORMAT_YCBCR_420_888,
+                format,
                 { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
                 &mGraphicAllocation);
         if (err != C2_OK) {
@@ -506,6 +508,29 @@ TEST_F(C2BufferTest, GraphicAllocationTest) {
     ASSERT_TRUE(verifyPlane({ kWidth / 4, kHeight }, yInfo, y, 0));
     ASSERT_TRUE(verifyPlane({ kWidth / 4, kHeight }, uInfo, u, 0));
     ASSERT_TRUE(verifyPlane({ kWidth / 4, kHeight }, vInfo, v, 0));
+}
+
+TEST_F(C2BufferTest, RgbaGraphicAllocationTest) {
+    constexpr uint32_t kWidth = 320;
+    constexpr uint32_t kHeight = 240;
+
+    allocateGraphic(kWidth, kHeight, HAL_PIXEL_FORMAT_RGBA_8888);
+
+    uint8_t *addr[C2PlanarLayout::MAX_NUM_PLANES];
+    C2PlanarLayout layout;
+    mapGraphic(C2Rect(kWidth, kHeight), &layout, addr);
+
+    ASSERT_EQ(C2PlanarLayout::TYPE_RGBA, layout.type);
+    ASSERT_EQ(4u, layout.numPlanes);
+    for (uint32_t plane = 0; plane < layout.numPlanes; ++plane) {
+        ASSERT_NE(nullptr, addr[plane]);
+        EXPECT_EQ(4, layout.planes[plane].colInc);
+        EXPECT_EQ(1u, layout.planes[plane].colSampling);
+        EXPECT_EQ(1u, layout.planes[plane].rowSampling);
+        EXPECT_EQ(8u, layout.planes[plane].allocatedDepth);
+        EXPECT_EQ(8u, layout.planes[plane].bitDepth);
+        EXPECT_EQ(plane, static_cast<uint32_t>(addr[plane] - addr[0]));
+    }
 }
 
 TEST_F(C2BufferTest, GraphicBlockPoolTest) {
