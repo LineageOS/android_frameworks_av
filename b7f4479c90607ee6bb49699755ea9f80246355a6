@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1c9c1292_0446fe0c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2026-09-10T22:03:33Z",
+      "side": 1,
+      "message": "Luca, do you see any con doing this? I\u0027d prefer not to disable MMAP entirely (https://review.lineageos.org/c/LineageOS/android_device_oneplus_sm8750-common/+/501373).",
+      "revId": "b7f4479c90607ee6bb49699755ea9f80246355a6",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
