@@ -315,6 +315,11 @@ status_t StreamHalAidl::standby() {
             }
             FALLTHROUGH_INTENDED;
         case StreamDescriptor::State::IDLE:
+            // Legacy MMAP HALs that cannot recreate the buffer must retain it.
+            if (!mIsInput && mContext.isMmapped() && !mSupportsCreateMmapBuffer) {
+                AUGMENT_LOG(D, "MMAP recreation unsupported; keeping stream in IDLE");
+                return OK;
+            }
             RETURN_STATUS_IF_ERROR(sendCommand(makeHalCommand<HalCommand::Tag::standby>(),
                             &reply, true /*safeFromNonWorkerThread*/));
             if (reply.state != StreamDescriptor::State::STANDBY) {
