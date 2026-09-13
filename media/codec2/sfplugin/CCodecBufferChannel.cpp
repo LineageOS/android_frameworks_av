@@ -1454,7 +1454,21 @@ status_t CCodecBufferChannel::queueSecureInputBuffers(
         }
         buffer->setRange(0, outBufferSize);
     }
+<<<<<<< HEAD   (3e2a54d3dfbb7d0d7e8c9f0874df8d058055c194 Fix OOB in DynamicsProcessing MBC band processing)
     return queueInputBufferInternal(buffer, block, {}, bufferSize);
+=======
+    return queueInputBufferInternal(buffer, block, bufferSize);
+}
+
+void CCodecBufferChannel::queueDummyWork() {
+    std::unique_ptr<C2Work> work(new C2Work);
+    // WA: signal a empty work to HAL to trigger specific event, but totally drop the work
+    work->input.flags = C2FrameData::FLAG_DROP_FRAME;
+    work->worklets.emplace_back(new C2Worklet);
+    std::list<std::unique_ptr<C2Work>> items;
+    items.push_back(std::move(work));
+    (void)mComponent->queue(&items);
+>>>>>>> CHANGE (8cd24e2f31eb2878cc4f9bd646772582b8bc5ec6 Codec2: ensure dummy work has a non-empty worklet)
 }
 
 void CCodecBufferChannel::feedInputBufferIfAvailable() {
