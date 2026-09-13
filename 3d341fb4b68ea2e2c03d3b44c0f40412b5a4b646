@@ -34,6 +34,24 @@
       "parentUuid": "24c0904e_9eeec163",
       "revId": "3d341fb4b68ea2e2c03d3b44c0f40412b5a4b646",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "24937d2e_9357fcd2",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2026-09-13T12:05:12Z",
+      "side": 1,
+      "message": "Correction: \"QCOM patch\". Can you check if they patched this?\n\nhttps://git.codelinaro.org/clo/la/platform/frameworks/av/-/tree/LA.QSSI.17.0.r1-10800-qssi.0?ref_type\u003dtags",
+      "parentUuid": "d3268c59_cf8936e8",
+      "revId": "3d341fb4b68ea2e2c03d3b44c0f40412b5a4b646",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
