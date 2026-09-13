@@ -52,6 +52,24 @@
       "parentUuid": "d3268c59_cf8936e8",
       "revId": "3d341fb4b68ea2e2c03d3b44c0f40412b5a4b646",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "61404d65_973fca7d",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 18080
+      },
+      "writtenOn": "2026-09-13T12:38:50Z",
+      "side": 1,
+      "message": "The reason qcom works correctly is likely that its VDEC implementation properly handles the case where the worklet is empty, whereas MTK does not—at least not on my device. My patch can fix the issue, or that reverting 433713 would also resolve it, though I haven\u0027t yet verified whether reverting 433713 actually works.",
+      "parentUuid": "24937d2e_9357fcd2",
+      "revId": "3d341fb4b68ea2e2c03d3b44c0f40412b5a4b646",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
