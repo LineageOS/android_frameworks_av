@@ -16,6 +16,24 @@
       "message": "What device is this for?",
       "revId": "3d341fb4b68ea2e2c03d3b44c0f40412b5a4b646",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "d3268c59_cf8936e8",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 18080
+      },
+      "writtenOn": "2026-09-13T12:01:04Z",
+      "side": 1,
+      "message": "My device is an Android TV unit based on an MTK soc, but this is a widespread issue; the system crashes whenever the vendor\u0027s VDEC HAL lacks null-check logic. The AOSP codebase does not have this problem; it was introduced by Lineage patch 433708.",
+      "parentUuid": "24c0904e_9eeec163",
+      "revId": "3d341fb4b68ea2e2c03d3b44c0f40412b5a4b646",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
