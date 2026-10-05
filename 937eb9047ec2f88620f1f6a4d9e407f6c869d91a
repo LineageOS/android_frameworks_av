@@ -16,6 +16,23 @@
       "message": "I had the exact same issue on an Android 11-based device, and this fixed the USB-C-to-3.5 mm adapter not working on it.",
       "revId": "937eb9047ec2f88620f1f6a4d9e407f6c869d91a",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b3d9d2e7_385df48e",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 34512
+      },
+      "writtenOn": "2026-10-05T20:48:22Z",
+      "side": 1,
+      "message": "Also fixes USB audio issue on a21s",
+      "revId": "937eb9047ec2f88620f1f6a4d9e407f6c869d91a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
