@@ -830,6 +830,18 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) c
     DeviceVector preferredAvailableDevVec =
             getPreferredAvailableDevicesForProductStrategy(availableOutputDevices, strategy);
     if (!preferredAvailableDevVec.isEmpty()) {
+        // When the device speaker is selected for a call and an analog dock audio accessory
+        // (e.g. a Moto Mods speaker) is connected with media routed to it (FORCE_ANALOG_DOCK),
+        // use the dock as the speaker, like Motorola's stock audio policy did.
+        if ((legacyStrategy == STRATEGY_PHONE || legacyStrategy == STRATEGY_DTMF)
+                && getForceUse(AUDIO_POLICY_FORCE_FOR_DOCK) == AUDIO_POLICY_FORCE_ANALOG_DOCK
+                && preferredAvailableDevVec.containsDeviceWithType(AUDIO_DEVICE_OUT_SPEAKER)) {
+            DeviceVector analogDock =
+                    availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET);
+            if (!analogDock.isEmpty()) {
+                return analogDock;
+            }
+        }
         return preferredAvailableDevVec;
     }
 
