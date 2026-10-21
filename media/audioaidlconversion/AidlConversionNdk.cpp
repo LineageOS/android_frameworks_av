@@ -146,12 +146,14 @@ aidl2legacy_PlaybackTrackMetadata_playback_track_metadata_v7(const PlaybackTrack
     legacy.channel_mask = VALUE_OR_RETURN(aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
                     aidl.channelMask, false /*isInput*/));
     RETURN_IF_ERROR(aidl2legacy_AudioAttributesTags(aidl.tags, legacy.tags));
+#ifndef SKIP_CODEC_PROVENANCE_FIELD
     if (aidl.codecProvenance.has_value()) {
         RETURN_IF_ERROR(aidl2legacy_string(aidl.codecProvenance.value(), legacy.codec_provenance,
                                            AUDIO_ATTRIBUTES_CODEC_PROVENANCE_MAX_SIZE));
     } else {
         legacy.codec_provenance[0] = '\0';
     }
+#endif
     return legacy;
 }
 
@@ -166,10 +168,12 @@ legacy2aidl_playback_track_metadata_v7_PlaybackTrackMetadata(
     aidl.channelMask = VALUE_OR_RETURN(legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
                     legacy.channel_mask, false /*isInput*/));
     aidl.tags = VALUE_OR_RETURN(legacy2aidl_AudioAttributesTags(legacy.tags));
+#ifndef SKIP_CODEC_PROVENANCE_FIELD
     if (legacy.codec_provenance[0] != '\0') {
         aidl.codecProvenance = VALUE_OR_RETURN(legacy2aidl_string(legacy.codec_provenance,
                         AUDIO_ATTRIBUTES_CODEC_PROVENANCE_MAX_SIZE));
     }
+#endif
     return aidl;
 }
 
