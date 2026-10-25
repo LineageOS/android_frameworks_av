@@ -19,7 +19,10 @@ cc_library_shared {
         "-Werror",
         "-Wextra",
         "-fvisibility=hidden",
-    ],
+    ] + select(soong_config_variable("frameworks_av", "prefer_source_camcorder_builtin_mic"), {
+        true: ["-DPREFER_SOURCE_CAMCORDER_BUILTIN_MIC"],
+        default: [],
+    }),
     header_libs: [
         "libaudiopolicycommon",
         "libaudiopolicyengine_interface_headers",
@@ -46,3 +49,5 @@ cc_library_shared {
         "aconfig_lib_cc_static_link.defaults",
     ],
 }
+
+

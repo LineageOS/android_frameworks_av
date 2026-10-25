@@ -712,7 +712,11 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
     case AUDIO_SOURCE_CAMCORDER:
         // For a device without built-in mic, adding usb device
         device = availableDevices.getFirstExistingDevice({
+#ifdef PREFER_SOURCE_CAMCORDER_BUILTIN_MIC
+                AUDIO_DEVICE_IN_BUILTIN_MIC, AUDIO_DEVICE_IN_BACK_MIC,
+#else
                 AUDIO_DEVICE_IN_BACK_MIC, AUDIO_DEVICE_IN_BUILTIN_MIC,
+#endif
                 AUDIO_DEVICE_IN_USB_DEVICE});
         break;
     case AUDIO_SOURCE_VOICE_DOWNLINK:
