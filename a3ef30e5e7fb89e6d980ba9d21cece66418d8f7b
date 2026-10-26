@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "24f9a8d1_ba4b1215",
+        "filename": "services/audiopolicy/enginedefault/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 52,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2026-10-26T00:06:15Z",
+      "side": 1,
+      "message": "remove unnecessary edits",
+      "revId": "a3ef30e5e7fb89e6d980ba9d21cece66418d8f7b",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
