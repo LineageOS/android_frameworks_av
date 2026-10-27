@@ -16,6 +16,23 @@
       "message": "Verified on pdx223. @pontus@jensenkarlsson.se verified on pdx224.",
       "revId": "2c538bd253d1e8d6df55c1a2b426676270464095",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "48bb4637_dd44ba4a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32674
+      },
+      "writtenOn": "2026-10-27T07:34:36Z",
+      "side": 1,
+      "message": "Waiting for Sony SM8550, SM8650.",
+      "revId": "2c538bd253d1e8d6df55c1a2b426676270464095",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
