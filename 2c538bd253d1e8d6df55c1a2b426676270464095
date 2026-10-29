@@ -67,6 +67,23 @@
       "message": "...can\u0027t you just remove `AUDIO_DEVICE_IN_BACK_MIC` from audio policy if it doesn\u0027t work? What\u0027s the issue?",
       "revId": "2c538bd253d1e8d6df55c1a2b426676270464095",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6c07dafe_0e306f48",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 25732
+      },
+      "writtenOn": "2026-10-29T21:13:29Z",
+      "side": 1,
+      "message": "I\u0027d seriously remove the non-working mic rather than edit fwk.",
+      "revId": "2c538bd253d1e8d6df55c1a2b426676270464095",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
