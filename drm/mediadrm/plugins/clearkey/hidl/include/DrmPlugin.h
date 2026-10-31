@@ -333,8 +333,6 @@ private:
     uint32_t mNextSecureStopId;
     android::Mutex mPlayPolicyLock;
 
-    DeviceFiles mFileHandle GUARDED_BY(mFileHandleLock);
-    Mutex mFileHandleLock;
     Mutex mSecureStopLock;
     Mutex mSecurityLevelLock;
 
