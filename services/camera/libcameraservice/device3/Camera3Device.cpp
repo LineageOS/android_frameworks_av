@@ -1506,8 +1506,9 @@ status_t Camera3Device::filterParamsAndConfigureLocked(const CameraMetadata& par
     return configureStreamsLocked(operatingMode, filteredParams);
 }
 
-// The OPlus camera HAL only selects its high speed sensor modes for clients of its camera SDK.
-bool Camera3Device::markOplusSdkSession(CameraMetadata& params) {
+// The OPlus camera HAL only selects its high speed sensor modes, and only upscales to the video
+// sizes beyond the sensor readout, for clients of its camera SDK.
+bool Camera3Device::markOplusSdkSession(CameraMetadata& params, bool disableStabilization) {
     sp<VendorTagDescriptor> vTags;
     sp<VendorTagDescriptorCache> vCache = VendorTagDescriptorCache::getGlobalVendorTagCache();
     if (vCache.get() != nullptr) {
@@ -1525,9 +1526,29 @@ bool Camera3Device::markOplusSdkSession(CameraMetadata& params) {
         if (availableSessionKeys.data.i32[i] == static_cast<int32_t>(tag)) {
             // Stabilized high speed modes ask for more buffers than an encoder queue holds.
             uint8_t stabilization = ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_OFF;
+            if (disableStabilization &&
+                    params.update(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE, &stabilization, 1) !=
+                    OK) {
+                return false;
+            }
             uint8_t sdkSession = 1;
-            return params.update(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE, &stabilization, 1) ==
-                    OK && params.update(tag, &sdkSession, 1) == OK;
+            return params.update(tag, &sdkSession, 1) == OK;
+        }
+    }
+    return false;
+}
+
+bool Camera3Device::hasOplusCustomSizeStream() {
+    camera_metadata_entry_t activeArray = mDeviceInfo.find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+    if (activeArray.count != 4) {
+        return false;
+    }
+    const uint32_t activeWidth = activeArray.data.i32[2];
+    const uint32_t activeHeight = activeArray.data.i32[3];
+    for (size_t i = 0; i < mOutputStreams.size(); i++) {
+        if (mOutputStreams[i]->getWidth() > activeWidth ||
+                mOutputStreams[i]->getHeight() > activeHeight) {
+            return true;
         }
     }
     return false;
@@ -2767,7 +2788,10 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
 
     int64_t logId = mCameraServiceProxyWrapper->getCurrentLogIdForCamera(mId);
     CameraMetadata halSessionParams(sessionParams);
-    mOplusSdkSession = isConstrainedHighSpeed && markOplusSdkSession(halSessionParams);
+    mOplusSdkSession = isConstrainedHighSpeed && markOplusSdkSession(halSessionParams, true);
+    if (!isConstrainedHighSpeed && hasOplusCustomSizeStream()) {
+        markOplusSdkSession(halSessionParams, false);
+    }
     const camera_metadata_t *sessionBuffer = halSessionParams.getAndLock();
     res = mInterface->configureStreams(sessionBuffer, &config, bufferSizes, logId);
     halSessionParams.unlock(sessionBuffer);
