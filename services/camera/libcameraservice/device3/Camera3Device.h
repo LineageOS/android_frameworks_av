@@ -482,6 +482,8 @@ class Camera3Device :
     bool                       mIsConstrainedHighSpeedConfiguration;
 
     static constexpr const char* kOplusSdkSessionTag = "com.oplus.is.sdk.camera.package";
+    static constexpr const char* kOplusCombinedBuffersTag =
+            "org.codeaurora.qcamera3.sessionParameters.HALOutputBufferCombined";
     // Whether the current high speed configuration is marked as an OPlus camera SDK session.
     bool                       mOplusSdkSession = false;
 
@@ -925,6 +927,7 @@ class Camera3Device :
 
     bool findVendorSessionKey(const char* name, uint32_t* tag);
     bool markOplusSdkSession(CameraMetadata& params);
+    bool combineOplusHighSpeedBuffers(CameraMetadata& params);
 
     /**
      * Take the currently-defined set of streams and configure the HAL to use

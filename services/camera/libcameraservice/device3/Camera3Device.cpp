@@ -1536,6 +1536,35 @@ bool Camera3Device::markOplusSdkSession(CameraMetadata& params) {
             params.update(tag, &sdkSession, 1) == OK;
 }
 
+// The OPlus camera HAL batches the configurations it advertises with a batch size of one itself.
+bool Camera3Device::combineOplusHighSpeedBuffers(CameraMetadata& params) {
+    uint32_t tag;
+    camera_metadata_entry_t fpsRange = params.find(ANDROID_CONTROL_AE_TARGET_FPS_RANGE);
+    if (!findVendorSessionKey(kOplusCombinedBuffersTag, &tag) || fpsRange.count < 2 ||
+            mOutputStreams.size() == 0) {
+        return false;
+    }
+
+    int32_t width = mOutputStreams[0]->getWidth();
+    int32_t height = mOutputStreams[0]->getHeight();
+    camera_metadata_entry_t configs =
+            mDeviceInfo.find(ANDROID_CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS);
+    bool batchedByHal = false;
+    // Configurations are (width, height, min fps, max fps, max batch size) tuples.
+    for (size_t i = 0; i + 5 <= configs.count; i += 5) {
+        const int32_t* config = configs.data.i32 + i;
+        if (config[0] == width && config[1] == height && config[3] == fpsRange.data.i32[1]) {
+            if (config[4] != 1) {
+                return false;
+            }
+            batchedByHal = true;
+        }
+    }
+
+    int32_t combined = 1;
+    return batchedByHal && params.update(tag, &combined, 1) == OK;
+}
+
 status_t Camera3Device::getInputSurface(sp<Surface> *surface) {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
@@ -2771,6 +2800,9 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     int64_t logId = mCameraServiceProxyWrapper->getCurrentLogIdForCamera(mId);
     CameraMetadata halSessionParams(sessionParams);
     mOplusSdkSession = isConstrainedHighSpeed && markOplusSdkSession(halSessionParams);
+    if (mOplusSdkSession) {
+        combineOplusHighSpeedBuffers(halSessionParams);
+    }
     const camera_metadata_t *sessionBuffer = halSessionParams.getAndLock();
     res = mInterface->configureStreams(sessionBuffer, &config, bufferSizes, logId);
     halSessionParams.unlock(sessionBuffer);

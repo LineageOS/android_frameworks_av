@@ -1808,6 +1808,72 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupManualFlashStren
     return res;
 }
 
+// The OPlus camera HAL lists some of its high speed configurations only in a vendor tag.
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addOplusHighSpeedConfigurations() {
+    sp<ProviderInfo> parentProvider = mParentProvider.promote();
+    if (parentProvider == nullptr || parentProvider->mVendorTagDescriptor == nullptr) {
+        return OK;
+    }
+
+    const VendorTagDescriptor* vTags = parentProvider->mVendorTagDescriptor.get();
+    uint32_t sdkSessionTag;
+    uint32_t combinedBuffersTag;
+    uint32_t customConfigsTag;
+    if (CameraMetadata::getTagFromName("com.oplus.is.sdk.camera.package", vTags,
+                &sdkSessionTag) != OK ||
+            CameraMetadata::getTagFromName(
+                    "org.codeaurora.qcamera3.sessionParameters.HALOutputBufferCombined", vTags,
+                    &combinedBuffersTag) != OK ||
+            CameraMetadata::getTagFromName(
+                    "org.quic.camera2.customhfrfps.info.CustomHFRConfigurations", vTags,
+                    &customConfigsTag) != OK) {
+        return OK;
+    }
+
+    auto& c = mCameraCharacteristics;
+    camera_metadata_entry sessionKeys = c.find(ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+    auto isSessionKey = [&](uint32_t tag) {
+        const int32_t* end = sessionKeys.data.i32 + sessionKeys.count;
+        return std::find(sessionKeys.data.i32, end, static_cast<int32_t>(tag)) != end;
+    };
+    // The HAL only runs these configurations when asked to combine its output buffers.
+    if (!isSessionKey(sdkSessionTag) || !isSessionKey(combinedBuffersTag)) {
+        return OK;
+    }
+
+    camera_metadata_entry advertised =
+            c.find(ANDROID_CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS);
+    if (advertised.count == 0) {
+        return OK;
+    }
+
+    // Configurations are (width, height, min fps, max fps, max batch size) tuples.
+    constexpr size_t kConfigSize = 5;
+    constexpr size_t kBatchIndex = 4;
+    auto isAdvertised = [&](const int32_t* config) {
+        for (size_t i = 0; i + kConfigSize <= advertised.count; i += kConfigSize) {
+            if (std::equal(config, config + kBatchIndex, advertised.data.i32 + i)) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    std::vector<int32_t> configs(advertised.data.i32, advertised.data.i32 + advertised.count);
+    camera_metadata_entry custom = c.find(customConfigsTag);
+    for (size_t i = 0; i + kConfigSize <= custom.count; i += kConfigSize) {
+        const int32_t* config = custom.data.i32 + i;
+        if (!isAdvertised(config)) {
+            configs.insert(configs.end(), config, config + kConfigSize);
+        }
+    }
+    if (configs.size() == advertised.count) {
+        return OK;
+    }
+    return c.update(ANDROID_CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS, configs.data(),
+            configs.size());
+}
+
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupMonochromeTags() {
     status_t res = OK;
     auto& c = mCameraCharacteristics;
