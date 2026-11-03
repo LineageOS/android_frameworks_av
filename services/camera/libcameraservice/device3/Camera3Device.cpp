@@ -1554,6 +1554,62 @@ bool Camera3Device::hasOplusCustomSizeStream() {
     return false;
 }
 
+// The OPlus camera HAL picks the sensor readout for other clients by capability bits that
+// never select the readouts beyond the active array, so a stream larger than the active array
+// would be upscaled. Steer the session to the smallest readout that covers it instead.
+bool Camera3Device::forceOplusSensorMode(CameraMetadata& params) {
+    sp<VendorTagDescriptor> vTags;
+    sp<VendorTagDescriptorCache> vCache = VendorTagDescriptorCache::getGlobalVendorTagCache();
+    if (vCache.get() != nullptr) {
+        vCache->getVendorTagDescriptor(mVendorTagId, &vTags);
+    }
+
+    uint32_t forceSensorModeTag;
+    uint32_t sensorModeTableTag;
+    if (CameraMetadata::getTagFromName(
+                "org.codeaurora.qcamera3.sessionParameters.ForceSensorMode", vTags.get(),
+                &forceSensorModeTag) != OK ||
+            CameraMetadata::getTagFromName("org.quic.camera2.sensormode.info.SensorModeTable",
+                    vTags.get(), &sensorModeTableTag) != OK) {
+        return false;
+    }
+
+    camera_metadata_entry_t sensorModes = mDeviceInfo.find(sensorModeTableTag);
+    if (sensorModes.count < 2 || sensorModes.data.i32[1] != 3) {
+        return false;
+    }
+
+    uint32_t width = 0;
+    uint32_t height = 0;
+    for (size_t i = 0; i < mOutputStreams.size(); i++) {
+        width = std::max(width, mOutputStreams[i]->getWidth());
+        height = std::max(height, mOutputStreams[i]->getHeight());
+    }
+    int32_t fps = 30;
+    camera_metadata_entry_t fpsRange = params.find(ANDROID_CONTROL_AE_TARGET_FPS_RANGE);
+    if (fpsRange.count == 2) {
+        fps = fpsRange.data.i32[1];
+    }
+
+    int32_t bestIndex = -1;
+    int64_t bestArea = 0;
+    for (size_t i = 2; i + 2 < sensorModes.count; i += 3) {
+        const int32_t* mode = sensorModes.data.i32 + i;
+        const int64_t area = static_cast<int64_t>(mode[0]) * mode[1];
+        if (static_cast<uint32_t>(mode[0]) >= width && static_cast<uint32_t>(mode[1]) >= height &&
+                mode[2] >= fps && (bestIndex < 0 || area < bestArea)) {
+            bestIndex = (i - 2) / 3;
+            bestArea = area;
+        }
+    }
+    if (bestIndex < 0) {
+        return false;
+    }
+
+    uint8_t index = static_cast<uint8_t>(bestIndex);
+    return params.update(forceSensorModeTag, &index, 1) == OK;
+}
+
 status_t Camera3Device::getInputSurface(sp<Surface> *surface) {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
@@ -2791,6 +2847,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     mOplusSdkSession = isConstrainedHighSpeed && markOplusSdkSession(halSessionParams, true);
     if (!isConstrainedHighSpeed && hasOplusCustomSizeStream()) {
         markOplusSdkSession(halSessionParams, false);
+        forceOplusSensorMode(halSessionParams);
     }
     const camera_metadata_t *sessionBuffer = halSessionParams.getAndLock();
     res = mInterface->configureStreams(sessionBuffer, &config, bufferSizes, logId);

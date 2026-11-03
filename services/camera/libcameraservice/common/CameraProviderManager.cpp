@@ -1976,6 +1976,127 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addOplusCustomSizeCon
             newStallDurations.size());
 }
 
+// The OPlus camera HAL only runs the sensor readouts beyond the active array for its own camera
+// app, and leaves the video sizes they feed, such as 8K, out of the stream configurations. Advertise
+// the standard camcorder sizes that a readout covers, so that clients can request them and the
+// session can be steered to that readout.
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addOplusSensorModeSizes() {
+    sp<ProviderInfo> parentProvider = mParentProvider.promote();
+    if (parentProvider == nullptr || parentProvider->mVendorTagDescriptor == nullptr) {
+        return OK;
+    }
+
+    const VendorTagDescriptor* vTags = parentProvider->mVendorTagDescriptor.get();
+    uint32_t sdkSessionTag;
+    uint32_t forceSensorModeTag;
+    uint32_t sensorModeTableTag;
+    if (CameraMetadata::getTagFromName("com.oplus.is.sdk.camera.package", vTags,
+                &sdkSessionTag) != OK ||
+            CameraMetadata::getTagFromName(
+                    "org.codeaurora.qcamera3.sessionParameters.ForceSensorMode", vTags,
+                    &forceSensorModeTag) != OK ||
+            CameraMetadata::getTagFromName("org.quic.camera2.sensormode.info.SensorModeTable",
+                    vTags, &sensorModeTableTag) != OK) {
+        return OK;
+    }
+
+    auto& c = mCameraCharacteristics;
+    camera_metadata_entry sessionKeys = c.find(ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+    const int32_t* sessionKeysBegin = sessionKeys.data.i32;
+    const int32_t* sessionKeysEnd = sessionKeysBegin + sessionKeys.count;
+    if (std::find(sessionKeysBegin, sessionKeysEnd, static_cast<int32_t>(sdkSessionTag)) ==
+            sessionKeysEnd) {
+        return OK;
+    }
+
+    camera_metadata_entry activeArray = c.find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+    camera_metadata_entry sensorModes = c.find(sensorModeTableTag);
+    if (activeArray.count != 4 || sensorModes.count < 2 || sensorModes.data.i32[1] != 3) {
+        return OK;
+    }
+    const int32_t activeWidth = activeArray.data.i32[2];
+    const int32_t activeHeight = activeArray.data.i32[3];
+
+    // The readout must cover the size at the same aspect ratio, at a usable video frame rate.
+    auto readoutFpsFor = [&](int32_t width, int32_t height) {
+        int32_t fps = 0;
+        for (size_t i = 2; i + 2 < sensorModes.count; i += 3) {
+            const int32_t* mode = sensorModes.data.i32 + i;
+            const int64_t aspectDelta = static_cast<int64_t>(mode[0]) * height -
+                    static_cast<int64_t>(mode[1]) * width;
+            const bool sameAspect = (aspectDelta < 0 ? -aspectDelta : aspectDelta) * 100 <
+                    static_cast<int64_t>(width) * height;
+            if (mode[0] >= width && mode[1] >= height && sameAspect && mode[2] >= 24) {
+                fps = std::max(fps, mode[2]);
+            }
+        }
+        return fps;
+    };
+
+    camera_metadata_entry streamConfigs = c.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
+    camera_metadata_entry minDurations = c.find(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS);
+    camera_metadata_entry stallDurations = c.find(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS);
+    std::vector<int32_t> newStreamConfigs(streamConfigs.data.i32,
+            streamConfigs.data.i32 + streamConfigs.count);
+    std::vector<int64_t> newMinDurations(minDurations.data.i64,
+            minDurations.data.i64 + minDurations.count);
+    std::vector<int64_t> newStallDurations(stallDurations.data.i64,
+            stallDurations.data.i64 + stallDurations.count);
+
+    auto isAdvertised = [&](int32_t format, int32_t width, int32_t height) {
+        for (size_t i = 0; i + 3 < streamConfigs.count; i += 4) {
+            const int32_t* config = streamConfigs.data.i32 + i;
+            if (config[0] == format && config[1] == width && config[2] == height &&
+                    config[3] == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    // The sizes of the CamcorderProfile qualities above 1080p.
+    static constexpr int32_t kCamcorderSizes[][2] = {
+            {7680, 4320}, {4096, 2160}, {3840, 2160}, {2560, 1440}};
+    for (const auto& size : kCamcorderSizes) {
+        const int32_t width = size[0];
+        const int32_t height = size[1];
+        if (width <= activeWidth && height <= activeHeight) {
+            continue;
+        }
+        const int32_t fps = readoutFpsFor(width, height);
+        if (fps == 0) {
+            continue;
+        }
+        const int64_t duration = 1000000000LL / fps;
+        for (int32_t format : {HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
+                HAL_PIXEL_FORMAT_YCBCR_420_888}) {
+            if (isAdvertised(format, width, height)) {
+                continue;
+            }
+            newStreamConfigs.insert(newStreamConfigs.end(), {format, width, height,
+                    ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT});
+            newMinDurations.insert(newMinDurations.end(), {format, width, height, duration});
+            newStallDurations.insert(newStallDurations.end(), {format, width, height, 0});
+        }
+    }
+    if (newStreamConfigs.size() == streamConfigs.count) {
+        return OK;
+    }
+
+    status_t res = c.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
+            newStreamConfigs.data(), newStreamConfigs.size());
+    if (res != OK) {
+        return res;
+    }
+    res = c.update(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS, newMinDurations.data(),
+            newMinDurations.size());
+    if (res != OK) {
+        return res;
+    }
+    return c.update(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS, newStallDurations.data(),
+            newStallDurations.size());
+}
+
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupMonochromeTags() {
     status_t res = OK;
     auto& c = mCameraCharacteristics;

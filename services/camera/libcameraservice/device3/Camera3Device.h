@@ -925,6 +925,7 @@ class Camera3Device :
 
     bool markOplusSdkSession(CameraMetadata& params, bool disableStabilization);
     bool hasOplusCustomSizeStream();
+    bool forceOplusSensorMode(CameraMetadata& params);
 
     /**
      * Take the currently-defined set of streams and configure the HAL to use
