@@ -592,6 +592,11 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
                 __FUNCTION__, strerror(-res), res);
         return;
     }
+    res = addOplusHighSpeedConfigurations();
+    if (OK != res) {
+        ALOGE("%s: Unable to add OPlus high speed configurations: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+    }
 
     auto stat = addDynamicDepthTags();
     if (OK != stat) {
