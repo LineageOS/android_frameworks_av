@@ -781,6 +781,7 @@ private:
             SystemCameraKind getSystemCameraKind();
             status_t fixupMonochromeTags();
             status_t addOplusHighSpeedConfigurations();
+            status_t addOplusCustomSizeConfigurations();
             status_t fixupTorchStrengthTags();
             status_t fixupManualFlashStrengthControlTags(CameraMetadata& ch);
             status_t addDynamicDepthTags(bool maxResolution = false);
