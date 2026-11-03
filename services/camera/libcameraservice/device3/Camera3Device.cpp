@@ -1506,6 +1506,33 @@ status_t Camera3Device::filterParamsAndConfigureLocked(const CameraMetadata& par
     return configureStreamsLocked(operatingMode, filteredParams);
 }
 
+// The OPlus camera HAL only selects its high speed sensor modes for clients of its camera SDK.
+bool Camera3Device::markOplusSdkSession(CameraMetadata& params) {
+    sp<VendorTagDescriptor> vTags;
+    sp<VendorTagDescriptorCache> vCache = VendorTagDescriptorCache::getGlobalVendorTagCache();
+    if (vCache.get() != nullptr) {
+        vCache->getVendorTagDescriptor(mVendorTagId, &vTags);
+    }
+
+    uint32_t tag;
+    if (CameraMetadata::getTagFromName(kOplusSdkSessionTag, vTags.get(), &tag) != OK) {
+        return false;
+    }
+
+    camera_metadata_entry_t availableSessionKeys = mDeviceInfo.find(
+            ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+    for (size_t i = 0; i < availableSessionKeys.count; i++) {
+        if (availableSessionKeys.data.i32[i] == static_cast<int32_t>(tag)) {
+            // Stabilized high speed modes ask for more buffers than an encoder queue holds.
+            uint8_t stabilization = ANDROID_CONTROL_VIDEO_STABILIZATION_MODE_OFF;
+            uint8_t sdkSession = 1;
+            return params.update(ANDROID_CONTROL_VIDEO_STABILIZATION_MODE, &stabilization, 1) ==
+                    OK && params.update(tag, &sdkSession, 1) == OK;
+        }
+    }
+    return false;
+}
+
 status_t Camera3Device::getInputSurface(sp<Surface> *surface) {
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
@@ -2739,9 +2766,11 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     // is not enabled but the HAL supports session specific hal buffer manager).
 
     int64_t logId = mCameraServiceProxyWrapper->getCurrentLogIdForCamera(mId);
-    const camera_metadata_t *sessionBuffer = sessionParams.getAndLock();
+    CameraMetadata halSessionParams(sessionParams);
+    mOplusSdkSession = isConstrainedHighSpeed && markOplusSdkSession(halSessionParams);
+    const camera_metadata_t *sessionBuffer = halSessionParams.getAndLock();
     res = mInterface->configureStreams(sessionBuffer, &config, bufferSizes, logId);
-    sessionParams.unlock(sessionBuffer);
+    halSessionParams.unlock(sessionBuffer);
 
     if (res == BAD_VALUE) {
         // HAL rejected this set of streams as unsupported, clean up config
