@@ -926,8 +926,9 @@ class Camera3Device :
             int operatingMode);
 
     bool findVendorSessionKey(const char* name, uint32_t* tag);
-    bool markOplusSdkSession(CameraMetadata& params);
+    bool markOplusSdkSession(CameraMetadata& params, bool disableStabilization);
     bool combineOplusHighSpeedBuffers(CameraMetadata& params);
+    bool hasOplusCustomSizeStream();
 
     /**
      * Take the currently-defined set of streams and configure the HAL to use
