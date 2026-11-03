@@ -1808,6 +1808,60 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupManualFlashStren
     return res;
 }
 
+// The OPlus camera HAL only lists its 480fps high speed configurations in a vendor tag.
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addOplusHighSpeedConfigurations() {
+    sp<ProviderInfo> parentProvider = mParentProvider.promote();
+    if (parentProvider == nullptr || parentProvider->mVendorTagDescriptor == nullptr) {
+        return OK;
+    }
+
+    const VendorTagDescriptor* vTags = parentProvider->mVendorTagDescriptor.get();
+    uint32_t sdkSessionTag;
+    uint32_t customConfigsTag;
+    if (CameraMetadata::getTagFromName("com.oplus.is.sdk.camera.package", vTags,
+                &sdkSessionTag) != OK ||
+            CameraMetadata::getTagFromName(
+                    "org.quic.camera2.customhfrfps.info.CustomHFRConfigurations", vTags,
+                    &customConfigsTag) != OK) {
+        return OK;
+    }
+
+    auto& c = mCameraCharacteristics;
+    camera_metadata_entry sessionKeys = c.find(ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+    const int32_t* sessionKeysBegin = sessionKeys.data.i32;
+    const int32_t* sessionKeysEnd = sessionKeysBegin + sessionKeys.count;
+    if (std::find(sessionKeysBegin, sessionKeysEnd, static_cast<int32_t>(sdkSessionTag)) ==
+            sessionKeysEnd) {
+        return OK;
+    }
+
+    camera_metadata_entry advertised =
+            c.find(ANDROID_CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS);
+    int32_t maxFps = 0;
+    for (size_t i = 3; i < advertised.count; i += 5) {
+        maxFps = std::max(maxFps, advertised.data.i32[i]);
+    }
+    if (maxFps == 0) {
+        return OK;
+    }
+
+    std::vector<int32_t> configs(advertised.data.i32, advertised.data.i32 + advertised.count);
+    camera_metadata_entry custom = c.find(customConfigsTag);
+    for (size_t i = 0; i + 4 < custom.count; i += 5) {
+        const int32_t* config = custom.data.i32 + i;
+        if (config[3] > maxFps) {
+            // Batch them like the advertised configurations, one request per 60fps frame.
+            configs.insert(configs.end(),
+                    {config[0], config[1], config[2], config[3], config[3] / 60});
+        }
+    }
+    if (configs.size() == advertised.count) {
+        return OK;
+    }
+    return c.update(ANDROID_CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS, configs.data(),
+            configs.size());
+}
+
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fixupMonochromeTags() {
     status_t res = OK;
     auto& c = mCameraCharacteristics;
