@@ -923,7 +923,8 @@ class Camera3Device :
     status_t filterParamsAndConfigureLocked(const CameraMetadata& sessionParams,
             int operatingMode);
 
-    bool markOplusSdkSession(CameraMetadata& params);
+    bool markOplusSdkSession(CameraMetadata& params, bool disableStabilization);
+    bool hasOplusCustomSizeStream();
 
     /**
      * Take the currently-defined set of streams and configure the HAL to use
