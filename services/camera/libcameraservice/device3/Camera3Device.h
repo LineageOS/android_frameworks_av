@@ -481,6 +481,10 @@ class Camera3Device :
     // Flag indicating is the current active stream configuration is constrained high speed.
     bool                       mIsConstrainedHighSpeedConfiguration;
 
+    static constexpr const char* kOplusSdkSessionTag = "com.oplus.is.sdk.camera.package";
+    // Whether the current high speed configuration is marked as an OPlus camera SDK session.
+    bool                       mOplusSdkSession = false;
+
     /**** Scope for mLock ****/
 
     class HalInterface : public camera3::Camera3StreamBufferFreedListener,
@@ -918,6 +922,8 @@ class Camera3Device :
      */
     status_t filterParamsAndConfigureLocked(const CameraMetadata& sessionParams,
             int operatingMode);
+
+    bool markOplusSdkSession(CameraMetadata& params);
 
     /**
      * Take the currently-defined set of streams and configure the HAL to use

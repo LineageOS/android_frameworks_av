@@ -1683,7 +1683,7 @@ void AidlCamera3Device::applyMaxBatchSizeLocked(
         RequestList* requestList, const sp<camera3::Camera3OutputStreamInterface>& stream) {
     int batchSize = requestList->size();
 
-    if (!mBatchSizeLimitEnabled) {
+    if (!mBatchSizeLimitEnabled && !mOplusSdkSession) {
         (*requestList->begin())->mBatchSize = batchSize;
         stream->setBatchSize(batchSize);
         return;
@@ -1702,10 +1702,11 @@ void AidlCamera3Device::applyMaxBatchSizeLocked(
     const auto fpsRange = metadata.find(ANDROID_CONTROL_AE_TARGET_FPS_RANGE);
     if (fpsRange.count > 1) {
         auto configEntry = mDeviceInfo.find(tag);
+        // The OPlus HAL advertises only variable fps ranges, but batches fixed ones too.
         for (size_t index = 4; index < configEntry.count; index += 5) {
             if (stream->getWidth() == static_cast<uint32_t>(configEntry.data.i32[index - 4]) &&
                 stream->getHeight() == static_cast<uint32_t>(configEntry.data.i32[index - 3]) &&
-                fpsRange.data.i32[0] == configEntry.data.i32[index - 2] &&
+                (mOplusSdkSession || fpsRange.data.i32[0] == configEntry.data.i32[index - 2]) &&
                 fpsRange.data.i32[1] == configEntry.data.i32[index - 1]) {
                 const int maxBatchSize = configEntry.data.i32[index - 1] / 30;
                 const int reportedSize = configEntry.data.i32[index];
