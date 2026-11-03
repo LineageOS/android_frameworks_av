@@ -602,6 +602,11 @@ AidlProviderInfo::AidlDeviceInfo3::AidlDeviceInfo3(
         ALOGE("%s: Unable to add OPlus custom size configurations: %s (%d)",
                 __FUNCTION__, strerror(-res), res);
     }
+    res = addOplusSensorModeSizes();
+    if (OK != res) {
+        ALOGE("%s: Unable to add OPlus sensor mode sizes: %s (%d)",
+                __FUNCTION__, strerror(-res), res);
+    }
 
     auto stat = addDynamicDepthTags();
     if (OK != stat) {
