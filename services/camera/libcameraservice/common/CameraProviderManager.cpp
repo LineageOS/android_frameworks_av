@@ -1877,6 +1877,53 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addOplusHighSpeedConf
 
 // The OPlus camera HAL only exposes its larger front video sizes, which it upscales from the
 // sensor, to its own camera app and camera SDK clients. Advertise them like any other size.
+// The OPlus camera HAL only runs high speed sessions on its physical cameras.
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::removeOplusLogicalHighSpeed() {
+    sp<ProviderInfo> parentProvider = mParentProvider.promote();
+    if (parentProvider == nullptr || parentProvider->mVendorTagDescriptor == nullptr) {
+        return OK;
+    }
+
+    uint32_t sdkSessionTag;
+    if (CameraMetadata::getTagFromName("com.oplus.is.sdk.camera.package",
+                parentProvider->mVendorTagDescriptor.get(), &sdkSessionTag) != OK) {
+        return OK;
+    }
+
+    auto& c = mCameraCharacteristics;
+    camera_metadata_entry sessionKeys = c.find(ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+    const int32_t* sessionKeysBegin = sessionKeys.data.i32;
+    const int32_t* sessionKeysEnd = sessionKeysBegin + sessionKeys.count;
+    if (std::find(sessionKeysBegin, sessionKeysEnd, static_cast<int32_t>(sdkSessionTag)) ==
+            sessionKeysEnd) {
+        return OK;
+    }
+
+    camera_metadata_entry advertised = c.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    std::vector<uint8_t> capabilities(advertised.data.u8, advertised.data.u8 + advertised.count);
+    auto highSpeed = std::find(capabilities.begin(), capabilities.end(),
+            ANDROID_REQUEST_AVAILABLE_CAPABILITIES_CONSTRAINED_HIGH_SPEED_VIDEO);
+    if (highSpeed == capabilities.end() ||
+            std::find(capabilities.begin(), capabilities.end(),
+                    ANDROID_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) ==
+            capabilities.end()) {
+        return OK;
+    }
+    capabilities.erase(highSpeed);
+
+    status_t res = c.update(ANDROID_REQUEST_AVAILABLE_CAPABILITIES, capabilities.data(),
+            capabilities.size());
+    if (res != OK) {
+        return res;
+    }
+    res = c.erase(ANDROID_CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS);
+    if (res != OK) {
+        return res;
+    }
+    return removeAvailableKeys(c, {ANDROID_CONTROL_AVAILABLE_HIGH_SPEED_VIDEO_CONFIGURATIONS},
+            ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS);
+}
+
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addOplusCustomSizeConfigurations() {
     sp<ProviderInfo> parentProvider = mParentProvider.promote();
     if (parentProvider == nullptr || parentProvider->mVendorTagDescriptor == nullptr) {

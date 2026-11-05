@@ -781,6 +781,7 @@ private:
             SystemCameraKind getSystemCameraKind();
             status_t fixupMonochromeTags();
             status_t addOplusHighSpeedConfigurations();
+            status_t removeOplusLogicalHighSpeed();
             status_t addOplusCustomSizeConfigurations();
             status_t addOplusSensorModeSizes();
             status_t fixupTorchStrengthTags();
