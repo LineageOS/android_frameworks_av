@@ -2171,6 +2171,14 @@ void MatroskaExtractor::addTracks() {
                             AMEDIAFORMAT_KEY_CSD_2, &mSeekPreRollNs, sizeof(mSeekPreRollNs));
                 } else if (!strcmp("A_MPEG/L3", codecID)) {
                     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG);
+                } else if (!strcmp("A_AC3", codecID)) {
+                    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_AC3);
+                } else if (!strcmp("A_EAC3", codecID)) {
+                    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_EAC3);
+                } else if (!strcmp("A_DTS", codecID)) {
+                    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_DTS);
+                } else if (!strcmp("A_DTS/LOSSLESS", codecID)) {
+                    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_DTS_HD);
                 } else if (!strcmp("A_FLAC", codecID)) {
                     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_FLAC);
                     err = addFlacMetadata(meta, codecPrivate, codecPrivateSize);
