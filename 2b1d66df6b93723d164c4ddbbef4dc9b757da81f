@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "4415f843_e04f7705",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 34519
+      },
+      "writtenOn": "2026-11-09T04:08:26Z",
+      "side": 1,
+      "message": "Use relation chains (which is stacking changes on top of each other for commits on same repo) when uploading changes over the base branch, looks cleaner in that way",
+      "revId": "2b1d66df6b93723d164c4ddbbef4dc9b757da81f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
