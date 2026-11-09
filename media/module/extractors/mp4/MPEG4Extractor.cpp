@@ -5269,6 +5269,17 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
         return OK;
     }
 
+    if (objectTypeIndication >= 0xA9 && objectTypeIndication <= 0xAB) {
+        // DTS (0xA9), DTS-HD High Resolution (0xAA) and Master Audio (0xAB) in an mp4a entry
+        if (mLastTrack == NULL)
+            return ERROR_MALFORMED;
+
+        AMediaFormat_setString(mLastTrack->meta, AMEDIAFORMAT_KEY_MIME,
+                objectTypeIndication == 0xA9 ? MEDIA_MIMETYPE_AUDIO_DTS
+                                             : MEDIA_MIMETYPE_AUDIO_DTS_HD);
+        return OK;
+    }
+
     if (mLastTrack != NULL) {
         uint32_t maxBitrate = 0;
         uint32_t avgBitrate = 0;
