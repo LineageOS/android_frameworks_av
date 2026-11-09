@@ -152,6 +152,11 @@ struct ATSParser : public RefBase {
         // From ATSC A/53 Part 3:2009, 6.7.1
         STREAMTYPE_AC3                  = 0x81,
 
+        // DTS stream types used by Blu-ray (and muxers such as FFmpeg)
+        STREAMTYPE_DTS_BD               = 0x82,
+        STREAMTYPE_DTS_HD_BD            = 0x85,
+        STREAMTYPE_DTS_HD_MA_BD         = 0x86,
+
         // Stream type 0x83 is non-standard,
         // it could be LPCM or TrueHD AC3
         STREAMTYPE_LPCM_AC3             = 0x83,

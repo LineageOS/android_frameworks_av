@@ -1000,6 +1000,9 @@ ATSParser::Stream::Stream(
             break;
 
         case STREAMTYPE_DTS:
+        case STREAMTYPE_DTS_BD:
+        case STREAMTYPE_DTS_HD_BD:
+        case STREAMTYPE_DTS_HD_MA_BD:
             mode = ElementaryStreamQueue::DTS;
             break;
 
@@ -1241,6 +1244,9 @@ bool ATSParser::Stream::isAudio() const {
         case STREAMTYPE_AAC_ENCRYPTED:
         case STREAMTYPE_AC3_ENCRYPTED:
         case STREAMTYPE_DTS:
+        case STREAMTYPE_DTS_BD:
+        case STREAMTYPE_DTS_HD_BD:
+        case STREAMTYPE_DTS_HD_MA_BD:
             return true;
         case STREAMTYPE_PES_PRIVATE_DATA:
             return (mStreamTypeExt == EXT_DESCRIPTOR_DVB_AC4
