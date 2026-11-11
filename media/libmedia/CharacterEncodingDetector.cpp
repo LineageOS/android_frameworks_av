@@ -94,6 +94,54 @@ static bool isPrintableAscii(const char *value, size_t len) {
     return true;
 }
 
+// Returns true if the value is well-formed UTF-8 that contains at least one multibyte
+// sequence. Tags declared as UTF-8 or UTF-16 by the container (ID3v2 encodings 1-3, Vorbis
+// comments, MP4 atoms) reach the detector already converted to UTF-8, and legacy 8-bit
+// encodings practically never form valid multibyte UTF-8 by accident, so such values must be
+// kept as-is instead of being passed to ICU, which can misdetect short UTF-8 strings as a
+// single-byte codepage and double-encode them.
+static bool isMultibyteUtf8(const char *value, size_t len) {
+    const uint8_t *s = (const uint8_t *)value;
+    bool multibyte = false;
+    size_t i = 0;
+    while (i < len) {
+        uint8_t c = s[i];
+        if (c < 0x80) {
+            i++;
+            continue;
+        }
+        size_t n;
+        uint8_t lo = 0x80, hi = 0xbf; // allowed range of the first continuation byte
+        if (c >= 0xc2 && c <= 0xdf) {
+            n = 1;
+        } else if (c >= 0xe0 && c <= 0xef) {
+            n = 2;
+            if (c == 0xe0) lo = 0xa0;      // overlong
+            if (c == 0xed) hi = 0x9f;      // UTF-16 surrogates
+        } else if (c >= 0xf0 && c <= 0xf4) {
+            n = 3;
+            if (c == 0xf0) lo = 0x90;      // overlong
+            if (c == 0xf4) hi = 0x8f;      // above U+10FFFF
+        } else {
+            return false;
+        }
+        if (len - i <= n) {
+            return false;
+        }
+        if (s[i + 1] < lo || s[i + 1] > hi) {
+            return false;
+        }
+        for (size_t j = 2; j <= n; j++) {
+            if ((s[i + j] & 0xc0) != 0x80) {
+                return false;
+            }
+        }
+        i += n + 1;
+        multibyte = true;
+    }
+    return multibyte;
+}
+
 void CharacterEncodingDetector::detectAndConvert() {
 
     int size = mNames.size();
@@ -117,7 +165,10 @@ void CharacterEncodingDetector::detectAndConvert() {
         for (int i = 0; i < size; i++) {
             const char *name = mNames.getEntry(i);
             const char *value = mValues.getEntry(i);
-            if (!isPrintableAscii(value, strlen(value)) && (
+            // tags that are already valid UTF-8 need no detection, and would only skew the
+            // result for any legacy-encoded tags in the same file
+            if (!isPrintableAscii(value, strlen(value)) &&
+                    !isMultibyteUtf8(value, strlen(value)) && (
                         !strcmp(name, "artist") ||
                         !strcmp(name, "albumartist") ||
                         !strcmp(name, "composer") ||
@@ -202,7 +253,10 @@ void CharacterEncodingDetector::detectAndConvert() {
             // as default if there is no better match found.
             const char *enc = combinedenc;
 
-            if (!allprintable && (!strcmp(name, "artist") ||
+            if (isMultibyteUtf8(s, inputLength)) {
+                enc = "UTF-8";
+                ALOGV("@@@@ %s is valid UTF-8", name);
+            } else if (!allprintable && (!strcmp(name, "artist") ||
                     !strcmp(name, "albumartist") ||
                     !strcmp(name, "composer") ||
                     !strcmp(name, "genre") ||
