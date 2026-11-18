@@ -16,6 +16,24 @@
       "message": "aston, astonc, audi, avalon, etc... all of these devices have media_profiles.xml on odm/etc/camera path. WeChat reportedly crashed on audi device since it didn\u0027t read this path.",
       "revId": "fe5ea0e3e45a7a611e71b5f4c9af5e47ab9ecccf",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "5433584d_1a8ce3c4",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 35825
+      },
+      "writtenOn": "2026-11-18T13:43:39Z",
+      "side": 1,
+      "message": "https://github.com/LineageOS/android_device_oneplus_sm8650-common/blob/e84caeb25a6fc45a458558a23c1927b1c3c03c8c/proprietary-files.txt#L372\n\nwe already have odm media profile copied to soc specific path for audi/avalon on 23.2 (they are shipping 23.2 rn)\n\nwith 24.0, those are moved to target tree : https://review.lineageos.org/c/LineageOS/android_device_oneplus_sm8650-common/+/511901",
+      "parentUuid": "505247e3_e632f5ce",
+      "revId": "fe5ea0e3e45a7a611e71b5f4c9af5e47ab9ecccf",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
