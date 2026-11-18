@@ -44,8 +44,8 @@ namespace android {
 namespace /* unnamed */ {
 
 // Returns a list of possible paths for the media_profiles XML file.
-std::array<char const*, 5> const& getXmlPaths() {
-    static std::array<std::string const, 5> const paths =
+std::array<char const*, 6> const& getXmlPaths() {
+    static std::array<std::string const, 6> const paths =
         []() -> decltype(paths) {
             // Directories for XML file that will be searched (in this order).
             constexpr std::array<char const*, 4> searchDirs = {
@@ -67,17 +67,19 @@ std::array<char const*, 5> const& getXmlPaths() {
 
             return { searchDirs[0] + fileName,
                      searchDirs[1] + fileName,
+                     "odm/etc/camera/media_profiles.xml",
                      searchDirs[2] + fileName,
                      searchDirs[3] + fileName,
                      "system/etc/media_profiles.xml" // System fallback
                    };
         }();
-    static std::array<char const*, 5> const cPaths = {
+    static std::array<char const*, 6> const cPaths = {
             paths[0].data(),
             paths[1].data(),
             paths[2].data(),
             paths[3].data(),
-            paths[4].data()
+            paths[4].data(),
+            paths[5].data()
         };
     return cPaths;
 }
