@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "505247e3_e632f5ce",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 6360
+      },
+      "writtenOn": "2026-11-18T13:19:25Z",
+      "side": 1,
+      "message": "aston, astonc, audi, avalon, etc... all of these devices have media_profiles.xml on odm/etc/camera path. WeChat reportedly crashed on audi device since it didn\u0027t read this path.",
+      "revId": "fe5ea0e3e45a7a611e71b5f4c9af5e47ab9ecccf",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
