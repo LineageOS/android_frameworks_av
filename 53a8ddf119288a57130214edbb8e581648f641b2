@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "6ecd501d_15e58f2c",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 23878
+      },
+      "writtenOn": "2026-11-21T04:41:57Z",
+      "side": 1,
+      "message": "Controlled test: silent MP3s with UTF-8 (encoding 3) ID3v2.4 tags,\npushed to /sdcard/Music and scanned with MediaProvider:\n\n  \"Miejsce przyjęcie\"     -\u003e \"Miejsce przyjęcie\"     (no longer \"przyjÄ™cie\")\n  \"Příliš žluťoučký kůň\"  -\u003e \"Příliš žluťoučký kůň\"\n  \"Schöne Grüße\"          -\u003e \"Schöne Grüße\"\n\nExisting library: 1300 tracks, 81 with non-ASCII tags (mostly short\naccented Latin, e.g. \"Maïtika\", \"Conexión\", \"Sinéad\"), and no\nmojibake in any title/artist/album.",
+      "revId": "53a8ddf119288a57130214edbb8e581648f641b2",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
