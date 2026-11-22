@@ -52,7 +52,11 @@ size_t MediaCodecBuffer::offset() const {
 }
 
 status_t MediaCodecBuffer::setRange(size_t offset, size_t size) {
-    return mBuffer->setRangeWithStatus(offset, size);
+    if (offset > mBuffer->capacity() || size > mBuffer->capacity() - offset) {
+        return BAD_VALUE;
+    }
+    mBuffer->setRange(offset, size);
+    return OK;
 }
 
 sp<AMessage> MediaCodecBuffer::meta() {
