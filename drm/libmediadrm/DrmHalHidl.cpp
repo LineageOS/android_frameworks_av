@@ -40,6 +40,7 @@
 #include <mediadrm/IDrmMetricsConsumer.h>
 #include <utils/Log.h>
 
+#include <strings.h>
 #include <iomanip>
 #include <vector>
 
@@ -93,6 +94,10 @@ std::string toBase64StringNoPad(const T* data, size_t size) {
     }
 
     return std::string(outputString.c_str(), outputString.size());
+}
+
+bool isVideoMime(const char* mime) {
+    return mime != nullptr && strncasecmp(mime, "video/", 6) == 0;
 }
 
 }  // anonymous namespace
@@ -1481,8 +1486,19 @@ std::string DrmHalHidl::reportPluginMetrics() const {
 
 DrmStatus DrmHalHidl::requiresSecureDecoder(const char* mime, bool* required) const {
     Mutex::Autolock autoLock(mLock);
+    INIT_CHECK();
     if (mPluginV1_4 == NULL) {
-        return DrmStatus(false);
+        if (required) {
+            *required = false;
+            if (isVideoMime(mime)) {
+                String8 securityLevel;
+                if (getPropertyStringInternal(String8("securityLevel"), securityLevel) == OK &&
+                    securityLevel == "L1") {
+                    *required = true;
+                }
+            }
+        }
+        return DrmStatus(OK);
     }
     auto hResult = mPluginV1_4->requiresSecureDecoderDefault(hidl_string(mime));
     if (!hResult.isOk()) {
@@ -1499,8 +1515,24 @@ DrmStatus DrmHalHidl::requiresSecureDecoder(const char* mime,
                                             DrmPlugin::SecurityLevel securityLevel,
                                             bool* required) const {
     Mutex::Autolock autoLock(mLock);
+    INIT_CHECK();
     if (mPluginV1_4 == NULL) {
-        return DrmStatus(false);
+        if (required) {
+            *required = false;
+            if (isVideoMime(mime)) {
+                if (securityLevel == DrmPlugin::kSecurityLevelMax) {
+                    String8 level;
+                    if (getPropertyStringInternal(String8("securityLevel"), level) == OK &&
+                        level == "L1") {
+                        *required = true;
+                    }
+                } else if (securityLevel == DrmPlugin::kSecurityLevelHwSecureDecode ||
+                           securityLevel == DrmPlugin::kSecurityLevelHwSecureAll) {
+                    *required = true;
+                }
+            }
+        }
+        return DrmStatus(OK);
     }
     auto hLevel = toHidlSecurityLevel(securityLevel);
     auto hResult = mPluginV1_4->requiresSecureDecoder(hidl_string(mime), hLevel);
