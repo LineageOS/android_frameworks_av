@@ -476,6 +476,13 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                 (getForceUse(AUDIO_POLICY_FORCE_FOR_DOCK) == AUDIO_POLICY_FORCE_ANALOG_DOCK)) {
             devices2 = availableOutputDevices.getDevicesFromType(
                     AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET);
+            // Analog dock audio accessories (e.g. Moto Mods speakers) are loudspeakers, and
+            // audio HALs supporting them may reject the dock + speaker combination (Motorola's
+            // does): play ringtones, alarms and other sonification sounds on the dock alone.
+            if (!devices2.isEmpty() && ((strategy == STRATEGY_SONIFICATION)
+                    || (strategy == STRATEGY_ENFORCED_AUDIBLE))) {
+                devices.remove(devices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER));
+            }
         }
 
         if ((devices2.isEmpty()) && (strategy != STRATEGY_SONIFICATION)) {
