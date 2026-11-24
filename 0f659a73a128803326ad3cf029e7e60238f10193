@@ -16,6 +16,24 @@
       "message": "@pierre.augustin@gmail.com need V+1 vote as well on all these - implies \"it works\".",
       "revId": "0f659a73a128803326ad3cf029e7e60238f10193",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "b0485bbb_ad7045a1",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 38178
+      },
+      "writtenOn": "2026-11-24T19:01:24Z",
+      "side": 1,
+      "message": "@johnsonnolen@gmail.com Could you please provide me with a test build with all the changes just to make sur this one works as expected once cimpsince I don\u0027t have a build environnement at my disposal.",
+      "parentUuid": "939eee16_56d82671",
+      "revId": "0f659a73a128803326ad3cf029e7e60238f10193",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
