@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "1ca32402_62a3cc36",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32620
+      },
+      "writtenOn": "2026-11-24T19:11:29Z",
+      "side": 1,
+      "message": "Tested together with 514802 on the Amazon Fire HD 8 2022 and works fine too.",
+      "revId": "036c9beaea12048e89cd249928d7b2dde05e1cd4",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
