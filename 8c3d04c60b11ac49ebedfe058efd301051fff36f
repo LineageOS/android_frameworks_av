@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "f006feac_cdb0f0cb",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 32620
+      },
+      "writtenOn": "2026-11-24T19:11:01Z",
+      "side": 1,
+      "message": "Fixes L1 secure playback on the Amazon Fire HD 8 2022",
+      "revId": "8c3d04c60b11ac49ebedfe058efd301051fff36f",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
