@@ -70,6 +70,24 @@
       "parentUuid": "d33e69dd_6f04a706",
       "revId": "0f659a73a128803326ad3cf029e7e60238f10193",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "3451a20d_64066a9a",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 16185
+      },
+      "writtenOn": "2026-11-25T06:29:28Z",
+      "side": 1,
+      "message": "also, to clarify, only media should play over the speaker yes? The rest over internal speaker? That\u0027s the behavior I see on Nash and Messi with this topic + the Beckham change picked and adapted.\n\nIf that\u0027s the intention, works great here.",
+      "parentUuid": "1c48b703_ebea7357",
+      "revId": "0f659a73a128803326ad3cf029e7e60238f10193",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
