@@ -88,6 +88,24 @@
       "parentUuid": "1c48b703_ebea7357",
       "revId": "0f659a73a128803326ad3cf029e7e60238f10193",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "006d1c0c_8613dae4",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 3
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 38178
+      },
+      "writtenOn": "2026-11-27T11:22:54Z",
+      "side": 1,
+      "message": "Thanks for the build. Tested 20261124 on beckham after a clean wipe: media, alarms, timers and incoming call ringtones play on the mod; earpiece calls stay on the phone, and speakerphone switches to the mod (mod voice speaker calibration). No more \"Invalid combo device(0x802)\" errors. V+1 on the whole topic.\n\nTo answer your question: the intent is to reproduce stock behavior that I checked on a Z2 Play I have laying around. Everything that would play on the loudspeaker goes to the mod when it is attached, including ringtones and alarms. That\u0027s what Motorola\u0027s stock ROM does. On beckham, without 514871, ringtones and alarms are silent altogether, because the HAL rejects the speaker + dock combo.",
+      "parentUuid": "3451a20d_64066a9a",
+      "revId": "0f659a73a128803326ad3cf029e7e60238f10193",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
